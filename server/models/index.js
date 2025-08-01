@@ -1,0 +1,9 @@
+require("./User");
+require("./Investor");
+require("./PropertyOwner");
+require("./LocalRepresentative");
+require("./Admin");
+require("./Property");
+require("./Investment");
+require("./Notification");
+require("./RentalPayment");

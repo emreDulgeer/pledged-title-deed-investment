@@ -1,0 +1,12 @@
+# node modules
+**/node_modules
+
+# dotenv
+*.env
+
+# Mongo dump
+db/dumps/
+
+# system files
+.DS_Store
+Thumbs.db

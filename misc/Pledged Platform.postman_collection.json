@@ -1,0 +1,1882 @@
+{
+	"info": {
+		"_postman_id": "9a4ac77f-d2ae-4b36-96b2-a7014668b4ef",
+		"name": "Pledged Platform",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "23620503"
+	},
+	"item": [
+		{
+			"name": "Investments",
+			"item": [
+				{
+					"name": "Investor - Send Investment Offer",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+									"let json = pm.response.json();",
+									"pm.test('Offer sent', function() { pm.expect(json.data.status).to.eql('offer_sent'); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "role",
+								"value": "investor",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"amountInvested\": 200000\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/investments/property/:propertyId/offer",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								"property",
+								":propertyId",
+								"offer"
+							],
+							"variable": [
+								{
+									"key": "propertyId",
+									"value": "{{propertyId}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Investor - My Investments (Paginate/Filtre/Sıralama)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Has pagination', function() { pm.expect(json).to.have.property('pagination'); });",
+									"pm.test('Investments array', function () { pm.expect(Array.isArray(json.data)).to.be.true; });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "investor",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/investments/my?sortBy=createdAt&sortOrder=desc&page=1&limit=5",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								"my"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "active",
+									"disabled": true
+								},
+								{
+									"key": "sortBy",
+									"value": "createdAt"
+								},
+								{
+									"key": "sortOrder",
+									"value": "desc"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "5"
+								},
+								{
+									"key": "country",
+									"value": "Spain",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Investor/Owner/Admin/Rep - Get Investment Detail",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Investment detail exists', function() { pm.expect(json.data).to.have.property('property'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "investor",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/investments/:id",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "688c1644d57fb738557d3889"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Owner - Accept Offer",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Offer accepted', function() { pm.expect(json.data.status).to.eql('contract_signed'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/investments/:id/accept",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								":id",
+								"accept"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "688c1644d57fb738557d3889"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Owner - Reject Offer",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Offer rejected', function() { pm.expect(json.message).to.include('rejected'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/investments/:id/reject",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								":id",
+								"reject"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "688c1644d57fb738557d3889"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Owner - Make Rental Payment",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Rental paid', function() { pm.expect(json.message).to.include('Rental payment marked as paid'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"month\": \"2025-08\",\n  \"paymentReceipt\": \"string\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/investments/:id/payment",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								":id",
+								"payment"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "688c1644d57fb738557d3889"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Owner/Admin - Get Property Investments",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Investments array', function () { pm.expect(Array.isArray(json.data)).to.be.true; });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/investments/property/:propertyId",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								"property",
+								":propertyId"
+							],
+							"variable": [
+								{
+									"key": "propertyId",
+									"value": "688c1644d57fb738557d3887"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Investor/Owner/Admin - Upload Contract",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "role",
+								"value": "investor",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"contractFile\": \"contract-file-path.pdf\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/investments/:id/contract",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								":id",
+								"contract"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "688c1644d57fb738557d3889"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Owner/Rep/Admin - Upload Title Deed",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"titleDeedDocument\": \"deed-file-path.pdf\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/investments/:id/title-deed",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								":id",
+								"title-deed"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "688c1644d57fb738557d3889"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin - List All Investments (Paginate/Filtre/Sıralama)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Has pagination', function() { pm.expect(json).to.have.property('pagination'); });",
+									"pm.test('Investments array', function () { pm.expect(Array.isArray(json.data)).to.be.true; });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "admin",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/investments?status=active&page=1&limit=5&sortBy=createdAt",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "active"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "5"
+								},
+								{
+									"key": "sortBy",
+									"value": "createdAt"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin - Assign Local Representative",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "role",
+								"value": "admin",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"representativeId\": \"688c1644d57fb738557d3899\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/investments/:id/assign-representative",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								":id",
+								"assign-representative"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "688c1644d57fb738557d3889"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin/Owner - Process Refund",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"amount\": 70000\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/investments/:id/refund",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								":id",
+								"refund"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "688c1644d57fb738557d3889"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin - Transfer Property",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "role",
+								"value": "admin",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"method\": \"market_sale\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/investments/:id/transfer",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								":id",
+								"transfer"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "688c1644d57fb738557d3889"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Investor/Owner - Request Local Representative",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "role",
+								"value": "investor",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/investments/:id/request-representative",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								":id",
+								"request-representative"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "688c1644d57fb738557d3889"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Owner - Get My Rental Payments (Paginate/Filtre/Sıralama)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Rental payment list paginated', function() { pm.expect(json).to.have.property('pagination'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/investments/rental-payments/owner?status=paid&page=1&limit=5",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								"rental-payments",
+								"owner"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "paid"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "5"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Investor - Get My Rental Income (Paginate/Filtre/Sıralama)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Rental income paginated', function() { pm.expect(json).to.have.property('pagination'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "investor",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/investments/rental-payments/investor?status=paid&page=1&limit=5",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								"rental-payments",
+								"investor"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "paid"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "5"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin/Rep - Upcoming Rental Payments",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "admin",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/investments/reports/upcoming-payments?days=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								"reports",
+								"upcoming-payments"
+							],
+							"query": [
+								{
+									"key": "days",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin/Rep - Delayed Rental Payments",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "admin",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/investments/reports/delayed-payments",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								"reports",
+								"delayed-payments"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin/Owner/Investor - Investment Statistics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "investor",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/investments/:id/statistics",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"investments",
+								":id",
+								"statistics"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "688c1644d57fb738557d3889"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Properties",
+			"item": [
+				{
+					"name": "List - Public Properties (Filtre/Sıralama/Paginate)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Response has pagination', function() { pm.expect(json).to.have.property('pagination'); });",
+									"pm.test('Data is array', function () { pm.expect(Array.isArray(json.data)).to.be.true; });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "investor",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/properties?page=1&limit=5",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties"
+							],
+							"query": [
+								{
+									"key": "country",
+									"value": "Portugal",
+									"disabled": true
+								},
+								{
+									"key": "city",
+									"value": "Lisbon",
+									"disabled": true
+								},
+								{
+									"key": "propertyType",
+									"value": "apartment",
+									"disabled": true
+								},
+								{
+									"key": "annualYieldPercentMin",
+									"value": "5",
+									"disabled": true
+								},
+								{
+									"key": "requestedInvestmentMax",
+									"value": "100000",
+									"disabled": true
+								},
+								{
+									"key": "sortBy",
+									"value": "annualYieldPercent",
+									"disabled": true
+								},
+								{
+									"key": "sortOrder",
+									"value": "desc",
+									"disabled": true
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "5"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Property Detail (Public)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Has property details', function() { pm.expect(json.data).to.have.property('country'); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "investor",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/properties/:id",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{propertyId}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Property (Owner)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+									"let json = pm.response.json();",
+									"pm.test('Created property has status draft', function() { pm.expect(json.data.status).to.eql('draft'); });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"country\": \"Portugal\",\n  \"city\": \"Lisbon\",\n  \"fullAddress\": \"Av. Liberdade, 100\",\n  \"propertyType\": \"apartment\",\n  \"size\": 120,\n  \"rooms\": 3,\n  \"estimatedValue\": 300000,\n  \"requestedInvestment\": 70000,\n  \"rentOffered\": 700,\n  \"contractPeriodMonths\": 36,\n  \"images\": [],\n  \"documents\": []\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/properties",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Property (Owner)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Updated property has new value', function() { pm.expect(json.data.rooms).to.eql(4); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"description\": \"Kiralık, manzaralı, çok merkezi!\",\n  \"rooms\": 4\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/properties/:id",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "688c1644d57fb738557d3887"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Property (Owner)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Delete message', function() { pm.expect(json.message).to.include('deleted'); });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/properties/:id",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "My Properties (Owner - Paginate/Filtre/Sıralama)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Owner's property list paginated', function() { pm.expect(json).to.have.property('pagination'); });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/properties/my/properties?status=published&sortBy=createdAt&sortOrder=desc&page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								"my",
+								"properties"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "published"
+								},
+								{
+									"key": "sortBy",
+									"value": "createdAt"
+								},
+								{
+									"key": "sortOrder",
+									"value": "desc"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Property Detail (Owner - AdminNotes)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/properties/my/properties/:id",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								"my",
+								"properties",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Property Statistics (Owner)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/properties/:id/statistics",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								":id",
+								"statistics"
+							],
+							"variable": [
+								{
+									"key": "id"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "All Property Statistics (Owner)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/properties/my/statistics",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								"my",
+								"statistics"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Feature Property (Owner)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "role",
+								"value": "property_owner",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"duration\": 2\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/properties/:id/feature",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								":id",
+								"feature"
+							],
+							"variable": [
+								{
+									"key": "id"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Featured Properties",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "investor",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/properties/featured?page=1&limit=5",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								"featured"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "5"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Properties for Map",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "investor",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/properties/map?country=Portugal&city=Lisbon",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								"map"
+							],
+							"query": [
+								{
+									"key": "country",
+									"value": "Portugal"
+								},
+								{
+									"key": "city",
+									"value": "Lisbon"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Favorite/Unfavorite Property (Investor)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "role",
+								"value": "investor",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/properties/:id/favorite",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								":id",
+								"favorite"
+							],
+							"variable": [
+								{
+									"key": "id"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "My Favorite Properties (Investor)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "investor",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/properties/my/favorites",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								"my",
+								"favorites"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin - List All Properties",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "role",
+								"value": "admin",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/properties/admin/all?status=published&page=1&limit=10&sortBy=createdAt",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								"admin",
+								"all"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "published"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "sortBy",
+									"value": "createdAt"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin - Update Property Status",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "role",
+								"value": "admin",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"published\",\n  \"reviewNotes\": \"Looks good, approved.\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/properties/:id/status",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								":id",
+								"status"
+							],
+							"variable": [
+								{
+									"key": "id"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin - Flag Property",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "role",
+								"value": "admin",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"issues\": [\"Invalid address\"],\n  \"action\": \"add\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/properties/:id/flag",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"properties",
+								":id",
+								"flag"
+							],
+							"variable": [
+								{
+									"key": "id"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Notifications",
+			"item": [
+				{
+					"name": "Get My Notifications (Filtre, Sıralama, Paginate)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Data is array', function () { pm.expect(Array.isArray(json.data)).to.be.true; });",
+									"pm.test('Notification fields', function() { if(json.data.length > 0) pm.expect(json.data[0]).to.have.property('title'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/notifications/my?type=rent_payment_received&unreadOnly=false&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"notifications",
+								"my"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "rent_payment_received"
+								},
+								{
+									"key": "unreadOnly",
+									"value": "false"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Notifications (Only Unread)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Data is array', function () { pm.expect(Array.isArray(json.data)).to.be.true; });",
+									"pm.test('Unread only', function() { if(json.data.length > 0) pm.expect(json.data[0].isRead).to.eql(false); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/notifications/my?unreadOnly=true&limit=5",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"notifications",
+								"my"
+							],
+							"query": [
+								{
+									"key": "unreadOnly",
+									"value": "true"
+								},
+								{
+									"key": "limit",
+									"value": "5"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Notifications (Farklı Type ve Limit ile)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/notifications/my?type=offer_accepted&limit=3",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"notifications",
+								"my"
+							],
+							"query": [
+								{
+									"key": "type",
+									"value": "offer_accepted"
+								},
+								{
+									"key": "limit",
+									"value": "3"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Unread Notification Count",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Has unreadCount', function() { pm.expect(json.data).to.have.property('unreadCount'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/notifications/my/unread-count",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"notifications",
+								"my",
+								"unread-count"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Notification As Read",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Marked as read', function() { pm.expect(json.message).to.include('marked as read'); });"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/notifications/:id/read",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"notifications",
+								":id",
+								"read"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{notificationId}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark All Notifications As Read",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('All marked as read', function() { pm.expect(json.message).to.include('All notifications marked as read'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/notifications/mark-all-read",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"notifications",
+								"mark-all-read"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin - Send Bulk Notification (role veya ülkeye)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('Bulk notification sent', function() { pm.expect(json.data).to.have.property('recipientCount'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"filters\": { \"role\": \"investor\", \"country\": \"Turkey\" },\n  \"notification\": {\n    \"type\": \"system_announcement\",\n    \"title\": \"Test Bulk\",\n    \"message\": \"Bu bir test bulk notification'dır.\",\n    \"priority\": \"medium\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/notifications/bulk",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"notifications",
+								"bulk"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Admin - Send System Notification (Everyone)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+									"let json = pm.response.json();",
+									"pm.test('System notification sent', function() { pm.expect(json.data).to.have.property('recipientCount'); });"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"System Outage\",\n  \"message\": \"Scheduled maintenance on Sunday.\",\n  \"priority\": \"high\",\n  \"type\": \"system_maintenance\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/notifications/system",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"notifications",
+								"system"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000/api/v1",
+			"type": "string"
+		},
+		{
+			"key": "propertyId",
+			"value": "688c1644d57fb738557d3887",
+			"type": "string"
+		}
+	]
+}
