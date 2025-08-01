@@ -18,11 +18,7 @@ Tüm endpoint’ler Postman Collection içinde tanımlı:
 Klasör Yapısı
 server/ → Backend (Express + Mongo + Docker)
 
-seed/ → Örnek kullanıcılar, mülkler, yatırımlar
-
-db/dumps/ → Mongorestore için dump klasörü (push'lanmadı)
-
-misc/ → Postman Collection ve diğer yardımcı dosyalar
+misc/ → Postman Collection 
 
 ## Kullanılan Teknolojiler
 Node.js (Express)
