@@ -30,10 +30,10 @@ Docker + Docker Compose
 Role-based auth (FakeAuth middleware şimdilik authentication yazılmadığı için fakeAuth middleware kullanıyoruz)
 ## Ortam Değişkenleri (.env)
 ```env
-PORT=5000
-MONGO_URI=mongodb://localhost:27017/pledged_platform
-JWT_SECRET=change_me
-NODE_ENV=development
+PORT=Port
+MONGO_URI=URL
+JWT_SECRET=JWT Secret
+NODE_ENV=Env
 ```
 
 ## Postman Variables
