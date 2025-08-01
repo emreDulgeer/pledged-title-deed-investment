@@ -1,6 +1,6 @@
-# Pledged Title Deed Investment Platform (Backend)
+# Pledged Title Deed Investment Platform 
 
-Backend API for pledged property investment platform.
+Pledged property investment platform.
 
 ## 🚀 Başlatmak için
 
