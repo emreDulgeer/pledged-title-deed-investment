@@ -31,7 +31,7 @@ MongoDB (Mongoose)
 
 Docker + Docker Compose
 
-Role-based auth (FakeAuth middleware)
+Role-based auth (FakeAuth middleware şimdilik authentication yazılmadığı için fakeAuth middleware kullanıyoruz)
 ## Ortam Değişkenleri (.env)
 ```env
 PORT=5000
