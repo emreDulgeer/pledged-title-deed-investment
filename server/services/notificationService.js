@@ -1,5 +1,5 @@
 // server/services/notificationService.js
-
+const User = require("../models/User");
 const NotificationRepository = require("../repositories/notificationRepository");
 const {
   toNotificationDto,
@@ -233,6 +233,18 @@ class NotificationService {
         },
       ],
     });
+  }
+  async notifyAdminsNewUserRegistration(user) {
+    const admins = await User.find({ role: "admin" });
+
+    for (const admin of admins) {
+      await this.createNotification(admin._id, "admin", {
+        type: "user_registration",
+        title: "Yeni Kullanıcı Kaydı",
+        message: `${user.fullName} (${user.email}) adlı kullanıcı sisteme kayıt oldu.`,
+        priority: "medium",
+      });
+    }
   }
 
   // Kullanıcının bildirimlerini getir

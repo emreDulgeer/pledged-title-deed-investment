@@ -26,53 +26,60 @@ class PaginationHelper {
     return { [safeSortBy]: safeSortOrder };
   }
 
-  static getFilterParams(query, allowedFilters = {}) {
+  static getFilterParams(query = {}, allowedFilters = {}) {
     const filters = {};
 
     Object.keys(allowedFilters).forEach((key) => {
       const filterType = allowedFilters[key];
 
-      switch (filterType) {
-        case "numberRange": {
-          const minKey = `${key}Min`;
-          const maxKey = `${key}Max`;
-          if (query[minKey] !== undefined || query[maxKey] !== undefined) {
-            filters[key] = {};
-            if (query[minKey] !== undefined) {
-              filters[key].$gte = Number(query[minKey]);
-            }
-            if (query[maxKey] !== undefined) {
-              filters[key].$lte = Number(query[maxKey]);
-            }
+      // Nested property kontrolü (property.country gibi)
+      if (key.includes(".")) {
+        const value = query[key];
+        if (value !== undefined && value !== null && value !== "") {
+          switch (filterType) {
+            case "exact":
+              filters[key] = value;
+              break;
+            case "contains":
+              filters[key] = { $regex: value, $options: "i" };
+              break;
+            case "numberRange":
+              const min = query[`${key}Min`];
+              const max = query[`${key}Max`];
+              if (min !== undefined || max !== undefined) {
+                filters[key] = {};
+                if (min !== undefined) filters[key].$gte = Number(min);
+                if (max !== undefined) filters[key].$lte = Number(max);
+              }
+              break;
           }
-          break;
         }
-
-        default: {
-          if (query[key] !== undefined && query[key] !== "") {
+      } else {
+        // Mevcut filtreleme mantığı
+        if (Object.prototype.hasOwnProperty.call(query, key)) {
+          const value = query[key];
+          if (value !== undefined && value !== null && value !== "") {
             switch (filterType) {
               case "exact":
-                filters[key] = query[key];
+                filters[key] = value;
                 break;
-
               case "contains":
-                filters[key] = { $regex: query[key], $options: "i" };
+                filters[key] = { $regex: value, $options: "i" };
                 break;
-
-              case "number":
-                filters[key] = Number(query[key]);
-                break;
-
-              case "boolean":
-                filters[key] = query[key] === "true";
-                break;
-
-              case "array":
+              case "in":
                 filters[key] = {
                   $in: Array.isArray(query[key]) ? query[key] : [query[key]],
                 };
                 break;
-
+              case "numberRange":
+                const min = query[`${key}Min`];
+                const max = query[`${key}Max`];
+                if (min !== undefined || max !== undefined) {
+                  filters[key] = {};
+                  if (min !== undefined) filters[key].$gte = Number(min);
+                  if (max !== undefined) filters[key].$lte = Number(max);
+                }
+                break;
               case "dateRange":
                 const start = query[`${key}Start`];
                 const end = query[`${key}End`];
@@ -166,7 +173,7 @@ const investmentFilters = {
   currency: "exact",
   amountInvested: "numberRange",
   createdAt: "dateRange",
-  // Property filters through populate
+  // Property filters through populate - nested filter desteği
   "property.country": "exact",
   "property.city": "contains",
   "property.propertyType": "exact",

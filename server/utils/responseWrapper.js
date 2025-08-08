@@ -76,6 +76,10 @@ const responseWrapper = {
     const response = new ErrorResponse(message, 404);
     return res.status(404).json(response);
   },
+  conflict: (res, message = "Conflict") => {
+    const response = new ErrorResponse(message, 409);
+    return res.status(409).json(response);
+  },
 
   paginated: (
     res,

@@ -266,12 +266,13 @@ class InvestmentController {
   };
 
   // Investor'ın yatırımlarını getir
+  // getMyInvestments metodunu güncelle
   getMyInvestments = async (req, res) => {
     try {
       const investorId = req.user.id;
       const result = await this.investmentService.getInvestorInvestments(
         investorId,
-        req.query
+        req.query // Direkt query'yi gönder, service'de işleyeceğiz
       );
 
       return responseWrapper.paginated(

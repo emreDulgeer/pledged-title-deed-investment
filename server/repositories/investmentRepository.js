@@ -2,6 +2,7 @@
 
 const Investment = require("../models/Investment");
 const BaseRepository = require("./baseRepository");
+const { PaginationHelper } = require("../utils/paginationHelper");
 
 class InvestmentRepository extends BaseRepository {
   constructor() {
@@ -238,6 +239,99 @@ class InvestmentRepository extends BaseRepository {
       .find(query)
       .populate("property propertyOwner")
       .sort({ createdAt: -1 });
+  }
+  async paginate(query = {}, options = {}) {
+    const {
+      populate = "",
+      select = "",
+      allowedFilters = {},
+      allowedSortFields = [],
+      customFilters = {},
+    } = options;
+
+    const { page, limit, skip } = PaginationHelper.getPaginationParams(query);
+    const sort = PaginationHelper.getSortParams(query, allowedSortFields);
+
+    // Filtreleri al
+    const queryFilters = PaginationHelper.getFilterParams(
+      query,
+      allowedFilters
+    );
+
+    // Property filtrelerini ayır
+    const propertyFilters = {};
+    const directFilters = {};
+
+    Object.keys(queryFilters).forEach((key) => {
+      if (key.startsWith("property.")) {
+        // property.country -> country olarak dönüştür
+        const propertyField = key.replace("property.", "");
+        propertyFilters[propertyField] = queryFilters[key];
+      } else {
+        directFilters[key] = queryFilters[key];
+      }
+    });
+
+    // Önce property'leri filtrele
+    let propertyIds = [];
+    if (Object.keys(propertyFilters).length > 0) {
+      const Property = require("../models/Property");
+      const properties = await Property.find(propertyFilters).select("_id");
+      propertyIds = properties.map((p) => p._id);
+
+      // Eğer hiç property bulunamadıysa, boş döndür
+      if (propertyIds.length === 0) {
+        return {
+          data: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            totalPages: 0,
+            hasNext: false,
+            hasPrev: false,
+          },
+        };
+      }
+    }
+
+    // Final filtreleri birleştir
+    const finalFilters = { ...directFilters, ...customFilters };
+
+    // Property filtreleri varsa, property ID'leri ile filtrele
+    if (propertyIds.length > 0) {
+      finalFilters.property = { $in: propertyIds };
+    }
+
+    const total = await this.model.countDocuments(finalFilters);
+
+    let queryBuilder = this.model
+      .find(finalFilters)
+      .sort(sort)
+      .skip(skip)
+      .limit(limit);
+
+    if (populate) {
+      queryBuilder = queryBuilder.populate(populate);
+    }
+
+    if (select) {
+      queryBuilder = queryBuilder.select(select);
+    }
+
+    const data = await queryBuilder;
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1,
+      },
+    };
   }
 }
 

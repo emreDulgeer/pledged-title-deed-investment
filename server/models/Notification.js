@@ -46,6 +46,13 @@ const NotificationSchema = new mongoose.Schema(
         "system_maintenance",
         "new_feature",
         "general_announcement",
+
+        // Admin notifications
+        "user_registration",
+        "account_activated",
+        "membership_upgraded",
+        "user_reported",
+        "user_deleted",
       ],
     },
     title: {

@@ -147,8 +147,11 @@ class InvestmentService {
       throw new Error("Investment not found");
     }
 
+    // Status kontrolü - "offer_sent" olmalı, "pending" değil!
     if (investment.status !== "offer_sent") {
-      throw new Error("Offer is not in pending state");
+      throw new Error(
+        `Cannot accept offer. Current status is: ${investment.status}. Offer must be in 'offer_sent' status to be accepted.`
+      );
     }
 
     // Property owner kontrolü
@@ -161,7 +164,7 @@ class InvestmentService {
       status: "in_contract",
     });
 
-    // Investment durumunu güncelle
+    // Investment durumunu güncelle - bir sonraki aşama "contract_signed"
     const updatedInvestment = await this.investmentRepository.update(
       investmentId,
       {
@@ -197,8 +200,11 @@ class InvestmentService {
       throw new Error("Investment not found");
     }
 
+    // Status kontrolü - "offer_sent" olmalı
     if (investment.status !== "offer_sent") {
-      throw new Error("Offer is not in pending state");
+      throw new Error(
+        `Cannot reject offer. Current status is: ${investment.status}. Offer must be in 'offer_sent' status to be rejected.`
+      );
     }
 
     // Property owner kontrolü
@@ -592,6 +598,23 @@ class InvestmentService {
 
   // Investor'ın yatırımlarını getir
   async getInvestorInvestments(investorId, queryParams) {
+    // Property filtreleri için query'yi dönüştür
+    const transformedQuery = { ...queryParams };
+
+    // Property alanlarını dönüştür
+    if (queryParams.country) {
+      transformedQuery["property.country"] = queryParams.country;
+      delete transformedQuery.country;
+    }
+    if (queryParams.city) {
+      transformedQuery["property.city"] = queryParams.city;
+      delete transformedQuery.city;
+    }
+    if (queryParams.propertyType) {
+      transformedQuery["property.propertyType"] = queryParams.propertyType;
+      delete transformedQuery.propertyType;
+    }
+
     const options = {
       populate: "property",
       allowedFilters: investmentFilters,
@@ -600,9 +623,10 @@ class InvestmentService {
     };
 
     const result = await this.investmentRepository.paginate(
-      queryParams,
+      transformedQuery, // Dönüştürülmüş query'yi kullan
       options
     );
+
     return {
       data: result.data.map((inv) => toInvestmentListDto(inv)),
       pagination: result.pagination,
@@ -916,6 +940,15 @@ class InvestmentService {
   // Property Owner'ın kira ödemelerini getir
   async getPropertyOwnerRentalPayments(propertyOwnerId, queryParams) {
     const RentalPayment = require("../models/RentalPayment");
+    const Investment = require("../models/Investment");
+
+    // Önce aktif yatırımların ID'lerini al
+    const activeInvestments = await Investment.find({
+      propertyOwner: propertyOwnerId,
+      status: "active", // Sadece aktif yatırımlar
+    }).select("_id");
+
+    const activeInvestmentIds = activeInvestments.map((inv) => inv._id);
 
     const options = {
       populate: "investment property investor",
@@ -926,7 +959,10 @@ class InvestmentService {
         daysDelayed: "numberRange",
       },
       allowedSortFields: ["month", "amount", "status", "paidAt", "dueDate"],
-      customFilters: { propertyOwner: propertyOwnerId },
+      customFilters: {
+        propertyOwner: propertyOwnerId,
+        investment: { $in: activeInvestmentIds }, // Sadece aktif yatırımların ödemeleri
+      },
     };
 
     const result = await new BaseRepository(RentalPayment).paginate(
@@ -974,6 +1010,15 @@ class InvestmentService {
   // Investor'ın kira ödemelerini getir
   async getInvestorRentalPayments(investorId, queryParams) {
     const RentalPayment = require("../models/RentalPayment");
+    const Investment = require("../models/Investment");
+
+    // Önce aktif yatırımların ID'lerini al
+    const activeInvestments = await Investment.find({
+      investor: investorId,
+      status: "active", // Sadece aktif yatırımlar
+    }).select("_id");
+
+    const activeInvestmentIds = activeInvestments.map((inv) => inv._id);
 
     const options = {
       populate: "investment property propertyOwner",
@@ -984,7 +1029,10 @@ class InvestmentService {
         daysDelayed: "numberRange",
       },
       allowedSortFields: ["month", "amount", "status", "paidAt", "dueDate"],
-      customFilters: { investor: investorId },
+      customFilters: {
+        investor: investorId,
+        investment: { $in: activeInvestmentIds }, // Sadece aktif yatırımların ödemeleri
+      },
     };
 
     const result = await new BaseRepository(RentalPayment).paginate(
@@ -1029,10 +1077,23 @@ class InvestmentService {
   // Kira ödeme özeti
   async getRentalPaymentSummary(userId, userType) {
     const RentalPayment = require("../models/RentalPayment");
+    const Investment = require("../models/Investment");
+
+    // Önce aktif yatırımları bul
+    const activeInvestmentFilter =
+      userType === "investor"
+        ? { investor: userId, status: "active" }
+        : { propertyOwner: userId, status: "active" };
+
+    const activeInvestments = await Investment.find(
+      activeInvestmentFilter
+    ).select("_id");
+    const activeInvestmentIds = activeInvestments.map((inv) => inv._id);
+
     const filter =
       userType === "investor"
-        ? { investor: userId }
-        : { propertyOwner: userId };
+        ? { investor: userId, investment: { $in: activeInvestmentIds } }
+        : { propertyOwner: userId, investment: { $in: activeInvestmentIds } };
 
     const [total, paid, pending, delayed] = await Promise.all([
       RentalPayment.countDocuments(filter),
