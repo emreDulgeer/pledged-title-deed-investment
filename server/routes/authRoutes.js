@@ -314,13 +314,7 @@ router.post(
 router.post(
   "/account/cancel-deletion",
   auth,
-  authController.cancelAccountDeletion ||
-    ((req, res) => {
-      return responseWrapper.notImplemented(
-        res,
-        "Hesap silme iptali henüz aktif değil"
-      );
-    })
+  authController.cancelAccountDeletion
 );
 
 // Admin: Approve Account Deletion
@@ -649,6 +643,75 @@ router.get(
       return responseWrapper.error(res, "Hata oluştu");
     }
   }
+);
+router.get(
+  "/admin/pending-kyc/:userId",
+  auth,
+  authorize(["admin"]),
+  [param("userId").isMongoId()],
+  validateRequest,
+  authController.getPendingKycUserById
+);
+// ==================== ADMIN ACCOUNT DELETION ROUTES ====================
+
+// Admin: Get Account Deletion Requests (Pagination, Sorting, Filtering destekli)
+router.get(
+  "/admin/account-deletion-requests",
+  auth,
+  authorize(["admin"]),
+  authController.getAccountDeletionRequests
+);
+
+// Admin: Get Account Deletion Request By ID (Detaylı bilgi)
+router.get(
+  "/admin/account-deletion-requests/:requestId",
+  auth,
+  authorize(["admin"]),
+  [param("requestId").isMongoId()],
+  validateRequest,
+  authController.getAccountDeletionRequestById
+);
+// ==================== SECURITY ROUTES ====================
+
+// Get Login History
+router.get("/security/login-history", auth, authController.getLoginHistory);
+
+// Get Active Sessions
+router.get("/security/sessions", auth, authController.getActiveSessions);
+
+// Revoke All Sessions
+router.post(
+  "/security/revoke-all-sessions",
+  auth,
+  rateLimiter.strict,
+  [body("password").notEmpty()],
+  validateRequest,
+  authController.revokeAllSessions
+);
+
+// Get Trusted IPs
+router.get("/security/trusted-ip", auth, authController.getTrustedIPs);
+
+// Add Trusted IP
+router.post(
+  "/security/trusted-ip",
+  auth,
+  rateLimiter.moderate,
+  [
+    body("ip").notEmpty().isIP(),
+    body("name").optional().trim().isLength({ max: 50 }),
+  ],
+  validateRequest,
+  authController.addTrustedIP
+);
+
+// Remove Trusted IP
+router.delete(
+  "/security/trusted-ip/:ip",
+  auth,
+  [param("ip").isIP()],
+  validateRequest,
+  authController.removeTrustedIP
 );
 
 // ==================== OAUTH ROUTES (Future Implementation) ====================

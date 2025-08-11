@@ -65,10 +65,113 @@ const UserSchema = new mongoose.Schema(
       default: "Pending",
     },
     is2FAEnabled: { type: Boolean, default: false },
+    paymentHistory: [
+      {
+        paymentId: String,
+        amount: Number,
+        currency: {
+          type: String,
+          default: "USD",
+        },
+        method: {
+          type: String,
+          enum: ["credit_card", "bank_transfer", "crypto", "paypal", "wise"],
+        },
+        plan: String,
+        type: {
+          type: String,
+          enum: [
+            "membership_activation",
+            "membership_upgrade",
+            "membership_renewal",
+            "service_purchase",
+          ],
+        },
+        status: {
+          type: String,
+          enum: ["pending", "completed", "failed", "refunded"],
+          default: "completed",
+        },
+        date: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+
+    // Trusted IPs
+    trustedIPs: [
+      {
+        ip: {
+          type: String,
+          required: true,
+        },
+        name: {
+          type: String,
+          default: "İsimsiz IP",
+        },
+        addedAt: {
+          type: Date,
+          default: Date.now,
+        },
+        lastUsedAt: Date,
+      },
+    ],
+
+    // Session Management
+    activeSessions: [
+      {
+        tokenId: String,
+        deviceInfo: String,
+        ip: String,
+        location: String,
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+        lastActivityAt: Date,
+      },
+    ],
+
+    // Security Settings
+    securitySettings: {
+      loginNotifications: {
+        type: Boolean,
+        default: true,
+      },
+      unusualActivityAlerts: {
+        type: Boolean,
+        default: true,
+      },
+      requireIPVerification: {
+        type: Boolean,
+        default: false,
+      },
+      sessionTimeout: {
+        type: Number,
+        default: 30, // dakika
+        min: 5,
+        max: 1440,
+      },
+    },
+
+    // Login History (son 100 giriş)
+    loginHistory: [
+      {
+        ip: String,
+        userAgent: String,
+        location: String,
+        success: Boolean,
+        reason: String, // Başarısızsa neden
+        timestamp: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   { timestamps: true }
 );
-UserSchema.index({ email: 1 });
 UserSchema.index({ role: 1 });
 UserSchema.index({ accountStatus: 1 });
 UserSchema.index({ membershipStatus: 1 });
