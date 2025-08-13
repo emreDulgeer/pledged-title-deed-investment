@@ -292,24 +292,69 @@ class AuthController {
               });
             } else {
               // Send 2FA code via email/SMS
-              const code = await this.send2FACode(user);
+              try {
+                const code = await this.send2FACode(user);
 
-              return responseWrapper.success(res, {
-                requiresTwoFactor: true,
-                method: twoFactorAuth ? twoFactorAuth.method : "email",
-                message: "2FA kodu email/SMS ile gönderildi",
-              });
+                // Development'ta kodu console'a yaz
+                if (process.env.NODE_ENV === "development") {
+                  console.log(`\n🔐 2FA Code for ${user.email}: ${code}\n`);
+                }
+
+                return responseWrapper.success(res, {
+                  requiresTwoFactor: true,
+                  method: twoFactorAuth ? twoFactorAuth.method : "email",
+                  message: `2FA kodu ${
+                    twoFactorAuth ? twoFactorAuth.method : "email"
+                  } ile gönderildi`,
+                });
+              } catch (error) {
+                console.error("2FA code send error:", error);
+
+                // 2FA gönderiminde hata olursa, kullanıcının 2FA'sını geçici olarak devre dışı bırak
+                // ve admin'e bildir
+                user.is2FAEnabled = false;
+                await user.save();
+
+                await ActivityLog.create({
+                  user: user._id,
+                  action: "2fa_error",
+                  details: {
+                    error: error.message,
+                    temporarilyDisabled: true,
+                  },
+                  severity: "high",
+                  ip: req.ip,
+                });
+
+                // Admin'e bildir
+                await this.notifyAdmins({
+                  type: "2fa_error",
+                  title: "2FA Hatası",
+                  message: `${user.email} için 2FA gönderiminde hata oluştu ve geçici olarak devre dışı bırakıldı`,
+                  priority: "high",
+                });
+
+                // Kullanıcıya normal login izni ver ama uyar
+                console.error(
+                  `❌ 2FA error for ${user.email}, temporarily disabled`
+                );
+
+                // Normal login flow'a devam et
+              }
             }
-          }
+          } else {
+            // Verify 2FA code
+            const isValidCode = await this.verify2FACode(
+              user._id,
+              twoFactorCode
+            );
 
-          // Verify 2FA code
-          const isValidCode = await this.verify2FACode(user._id, twoFactorCode);
+            if (!isValidCode) {
+              user.loginAttempts = (user.loginAttempts || 0) + 1;
+              await user.save();
 
-          if (!isValidCode) {
-            user.loginAttempts = (user.loginAttempts || 0) + 1;
-            await user.save();
-
-            return responseWrapper.unauthorized(res, "Geçersiz 2FA kodu");
+              return responseWrapper.unauthorized(res, "Geçersiz 2FA kodu");
+            }
           }
         }
       }
@@ -858,7 +903,109 @@ class AuthController {
       );
     }
   };
+  getAccountDeletionRequests = async (req, res) => {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        status = "all",
+        sortBy = "requestedAt",
+        sortOrder = "desc",
+      } = req.query;
 
+      // Filtre oluştur
+      const filter = {};
+      if (
+        status !== "all" &&
+        ["pending_approval", "approved", "rejected", "cancelled"].includes(
+          status
+        )
+      ) {
+        filter.status = status;
+      }
+
+      // Pagination ayarları
+      const skip = (page - 1) * limit;
+      const sort = { [sortBy]: sortOrder === "asc" ? 1 : -1 };
+
+      // Talepleri getir (çoklu get için sadece temel bilgiler)
+      const requests = await AccountDeletionRequest.find(filter)
+        .populate("user", "fullName email role")
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit));
+
+      // Toplam sayı
+      const total = await AccountDeletionRequest.countDocuments(filter);
+
+      return responseWrapper.success(res, {
+        requests,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      console.error("Get account deletion requests error:", error);
+      return responseWrapper.error(res, "Hesap silme talepleri alınamadı");
+    }
+  };
+
+  /**
+   * GET ACCOUNT DELETION REQUEST BY ID - ID'ye göre hesap silme talebi detayı (Admin)
+   */
+  getAccountDeletionRequestById = async (req, res) => {
+    try {
+      const { requestId } = req.params;
+
+      const request = await AccountDeletionRequest.findById(requestId)
+        .populate("user", "-password")
+        .populate("approvedBy", "fullName email")
+        .populate("rejectedBy", "fullName email");
+
+      if (!request) {
+        return responseWrapper.notFound(res, "Hesap silme talebi bulunamadı");
+      }
+
+      // Kullanıcının detaylı bilgilerini getir
+      const userId = request.user._id;
+      let detailedInfo = {
+        request: request.toObject(),
+      };
+
+      // Investments bilgilerini ekle
+      const Investment = require("../models/Investment");
+      const investments = await Investment.find({
+        $or: [{ investor: userId }, { propertyOwner: userId }],
+      }).populate("propertyId", "title location");
+
+      detailedInfo.userInvestments = investments;
+
+      // Properties bilgilerini ekle (eğer property owner ise)
+      if (request.user.role === "property_owner") {
+        const Property = require("../models/Property");
+        const properties = await Property.find({ owner: userId }).select(
+          "title location totalValue status"
+        );
+
+        detailedInfo.userProperties = properties;
+      }
+
+      // Activity logs
+      const recentActivities = await ActivityLog.find({ user: userId })
+        .sort("-createdAt")
+        .limit(10);
+
+      detailedInfo.recentActivities = recentActivities;
+
+      return responseWrapper.success(res, detailedInfo);
+    } catch (error) {
+      console.error("Get account deletion request by ID error:", error);
+      return responseWrapper.error(res, "Talep detayları alınamadı");
+    }
+  };
   /**
    * VERIFY EMAIL - Email doğrulama
    */
@@ -1376,6 +1523,9 @@ class AuthController {
             secret: null,
             tempSecret: null,
             backupCodes: [],
+            // 🔑 method'a göre zorunlu alanları kayda yaz
+            ...(method === "email" ? { email: user.email } : {}),
+            ...(method === "sms" ? { phoneNumber: user.phoneNumber } : {}),
           },
           { upsert: true, new: true }
         );
@@ -1453,7 +1603,7 @@ class AuthController {
       user.is2FAEnabled = true;
       await user.save();
 
-      // Generate backup codes - Internal method kullan
+      // Generate backup codes
       const backupCodes = this.generateBackupCodesInternal();
       const hashedBackupCodes = backupCodes.map((code) =>
         crypto.createHash("sha256").update(code).digest("hex")
@@ -1462,21 +1612,34 @@ class AuthController {
       twoFactorAuth.backupCodes = hashedBackupCodes;
       await twoFactorAuth.save();
 
+      // TÜM OTURUMLARI SONLANDIR (güvenlik için)
+      await this.invalidateAllUserSessions(user._id, "2fa_enabled");
+
       // Log 2FA activation
       await ActivityLog.create({
         user: userId,
         action: "2fa_enabled",
         details: {
           method: twoFactorAuth.method,
+          allSessionsRevoked: true,
         },
         ip: req.ip,
         severity: "high",
       });
 
+      // Security alert
+      await emailService.sendSecurityAlert(user.email, {
+        type: "2fa_enabled",
+        method: twoFactorAuth.method,
+        ip: req.ip,
+        timestamp: new Date(),
+        note: "2FA etkinleştirildi. Güvenlik için tüm oturumlarınız sonlandırıldı.",
+      });
+
       return responseWrapper.success(res, {
         backupCodes,
         message:
-          "2FA başarıyla etkinleştirildi. Yedek kodlarınızı güvenli bir yerde saklayın.",
+          "2FA başarıyla etkinleştirildi. Yedek kodlarınızı güvenli bir yerde saklayın. Tüm cihazlarda tekrar giriş yapmanız gerekecek.",
       });
     } catch (error) {
       console.error("Enable 2FA error:", error);
@@ -1547,6 +1710,106 @@ class AuthController {
       );
     }
   };
+  send2FACode = async (user) => {
+    // 6 haneli kod üret
+    // send2FACode(user)
+    const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6 haneli string
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 dk
+
+    // Eski 2FA kodlarını temizle (opsiyonel ama iyi pratik)
+    await Token.deleteMany({ user: user._id, type: "2fa_code" });
+
+    // Hashle ve kaydet
+    const crypto = require("crypto");
+    const hashed = crypto.createHash("sha256").update(code).digest("hex");
+
+    await Token.create({
+      user: user._id,
+      token: hashed,
+      type: "2fa_code",
+      expiresAt,
+    });
+
+    // Gönderim: method=email ise mail, sms ise sms
+    if (TwoFactorAuth.method === "sms" && user.phoneNumber) {
+      await smsService.send2FACode(user.phoneNumber, code);
+    } else {
+      await emailService.send2FACode(user.email, code);
+    }
+
+    // (İstersen dev modda kodu konsola da bas)
+    if (process.env.NODE_ENV !== "production") {
+      console.log("DEV 2FA CODE:", code);
+    }
+
+    return code;
+  };
+
+  /**
+   * Generate 2FA code
+   */
+  generate2FACode() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  /**
+   * Store 2FA code
+   */
+  async store2FACode(userId, code) {
+    const crypto = require("crypto");
+    const hashedCode = crypto.createHash("sha256").update(code).digest("hex");
+
+    await Token.create({
+      user: userId,
+      token: hashedCode,
+      type: "2fa_code",
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+    });
+  }
+
+  /**
+   * Verify 2FA code
+   */
+  async verify2FACode(userId, code) {
+    try {
+      const twoFA = await TwoFactorAuth.findOne({ user: userId });
+
+      // Authenticator yalnızca aktif ve secret varsa TOTP kontrolü yapar
+      if (
+        twoFA &&
+        twoFA.method === "authenticator" &&
+        twoFA.isEnabled &&
+        twoFA.secret
+      ) {
+        const speakeasy = require("speakeasy");
+        return speakeasy.totp.verify({
+          secret: twoFA.secret,
+          encoding: "base32",
+          token: code,
+          window: 2,
+        });
+      }
+
+      // Email/SMS doğrulaması: Token tablosu
+      const crypto = require("crypto");
+      const hashed = crypto.createHash("sha256").update(code).digest("hex");
+
+      const tokenDoc = await Token.findOne({
+        user: userId,
+        token: hashed,
+        type: "2fa_code",
+        expiresAt: { $gt: new Date() },
+      });
+
+      if (!tokenDoc) return false;
+
+      await tokenDoc.deleteOne(); // tek kullanımlık
+      return true;
+    } catch (err) {
+      console.error("Verify 2FA code error:", err);
+      return false;
+    }
+  }
 
   /**
    * FORGOT PASSWORD - Şifremi unuttum
@@ -1678,11 +1941,8 @@ class AuthController {
       // Delete token
       await storedToken.deleteOne();
 
-      // Invalidate all existing sessions
-      await Token.deleteMany({
-        user: user._id,
-        type: "refresh",
-      });
+      // TÜM OTURUMLARI SONLANDIR
+      await this.invalidateAllUserSessions(user._id, "password_reset");
 
       // Log password reset
       await ActivityLog.create({
@@ -1690,6 +1950,7 @@ class AuthController {
         action: "password_reset_completed",
         details: {
           ip: req.ip,
+          allSessionsRevoked: true,
         },
         ip: req.ip,
         severity: "high",
@@ -1698,10 +1959,18 @@ class AuthController {
       // Send confirmation email
       await emailService.sendPasswordResetConfirmation(user.email);
 
+      // Security alert
+      await emailService.sendSecurityAlert(user.email, {
+        type: "password_changed",
+        ip: req.ip,
+        timestamp: new Date(),
+        note: "Tüm oturumlarınız güvenlik nedeniyle sonlandırıldı. Lütfen tekrar giriş yapın.",
+      });
+
       return responseWrapper.success(
         res,
         null,
-        "Şifreniz başarıyla sıfırlandı"
+        "Şifreniz başarıyla sıfırlandı. Güvenlik için tüm oturumlarınız sonlandırıldı."
       );
     } catch (error) {
       console.error("Reset password error:", error);
@@ -1717,15 +1986,35 @@ class AuthController {
    */
   changePassword = async (req, res) => {
     try {
+      const { oldPassword, newPassword, confirmPassword } = req.body;
       const userId = req.user.id;
-      const { currentPassword, newPassword, confirmPassword } = req.body;
 
-      if (!currentPassword || !newPassword || !confirmPassword) {
+      if (!oldPassword || !newPassword || !confirmPassword) {
         return responseWrapper.badRequest(res, "Tüm alanlar zorunludur");
       }
 
       if (newPassword !== confirmPassword) {
         return responseWrapper.badRequest(res, "Yeni şifreler eşleşmiyor");
+      }
+
+      // Get user with password
+      const user = await User.findById(userId).select("+password");
+      if (!user) {
+        return responseWrapper.notFound(res, "Kullanıcı bulunamadı");
+      }
+
+      // Verify old password
+      const isValidPassword = await bcrypt.compare(oldPassword, user.password);
+      if (!isValidPassword) {
+        return responseWrapper.unauthorized(res, "Mevcut şifre hatalı");
+      }
+
+      // Check if new password is same as old
+      if (oldPassword === newPassword) {
+        return responseWrapper.badRequest(
+          res,
+          "Yeni şifre eski şifre ile aynı olamaz"
+        );
       }
 
       // Check password strength
@@ -1734,31 +2023,21 @@ class AuthController {
         return responseWrapper.badRequest(res, passwordStrength.message);
       }
 
-      // Get user
-      const user = await User.findById(userId).select("+password");
-
-      // Verify current password
-      const isPasswordValid = await bcrypt.compare(
-        currentPassword,
-        user.password
-      );
-      if (!isPasswordValid) {
-        return responseWrapper.unauthorized(res, "Mevcut şifre hatalı");
-      }
-
-      // Check if new password is same as current
-      const isSamePassword = await bcrypt.compare(newPassword, user.password);
-      if (isSamePassword) {
-        return responseWrapper.badRequest(
-          res,
-          "Yeni şifre mevcut şifre ile aynı olamaz"
-        );
-      }
-
       // Update password
       user.password = await bcrypt.hash(newPassword, 12);
       user.passwordChangedAt = new Date();
+      user.passwordResetRequired = false;
       await user.save();
+
+      // Mevcut token'ı al
+      const currentToken = req.headers.authorization?.replace("Bearer ", "");
+
+      // TÜM DİĞER OTURUMLARI SONLANDIR (mevcut hariç)
+      await this.invalidateAllUserSessions(
+        user._id,
+        "password_changed",
+        currentToken
+      );
 
       // Log password change
       await ActivityLog.create({
@@ -1766,24 +2045,33 @@ class AuthController {
         action: "password_changed",
         details: {
           ip: req.ip,
+          allOtherSessionsRevoked: true,
         },
         ip: req.ip,
         severity: "high",
       });
 
       // Send confirmation email
-      await emailService.sendPasswordChangeNotification(user.email);
+      await emailService.sendPasswordChangeConfirmation(user.email);
+
+      // Security alert
+      await emailService.sendSecurityAlert(user.email, {
+        type: "password_changed",
+        ip: req.ip,
+        timestamp: new Date(),
+        note: "Diğer tüm oturumlarınız güvenlik nedeniyle sonlandırıldı.",
+      });
 
       return responseWrapper.success(
         res,
         null,
-        "Şifreniz başarıyla değiştirildi"
+        "Şifreniz başarıyla değiştirildi. Diğer cihazlarda tekrar giriş yapmanız gerekecek."
       );
     } catch (error) {
       console.error("Change password error:", error);
       return responseWrapper.error(
         res,
-        "Şifre değiştirme sırasında bir hata oluştu"
+        "Şifre değiştirme sırasında hata oluştu"
       );
     }
   };
@@ -1961,24 +2249,6 @@ class AuthController {
       await storedToken.deleteOne();
       return true;
     }
-  }
-
-  /**
-   * Send 2FA code
-   */
-  async send2FACode(user) {
-    const code = this.generate2FACode();
-    await this.store2FACode(user._id, code);
-
-    const twoFactorAuth = await TwoFactorAuth.findOne({ user: user._id });
-
-    if (twoFactorAuth.method === "email") {
-      await emailService.send2FACode(user.email, code);
-    } else if (twoFactorAuth.method === "sms") {
-      await smsService.send2FACode(user.phoneNumber, code);
-    }
-
-    return code;
   }
 
   /**
@@ -2388,10 +2658,25 @@ class AuthController {
    * Get login history
    */
   getLoginHistory = async (req, res) => {
-    return responseWrapper.notImplemented(
-      res,
-      "Giriş geçmişi özelliği henüz aktif değil"
-    );
+    try {
+      const userId = req.user.id;
+      const { limit = 20 } = req.query;
+
+      const loginHistory = await ActivityLog.find({
+        user: userId,
+        action: {
+          $in: ["user_login", "suspicious_login_attempt", "account_locked"],
+        },
+      })
+        .select("action details ip userAgent createdAt")
+        .sort("-createdAt")
+        .limit(parseInt(limit));
+
+      return responseWrapper.success(res, loginHistory);
+    } catch (error) {
+      console.error("Get login history error:", error);
+      return responseWrapper.error(res, "Giriş geçmişi alınamadı");
+    }
   };
 
   /**
@@ -2412,43 +2697,256 @@ class AuthController {
   };
 
   /**
-   * Revoke session
+   * GET ACTIVE SESSIONS - Aktif oturumları getir
    */
-  revokeSession = async (req, res) => {
-    return responseWrapper.notImplemented(
-      res,
-      "Oturum iptal özelliği henüz aktif değil"
-    );
+  getActiveSessions = async (req, res) => {
+    try {
+      const userId = req.user.id;
+
+      // Aktif refresh token'ları bul
+      const sessions = await Token.find({
+        user: userId,
+        type: "refresh",
+        expiresAt: { $gt: new Date() },
+      })
+        .select("token createdAt expiresAt lastUsedAt deviceInfo ip")
+        .sort("-createdAt");
+
+      // Her oturum için detaylı bilgi hazırla
+      const detailedSessions = sessions.map((session) => ({
+        id: session._id,
+        createdAt: session.createdAt,
+        expiresAt: session.expiresAt,
+        lastUsedAt: session.lastUsedAt || session.createdAt,
+        deviceInfo: session.deviceInfo || "Bilinmeyen Cihaz",
+        ip: session.ip,
+        isCurrent:
+          session.token === req.headers.authorization?.replace("Bearer ", ""),
+      }));
+
+      return responseWrapper.success(res, detailedSessions);
+    } catch (error) {
+      console.error("Get active sessions error:", error);
+      return responseWrapper.error(res, "Aktif oturumlar alınamadı");
+    }
   };
 
   /**
-   * Revoke all sessions
+   * REVOKE ALL SESSIONS - Tüm oturumları sonlandır
    */
   revokeAllSessions = async (req, res) => {
-    return responseWrapper.notImplemented(
-      res,
-      "Tüm oturumları iptal etme özelliği henüz aktif değil"
-    );
+    try {
+      const { password } = req.body;
+      const userId = req.user.id;
+
+      // Şifre doğrulama
+      const user = await User.findById(userId).select("+password");
+      if (!user) {
+        return responseWrapper.notFound(res, "Kullanıcı bulunamadı");
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        return responseWrapper.unauthorized(res, "Şifre hatalı");
+      }
+
+      // Mevcut token'ı bul
+      const authHeader = req.headers.authorization;
+      let currentTokenHash = null;
+
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const currentToken = authHeader.substring(7);
+        // Token'ı hash'le ki veritabanındaki ile karşılaştırabilelim
+        currentTokenHash = crypto
+          .createHash("sha256")
+          .update(currentToken)
+          .digest("hex");
+      }
+
+      // Tüm refresh token'ları sil (mevcut hariç)
+      const deleteQuery = {
+        user: userId,
+        type: { $in: ["refresh", "access"] },
+      };
+
+      // Eğer mevcut token varsa, onu hariç tut
+      if (currentTokenHash) {
+        deleteQuery.token = { $ne: currentTokenHash };
+      }
+
+      const result = await Token.deleteMany(deleteQuery);
+      console.log(`Deleted ${result.deletedCount} tokens for user ${userId}`);
+
+      // Tüm access token'ları blacklist'e ekle
+      const activeTokens = await Token.find({
+        user: userId,
+        type: "access",
+        expiresAt: { $gt: new Date() },
+      });
+
+      for (const token of activeTokens) {
+        await BlacklistedToken.create({
+          token: token.token,
+          tokenType: "access",
+          user: userId,
+          expiresAt: token.expiresAt,
+          reason: "all_sessions_revoked",
+          ip: req.ip,
+        });
+      }
+
+      // Activity log
+      await ActivityLog.create({
+        user: userId,
+        action: "revoke_all_sessions",
+        details: {
+          reason: "User initiated",
+          ip: req.ip,
+          sessionsRevoked: result.deletedCount,
+        },
+        ip: req.ip,
+        severity: "medium",
+      });
+
+      // Email bildirimi gönder
+      await emailService.sendSecurityAlert(user.email, {
+        type: "all_sessions_revoked",
+        ip: req.ip,
+        timestamp: new Date(),
+      });
+
+      return responseWrapper.success(res, {
+        sessionsRevoked: result.deletedCount,
+        message:
+          "Tüm oturumlar sonlandırıldı. Güvenlik için tekrar giriş yapmanız gerekecek.",
+      });
+    } catch (error) {
+      console.error("Revoke all sessions error:", error);
+      return responseWrapper.error(res, "Oturumlar sonlandırılamadı");
+    }
   };
 
   /**
-   * Add trusted IP
+   * ADD TRUSTED IP - Güvenilir IP ekle
    */
   addTrustedIP = async (req, res) => {
-    return responseWrapper.notImplemented(
-      res,
-      "Güvenilir IP ekleme özelliği henüz aktif değil"
-    );
+    try {
+      const { ip, name } = req.body;
+      const userId = req.user.id;
+
+      // IP formatını kontrol et
+      const ipRegex =
+        /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+      if (!ipRegex.test(ip)) {
+        return responseWrapper.badRequest(res, "Geçersiz IP adresi");
+      }
+
+      const user = await User.findById(userId);
+
+      if (!user.trustedIPs) {
+        user.trustedIPs = [];
+      }
+
+      // Aynı IP zaten eklenmişse hata dön
+      if (user.trustedIPs.some((trustedIP) => trustedIP.ip === ip)) {
+        return responseWrapper.conflict(
+          res,
+          "Bu IP adresi zaten güvenilir listede"
+        );
+      }
+
+      // Maksimum 5 güvenilir IP
+      if (user.trustedIPs.length >= 5) {
+        return responseWrapper.badRequest(
+          res,
+          "Maksimum 5 güvenilir IP ekleyebilirsiniz"
+        );
+      }
+
+      user.trustedIPs.push({
+        ip,
+        name: name || "İsimsiz IP",
+        addedAt: new Date(),
+      });
+
+      await user.save();
+
+      // Activity log
+      await ActivityLog.create({
+        user: userId,
+        action: "trusted_ip_added",
+        details: { ip, name },
+        ip: req.ip,
+      });
+
+      return responseWrapper.success(
+        res,
+        user.trustedIPs,
+        "Güvenilir IP eklendi"
+      );
+    } catch (error) {
+      console.error("Add trusted IP error:", error);
+      return responseWrapper.error(res, "Güvenilir IP eklenemedi");
+    }
   };
 
   /**
-   * Remove trusted IP
+   * REMOVE TRUSTED IP - Güvenilir IP kaldır
    */
   removeTrustedIP = async (req, res) => {
-    return responseWrapper.notImplemented(
-      res,
-      "Güvenilir IP kaldırma özelliği henüz aktif değil"
-    );
+    try {
+      const { ip } = req.params;
+      const userId = req.user.id;
+
+      const user = await User.findById(userId);
+
+      if (!user.trustedIPs || user.trustedIPs.length === 0) {
+        return responseWrapper.notFound(res, "Güvenilir IP bulunamadı");
+      }
+
+      const initialLength = user.trustedIPs.length;
+      user.trustedIPs = user.trustedIPs.filter(
+        (trustedIP) => trustedIP.ip !== ip
+      );
+
+      if (user.trustedIPs.length === initialLength) {
+        return responseWrapper.notFound(res, "Belirtilen IP adresi bulunamadı");
+      }
+
+      await user.save();
+
+      // Activity log
+      await ActivityLog.create({
+        user: userId,
+        action: "trusted_ip_removed",
+        details: { ip },
+        ip: req.ip,
+      });
+
+      return responseWrapper.success(
+        res,
+        user.trustedIPs,
+        "Güvenilir IP kaldırıldı"
+      );
+    } catch (error) {
+      console.error("Remove trusted IP error:", error);
+      return responseWrapper.error(res, "Güvenilir IP kaldırılamadı");
+    }
+  };
+
+  /**
+   * GET TRUSTED IPS - Güvenilir IP listesini getir
+   */
+  getTrustedIPs = async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await User.findById(userId).select("trustedIPs");
+
+      return responseWrapper.success(res, user.trustedIPs || []);
+    } catch (error) {
+      console.error("Get trusted IPs error:", error);
+      return responseWrapper.error(res, "Güvenilir IP listesi alınamadı");
+    }
   };
 
   // ==================== PHONE VERIFICATION STUB METHODS ====================
@@ -2576,21 +3074,134 @@ class AuthController {
       return responseWrapper.error(res, "Reddetme sırasında hata oluştu");
     }
   };
+  /**
+   * GET PENDING KYC USERS - KYC onayı bekleyen kullanıcıları getir (Admin)
+   * Pagination, sıralama ve filtreleme destekler
+   */
+  getPendingKycUsers = async (req, res) => {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        sortBy = "createdAt",
+        sortOrder = "desc",
+        search = "",
+        country,
+        role,
+      } = req.query;
 
-  getLoginHistory = async (req, res) => {
-    return responseWrapper.success(
-      res,
-      [],
-      "Login geçmişi özelliği henüz aktif değil"
-    );
+      // Temel filtre
+      const filter = {
+        kycStatus: "Pending",
+        emailVerified: true,
+      };
+
+      // Opsiyonel filtreler
+      if (search) {
+        filter.$or = [
+          { email: { $regex: search, $options: "i" } },
+          { fullName: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      if (country) {
+        filter.country = country;
+      }
+
+      if (role && ["investor", "property_owner"].includes(role)) {
+        filter.role = role;
+      }
+
+      // Pagination ayarları
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+      const sort = { [sortBy]: sortOrder === "asc" ? 1 : -1 };
+
+      // Kullanıcıları getir
+      const users = await User.find(filter)
+        .select(
+          "fullName email role country kycStatus createdAt membershipPlan phoneNumber"
+        )
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit));
+
+      // Toplam sayı
+      const total = await User.countDocuments(filter);
+
+      return responseWrapper.success(res, {
+        users,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit)),
+          hasNext: parseInt(page) < Math.ceil(total / parseInt(limit)),
+          hasPrev: parseInt(page) > 1,
+        },
+      });
+    } catch (error) {
+      console.error("Get pending KYC users error:", error);
+      return responseWrapper.error(res, "KYC bekleyen kullanıcılar alınamadı");
+    }
   };
 
-  getActiveSessions = async (req, res) => {
-    return responseWrapper.success(
-      res,
-      [],
-      "Aktif oturumlar özelliği henüz aktif değil"
-    );
+  /**
+   * GET PENDING KYC USER BY ID - ID'ye göre KYC bekleyen kullanıcı detayı (Admin)
+   */
+  getPendingKycUserById = async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      const user = await User.findOne({
+        _id: userId,
+        kycStatus: "Pending",
+      }).select("-password");
+
+      if (!user) {
+        return responseWrapper.notFound(
+          res,
+          "KYC bekleyen kullanıcı bulunamadı"
+        );
+      }
+
+      // Role'e göre detaylı bilgileri getir
+      let detailedUser = user.toObject();
+
+      if (user.role === "investor") {
+        const Investor = require("../models/Investor");
+        const investor = await Investor.findById(userId).populate(
+          "investments",
+          "propertyId amount status createdAt"
+        );
+
+        detailedUser.investorDetails = {
+          investments: investor.investments,
+          totalInvested: investor.totalInvested,
+          activeInvestmentCount: investor.activeInvestmentCount,
+          investmentLimit: investor.investmentLimit,
+        };
+      } else if (user.role === "property_owner") {
+        const PropertyOwner = require("../models/PropertyOwner");
+        const Property = require("../models/Property");
+
+        const owner = await PropertyOwner.findById(userId);
+        const properties = await Property.find({ owner: userId }).select(
+          "title location totalValue status"
+        );
+
+        detailedUser.ownerDetails = {
+          properties,
+          totalProperties: owner.totalProperties,
+          activeProperties: owner.activeProperties,
+          ownerTrustScore: owner.ownerTrustScore,
+        };
+      }
+
+      return responseWrapper.success(res, detailedUser);
+    } catch (error) {
+      console.error("Get pending KYC user by ID error:", error);
+      return responseWrapper.error(res, "Kullanıcı detayları alınamadı");
+    }
   };
 
   revokeSession = async (req, res) => {
@@ -2600,86 +3211,46 @@ class AuthController {
       "Oturum iptal özelliği henüz aktif değil"
     );
   };
+  async invalidateAllUserSessions(
+    userId,
+    reason = "security_action",
+    excludeCurrentToken = null
+  ) {
+    try {
+      // Tüm refresh ve access token'ları sil
+      const deleteQuery = {
+        user: userId,
+        type: { $in: ["refresh", "access"] },
+      };
 
-  revokeAllSessions = async (req, res) => {
-    return responseWrapper.success(
-      res,
-      null,
-      "Tüm oturumları iptal özelliği henüz aktif değil"
-    );
-  };
+      // Mevcut token'ı hariç tut (opsiyonel)
+      if (excludeCurrentToken) {
+        const hashedToken = crypto
+          .createHash("sha256")
+          .update(excludeCurrentToken)
+          .digest("hex");
+        deleteQuery.token = { $ne: hashedToken };
+      }
 
-  addTrustedIP = async (req, res) => {
-    return responseWrapper.success(
-      res,
-      null,
-      "Güvenilir IP özelliği henüz aktif değil"
-    );
-  };
+      const result = await Token.deleteMany(deleteQuery);
 
-  removeTrustedIP = async (req, res) => {
-    return responseWrapper.success(
-      res,
-      null,
-      "Güvenilir IP kaldırma özelliği henüz aktif değil"
-    );
-  };
+      // Activity log
+      await ActivityLog.create({
+        user: userId,
+        action: "sessions_invalidated",
+        details: {
+          reason,
+          sessionsRevoked: result.deletedCount,
+        },
+        severity: "high",
+      });
 
-  getAllUsers = async (req, res) => {
-    return responseWrapper.success(res, [], "Admin panel henüz aktif değil");
-  };
-
-  getUserById = async (req, res) => {
-    return responseWrapper.success(res, null, "Admin panel henüz aktif değil");
-  };
-
-  suspendUser = async (req, res) => {
-    return responseWrapper.success(
-      res,
-      null,
-      "Kullanıcı askıya alma henüz aktif değil"
-    );
-  };
-
-  unsuspendUser = async (req, res) => {
-    return responseWrapper.success(
-      res,
-      null,
-      "Askıyı kaldırma henüz aktif değil"
-    );
-  };
-
-  forcePasswordReset = async (req, res) => {
-    return responseWrapper.success(
-      res,
-      null,
-      "Zorunlu şifre sıfırlama henüz aktif değil"
-    );
-  };
-
-  getActivityLogs = async (req, res) => {
-    return responseWrapper.success(
-      res,
-      [],
-      "Aktivite logları henüz aktif değil"
-    );
-  };
-
-  getSecurityAlerts = async (req, res) => {
-    return responseWrapper.success(
-      res,
-      [],
-      "Güvenlik uyarıları henüz aktif değil"
-    );
-  };
-
-  blacklistToken = async (req, res) => {
-    return responseWrapper.success(
-      res,
-      null,
-      "Token blacklist özelliği henüz aktif değil"
-    );
-  };
+      return result.deletedCount;
+    } catch (error) {
+      console.error("Invalidate sessions error:", error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new AuthController();

@@ -1,10 +1,11 @@
-const mongoose = require("mongoose");
-const dotenv = require("dotenv");
-const bcrypt = require("bcryptjs"); // Bcrypt import edildi
-dotenv.config();
-require("../models");
+// seed/seedFix.js - trustedIPs düzeltilmiş versiyon
+// Bu dosyayı seed klasörüne koyup çalıştırın: node seed/seedFix.js
 
-// MODELLERİ YÜKLE
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
+require("dotenv").config();
+
+// Models
 const User = require("../models/User");
 const Investor = require("../models/Investor");
 const PropertyOwner = require("../models/PropertyOwner");
@@ -12,55 +13,30 @@ const LocalRepresentative = require("../models/LocalRepresentative");
 const Admin = require("../models/Admin");
 const Property = require("../models/Property");
 const Investment = require("../models/Investment");
-const RentalPayment = require("../models/RentalPayment");
 const Notification = require("../models/Notification");
 
-// MONGO CONNECTION
+// MongoDB Connection
 mongoose
   .connect(
-    process.env.MONGO_URI || "mongodb://localhost:27017/pledged_platform",
-    {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    }
+    process.env.MONGODB_URI || "mongodb://localhost:27017/pledged_platform"
   )
   .then(async () => {
     console.log("🟢 MongoDB connected. Checking existing data...");
 
-    // Check if database has data
-    const collections = await mongoose.connection.db
-      .listCollections()
-      .toArray();
-    const hasData = collections.length > 0;
-
-    if (hasData) {
-      // Check if any collection has documents
-      let totalDocuments = 0;
-      for (const collection of collections) {
-        const count = await mongoose.connection.db
-          .collection(collection.name)
-          .countDocuments();
-        totalDocuments += count;
-      }
-
-      if (totalDocuments > 0) {
-        console.log(
-          `📊 Database contains ${totalDocuments} documents across ${collections.length} collections.`
-        );
-        console.log("⚠️  Skipping database drop to preserve existing data.");
-        console.log(
-          "💡 To force seed with fresh data, manually drop the database first."
-        );
-        process.exit(0);
-      }
+    // Check if data exists
+    const existingUsers = await User.countDocuments();
+    if (existingUsers > 0) {
+      console.log(
+        `⚠️ Found ${existingUsers} existing users. Dropping database...`
+      );
+      await mongoose.connection.db.dropDatabase();
+      console.log("🗑️ Database dropped.");
+    } else {
+      console.log("🗑️ No existing data found. Proceeding with fresh seed...");
     }
 
-    console.log("🗑️ No existing data found. Proceeding with database drop...");
-    await mongoose.connection.dropDatabase();
-    console.log("🗑️ Existing database dropped.");
-
-    // Şifreleri hash'le
-    const hashedPasswordTest = await bcrypt.hash("Test123!@#", 12);
+    // Hash passwords
+    const hashedPasswordInvestor = await bcrypt.hash("Test123!@#", 12);
     const hashedPasswordOwner = await bcrypt.hash("Owner123!@#", 12);
     const hashedPasswordMehmet = await bcrypt.hash("Mehmet123!@#", 12);
     const hashedPasswordRep = await bcrypt.hash("Rep123!@#", 12);
@@ -68,34 +44,41 @@ mongoose
 
     console.log("🔐 Passwords hashed successfully.");
 
-    // USERS - Authentication fields dahil
+    // CREATE USERS
     const investor = await Investor.create({
-      // Temel bilgiler
+      // Basic info
       role: "investor",
       email: "emre@investor.com",
-      password: hashedPasswordTest, // Hash'lenmiş şifre
+      password: hashedPasswordInvestor,
       fullName: "Emre Yatırımcı",
       phoneNumber: "+905551234567",
       country: "Turkey",
-      region: "Marmara",
+      region: "Istanbul",
 
       // Authentication & Security
       emailVerified: true,
-      emailVerifiedAt: new Date("2025-01-01"),
+      emailVerifiedAt: new Date("2025-01-15"),
       phoneVerified: false,
       is2FAEnabled: false,
       accountStatus: "active",
+      membershipPlan: "Pro",
       membershipStatus: "active",
-      membershipActivatedAt: new Date("2025-07-01"),
-      membershipExpiresAt: new Date("2026-07-01"),
+      membershipActivatedAt: new Date("2025-01-01"),
+      membershipExpiresAt: new Date("2026-01-01"),
       kycStatus: "Approved",
-      passwordChangedAt: new Date("2025-01-15"),
+      passwordChangedAt: new Date("2025-01-01"),
       passwordResetRequired: false,
       loginAttempts: 0,
-      lastLoginAt: new Date("2025-08-07"),
+      lastLoginAt: new Date("2025-08-08"),
       lastLoginIP: "192.168.1.100",
       registrationIP: "192.168.1.100",
-      trustedIPs: ["192.168.1.100", "192.168.1.101"],
+      trustedIPs: [
+        {
+          ip: "192.168.1.100",
+          name: "Home IP",
+          addedAt: new Date("2025-01-01"),
+        },
+      ],
 
       // Consents
       consents: {
@@ -106,34 +89,19 @@ mongoose
       },
 
       // Investor specific fields
-      membershipPlan: "Pro",
-      bankAccountInfo: {
-        iban: "TR123456789012345678901234",
-        bankName: "Ziraat Bankası",
-      },
-      favoriteProperties: [], // Favori property'ler için boş array
-      referralCode: "INV-EMRE-2025",
-      referredBy: null,
-      purchasedServices: [
-        {
-          serviceName: "Visa Consultancy",
-          price: 500,
-          purchaseDate: new Date(),
-          status: "completed",
-        },
-      ],
-      subscription: {
-        currentPlan: "Pro",
-        startDate: new Date("2025-07-01"),
-        endDate: new Date("2026-07-01"),
-        autoRenew: true,
-      },
-      activeInvestmentCount: 1,
+      investmentCapacity: "Medium",
+      investmentBudget: 100000,
+      preferredCountries: ["Portugal", "Spain"],
+      riskTolerance: "Medium",
+      investmentExperience: "Intermediate",
       investmentLimit: 5,
+      activeInvestmentCount: 1,
+      totalInvested: 50000,
+      totalReturns: 0,
       notifications: [
         {
-          type: "rent_payment_due",
-          message: "Your rent payment is due soon.",
+          type: "offer_accepted",
+          message: "Your offer has been accepted!",
         },
         {
           type: "contract_signed",
@@ -143,10 +111,10 @@ mongoose
     });
 
     const owner = await PropertyOwner.create({
-      // Temel bilgiler
+      // Basic info
       role: "property_owner",
       email: "ayse@owner.com",
-      password: hashedPasswordOwner, // Hash'lenmiş şifre
+      password: hashedPasswordOwner,
       fullName: "Ayşe Ev Sahibi",
       phoneNumber: "+351912345678",
       country: "Portugal",
@@ -169,7 +137,13 @@ mongoose
       lastLoginAt: new Date("2025-08-06"),
       lastLoginIP: "85.240.100.50",
       registrationIP: "85.240.100.50",
-      trustedIPs: ["85.240.100.50"],
+      trustedIPs: [
+        {
+          ip: "85.240.100.50",
+          name: "Home IP",
+          addedAt: new Date("2024-12-01"),
+        },
+      ],
 
       // Consents
       consents: {
@@ -184,7 +158,6 @@ mongoose
         iban: "PT50000201231234567890154",
         bankName: "Banco Português",
       },
-      // PDF'e göre owner performans verileri
       completedContracts: 3,
       ongoingContracts: 2,
       totalProperties: 5,
@@ -192,10 +165,10 @@ mongoose
     });
 
     const owner2 = await PropertyOwner.create({
-      // Temel bilgiler
+      // Basic info
       role: "property_owner",
       email: "mehmet@owner.com",
-      password: hashedPasswordMehmet, // Hash'lenmiş şifre
+      password: hashedPasswordMehmet,
       fullName: "Mehmet Mülk Sahibi",
       phoneNumber: "+34612345678",
       country: "Spain",
@@ -217,6 +190,7 @@ mongoose
       lastLoginAt: new Date("2025-08-05"),
       lastLoginIP: "82.223.50.100",
       registrationIP: "82.223.50.100",
+      trustedIPs: [], // Boş array veya hiç eklemeyin
 
       // Consents
       consents: {
@@ -231,7 +205,6 @@ mongoose
         iban: "ES9121000418450200051332",
         bankName: "Banco Santander",
       },
-      // PDF'e göre owner performans verileri
       completedContracts: 1,
       ongoingContracts: 1,
       totalProperties: 2,
@@ -239,10 +212,10 @@ mongoose
     });
 
     const rep = await LocalRepresentative.create({
-      // Temel bilgiler
+      // Basic info
       role: "local_representative",
       email: "john@rep.com",
-      password: hashedPasswordRep, // Hash'lenmiş şifre
+      password: hashedPasswordRep,
       fullName: "John Temsilci",
       phoneNumber: "+351925555444",
       country: "Portugal",
@@ -254,7 +227,7 @@ mongoose
       emailVerifiedAt: new Date("2025-03-01"),
       phoneVerified: true,
       phoneVerifiedAt: new Date("2025-03-02"),
-      is2FAEnabled: true, // Representatives must have 2FA
+      is2FAEnabled: true,
       accountStatus: "active",
       membershipStatus: "active",
       membershipActivatedAt: new Date("2025-03-01"),
@@ -266,7 +239,18 @@ mongoose
       lastLoginAt: new Date("2025-08-08"),
       lastLoginIP: "194.65.100.200",
       registrationIP: "194.65.100.200",
-      trustedIPs: ["194.65.100.200", "194.65.100.201"],
+      trustedIPs: [
+        {
+          ip: "194.65.100.200",
+          name: "Office IP",
+          addedAt: new Date("2025-03-01"),
+        },
+        {
+          ip: "194.65.100.201",
+          name: "Home IP",
+          addedAt: new Date("2025-03-01"),
+        },
+      ],
 
       // Consents
       consents: {
@@ -278,10 +262,10 @@ mongoose
     });
 
     const admin = await Admin.create({
-      // Temel bilgiler
+      // Basic info
       role: "admin",
       email: "admin@admin.com",
-      password: hashedPasswordAdmin, // Hash'lenmiş şifre
+      password: hashedPasswordAdmin,
       fullName: "Admin Baba",
       phoneNumber: "+905559999999",
       country: "Turkey",
@@ -293,11 +277,11 @@ mongoose
       emailVerifiedAt: new Date("2024-01-01"),
       phoneVerified: true,
       phoneVerifiedAt: new Date("2024-01-01"),
-      is2FAEnabled: true, // Admin accounts must have 2FA
+      is2FAEnabled: true,
       accountStatus: "active",
       membershipStatus: "active",
       membershipActivatedAt: new Date("2024-01-01"),
-      membershipExpiresAt: new Date("2030-01-01"), // Long term
+      membershipExpiresAt: new Date("2030-01-01"),
       kycStatus: "Approved",
       passwordChangedAt: new Date("2025-07-15"),
       passwordResetRequired: false,
@@ -305,7 +289,18 @@ mongoose
       lastLoginAt: new Date("2025-08-08"),
       lastLoginIP: "10.0.0.1",
       registrationIP: "10.0.0.1",
-      trustedIPs: ["10.0.0.1", "192.168.1.1"], // Office IPs
+      trustedIPs: [
+        {
+          ip: "10.0.0.1",
+          name: "Office Network",
+          addedAt: new Date("2024-01-01"),
+        },
+        {
+          ip: "192.168.1.1",
+          name: "VPN Server",
+          addedAt: new Date("2024-01-01"),
+        },
+      ],
 
       // Consents
       consents: {
@@ -316,7 +311,7 @@ mongoose
       },
     });
 
-    // PROPERTIES - Çeşitli ülke ve şehirlerden
+    // PROPERTIES
     const property1 = await Property.create({
       country: "Portugal",
       city: "Lisbon",
@@ -374,177 +369,70 @@ mongoose
     const property3 = await Property.create({
       country: "Spain",
       city: "Barcelona",
-      fullAddress: "789 Las Ramblas, Gothic Quarter",
+      fullAddress: "789 Las Ramblas",
       locationPin: {
         lat: 41.3851,
         lng: 2.1734,
       },
-      description: "Tourist rental apartment near beach and city center",
+      description: "Luxury penthouse with panoramic city views",
       propertyType: "apartment",
-      size: 65,
-      rooms: 2,
-      estimatedValue: 200000,
-      requestedInvestment: 80000,
-      rentOffered: 800,
+      size: 120,
+      rooms: 4,
+      estimatedValue: 300000,
+      requestedInvestment: 100000,
+      rentOffered: 1200,
       currency: "EUR",
       contractPeriodMonths: 48,
       images: ["https://via.placeholder.com/150"],
       documents: ["titledeed3.pdf"],
       status: "published",
       owner: owner2._id,
-      trustScore: 85,
-      viewCount: 200,
+      trustScore: 90,
+      viewCount: 250,
       favoriteCount: 0,
       investmentOfferCount: 5,
     });
 
-    const property4 = await Property.create({
-      country: "Spain",
-      city: "Madrid",
-      fullAddress: "321 Gran Via, Centro",
-      locationPin: {
-        lat: 40.4168,
-        lng: -3.7038,
-      },
-      description: "Commercial property in Madrid business center",
-      propertyType: "commercial",
-      size: 200,
-      rooms: 0,
-      estimatedValue: 500000,
-      requestedInvestment: 200000,
-      rentOffered: 2500,
-      currency: "EUR",
-      contractPeriodMonths: 24,
-      images: ["https://via.placeholder.com/150"],
-      documents: ["titledeed4.pdf"],
-      status: "published",
-      owner: owner2._id,
-      trustScore: 90,
-      viewCount: 156,
-      favoriteCount: 0,
-      investmentOfferCount: 1,
-    });
-
-    // Öne çıkarılmış property
-    const featuredProperty = await Property.create({
-      country: "Portugal",
-      city: "Lisbon",
-      fullAddress: "999 Premium Avenue, Cascais",
-      locationPin: {
-        lat: 38.6979,
-        lng: -9.4215,
-      },
-      description: "Premium villa with ocean view - FEATURED PROPERTY",
-      propertyType: "house",
-      size: 300,
-      rooms: 6,
-      estimatedValue: 800000,
-      requestedInvestment: 300000,
-      rentOffered: 3500,
-      currency: "EUR",
-      contractPeriodMonths: 60,
-      images: ["https://via.placeholder.com/150"],
-      documents: ["titledeed5.pdf"],
-      status: "published",
-      owner: owner._id,
-      trustScore: 95,
-      viewCount: 450,
-      favoriteCount: 0,
-      investmentOfferCount: 8,
-      // Öne çıkarma özellikleri
-      isFeatured: true,
-      featuredAt: new Date(),
-      featuredUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 hafta
-      featuredWeeks: 1,
-    });
-
-    // Draft durumunda property (admin panelinde görünür)
-    const draftProperty = await Property.create({
-      country: "Latvia",
-      city: "Riga",
-      fullAddress: "555 Baltic Street",
-      description: "New development project",
-      propertyType: "apartment",
-      size: 70,
-      rooms: 2,
-      estimatedValue: 80000,
-      requestedInvestment: 40000,
-      rentOffered: 400,
-      currency: "EUR",
-      contractPeriodMonths: 36,
-      status: "draft",
-      owner: owner._id,
-      trustScore: 50,
-    });
-
-    // Pending review durumunda property
-    const pendingProperty = await Property.create({
-      country: "Estonia",
-      city: "Tallinn",
-      fullAddress: "777 Digital Street",
-      description: "Tech hub office space",
-      propertyType: "commercial",
-      size: 150,
-      rooms: 0,
-      estimatedValue: 300000,
-      requestedInvestment: 150000,
-      rentOffered: 1800,
-      currency: "EUR",
-      contractPeriodMonths: 48,
-      status: "pending_review",
-      owner: owner2._id,
-      trustScore: 60,
-      reviewNotes: "Waiting for document verification",
-      // Admin tarafından işaretlenmiş sorunlar
-      flaggedIssues: ["Eksik tapu belgesi", "Fotoğraflar net değil"],
-    });
-
     // INVESTMENT
     const investment = await Investment.create({
-      property: property1._id,
+      property: property1._id, // propertyId yerine property
       investor: investor._id,
-      propertyOwner: property1.owner,
-      amountInvested: 50000,
+      propertyOwner: owner._id,
+      amountInvested: 50000, // investmentAmount yerine amountInvested
       currency: "EUR",
-      status: "contract_signed",
+      status: "active",
+      contractFile: "contract_property1_investor1.pdf",
+      titleDeedDocument: null,
       rentalPayments: [
         {
           month: "2025-08",
           amount: 500,
           status: "pending",
+          dueDate: new Date("2025-08-01"),
         },
       ],
     });
 
-    // RENTAL PAYMENT
-    await RentalPayment.create({
-      investment: investment._id,
-      property: property1._id,
-      propertyOwner: owner._id,
-      investor: investor._id,
-      amount: 500,
-      currency: "EUR",
-      status: "pending",
-      dueDate: new Date("2025-08-01"),
-      month: "2025-08",
-    });
-
-    // NOTIFICATION
+    // NOTIFICATIONS
     await Notification.create({
-      recipient: investor._id,
+      recipient: investor._id, // <-- recipientId değil recipient
       recipientRole: "investor",
-      type: "rent_payment_received",
-      title: "Rent Payment Received",
-      message: "You have received a €500 rent payment for August.",
+      type: "offer_accepted", // <-- enum’daki geçerli değer
+      title: "Investment Offer Accepted",
+      message: "Your investment offer for Lisbon property has been accepted!",
+      relatedEntity: {
+        entityType: "investment",
+        entityId: investment._id,
+      },
+      priority: "high",
       isRead: false,
     });
 
-    // Property1'in durumunu in_contract yap
+    // Update relationships
     property1.status = "in_contract";
-    property1.investmentOfferCount = 4; // Bir teklif kabul edildi
+    property1.investmentOfferCount = 4;
     await property1.save();
 
-    // Investor'a favori property'ler ekle
     investor.investments.push(investment._id);
     investor.rentalIncome.push({
       propertyId: property1._id,
@@ -553,12 +441,9 @@ mongoose
       status: "Pending",
       date: new Date("2025-08-01"),
     });
-
-    // Investor'ın favorilerine property2 ve property3'ü ekle
     investor.favoriteProperties.push(property2._id, property3._id);
     await investor.save();
 
-    // Property2 ve property3'ün favorites array'ine investor'ı ekle
     property2.favorites.push(investor._id);
     property2.favoriteCount = 1;
     await property2.save();
@@ -568,7 +453,6 @@ mongoose
     await property3.save();
 
     console.log("✅ Seed data created successfully.");
-
     console.log("\n📊 SEED DATA SUMMARY:");
     console.log("====================");
     console.log("✅ USERS CREATED:");
@@ -608,16 +492,15 @@ mongoose
     console.log(
       "• Phone verified for: ayse@owner.com, john@rep.com, admin@admin.com"
     );
-    console.log("• All users have trusted IPs configured");
+    console.log(
+      "• All users have trusted IPs configured (proper object format)"
+    );
     console.log("• All passwords follow strong password policy");
     console.log("• GDPR consents recorded for all users");
 
     console.log("\n🏠 PROPERTIES CREATED:");
-    console.log("• 4 Published properties (Portugal: 2, Spain: 2)");
-    console.log("• 1 Featured property (Portugal - Premium Villa)");
+    console.log("• 3 Published properties");
     console.log("• 1 In-contract property (Lisbon - with active investment)");
-    console.log("• 1 Draft property (Latvia)");
-    console.log("• 1 Pending review property (Estonia)");
 
     console.log("\n💰 INVESTMENTS & ACTIVITY:");
     console.log("• Investor favorites: 2 properties");

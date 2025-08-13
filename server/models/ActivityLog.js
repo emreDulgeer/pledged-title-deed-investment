@@ -32,12 +32,15 @@ const ActivityLogSchema = new mongoose.Schema(
         "membership_upgraded",
         "membership_downgraded",
         "membership_cancelled",
+        "revoke_all_sessions",
+        "sessions_invalidated",
 
         // Security actions
         "suspicious_login_attempt",
         "concurrent_sessions_detected",
         "ip_address_changed",
         "unusual_activity_detected",
+        "2fa_error",
 
         // Property actions
         "property_created",

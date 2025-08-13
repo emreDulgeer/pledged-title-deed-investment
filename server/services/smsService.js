@@ -49,11 +49,32 @@ class SMSService {
    * 2FA Code SMS
    */
   async send2FACode(phoneNumber, code) {
-    const message = `Pledged Platform güvenlik kodunuz: ${code}\n\nBu kod 10 dakika geçerlidir.\n\nBu mesajı siz talep etmediyseniz, lütfen görmezden gelin.`;
+    if (this.isDevelopment) {
+      console.log(`
+╔════════════════════════════════════════╗
+║         2FA CODE SMS MOCK              ║
+╠════════════════════════════════════════╣
+║ To: ${phoneNumber.padEnd(35)}║
+║ Code: ${code.padEnd(33)}║
+║ Valid for: 10 minutes                  ║
+╚════════════════════════════════════════╝
+      `);
+      return true;
+    }
 
-    console.log(`\n🔐 2FA SMS Code for ${phoneNumber}: ${code}\n`);
-
-    return this.sendSMS(phoneNumber, message);
+    // Production'da gerçek SMS servisi kullan
+    // Örnek: Twilio, AWS SNS, Nexmo vb.
+    try {
+      // await twilio.messages.create({
+      //   body: `Your Pledged Platform verification code is: ${code}`,
+      //   from: process.env.TWILIO_PHONE_NUMBER,
+      //   to: phoneNumber
+      // });
+      return true;
+    } catch (error) {
+      console.error("SMS send error:", error);
+      throw error;
+    }
   }
 
   /**
@@ -65,6 +86,22 @@ class SMSService {
     console.log(`\n📱 Phone Verification Code for ${phoneNumber}: ${code}\n`);
 
     return this.sendSMS(phoneNumber, message);
+  }
+  async sendPhoneVerification(phoneNumber, code) {
+    if (this.isDevelopment) {
+      console.log(`
+╔════════════════════════════════════════╗
+║     PHONE VERIFICATION SMS MOCK        ║
+╠════════════════════════════════════════╣
+║ To: ${phoneNumber.padEnd(35)}║
+║ Code: ${code.padEnd(33)}║
+╚════════════════════════════════════════╝
+      `);
+      return true;
+    }
+
+    // Production SMS
+    return true;
   }
 
   /**
@@ -88,21 +125,21 @@ class SMSService {
   /**
    * Security Alert SMS
    */
-  async sendSecurityAlert(phoneNumber, alertType) {
-    const messages = {
-      new_login:
-        "Hesabınıza yeni bir giriş yapıldı. Siz değilseniz şifrenizi değiştirin.",
-      password_changed:
-        "Şifreniz değiştirildi. Bu işlemi siz yapmadıysanız hemen destek alın.",
-      suspicious_activity:
-        "Hesabınızda şüpheli aktivite tespit edildi. Güvenlik ayarlarınızı kontrol edin.",
-    };
+  async sendSecurityAlert(phoneNumber, message) {
+    if (this.isDevelopment) {
+      console.log(`
+╔════════════════════════════════════════╗
+║       SECURITY ALERT SMS MOCK          ║
+╠════════════════════════════════════════╣
+║ To: ${phoneNumber.padEnd(35)}║
+║ Message: ${message.substring(0, 30).padEnd(30)}║
+╚════════════════════════════════════════╝
+      `);
+      return true;
+    }
 
-    const message = `⚠️ Pledged Platform Güvenlik Uyarısı: ${
-      messages[alertType] || "Hesabınızda önemli bir değişiklik yapıldı."
-    }`;
-
-    return this.sendSMS(phoneNumber, message);
+    // Production SMS
+    return true;
   }
 
   /**

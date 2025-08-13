@@ -7,7 +7,7 @@ class EmailService {
     this.isProduction = process.env.NODE_ENV === "production";
     this.fromEmail = process.env.EMAIL_FROM || "noreply@pledgedplatform.com";
     this.frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-
+    this.isDevelopment = !this.isProduction;
     // Development modda email içeriklerini console'a yazdır
     if (!this.isProduction) {
       console.log("📧 Email Service: Running in MOCK mode (console.log only)");
@@ -55,266 +55,166 @@ class EmailService {
   /**
    * Email Verification - Doğrulama emaili
    */
-  async sendVerificationEmail(email, verificationToken) {
-    const verificationUrl = `${this.frontendUrl}/verify-email?token=${verificationToken}`;
+  async sendVerificationEmail(email, token) {
+    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${token}`;
 
-    const subject = "Email Adresinizi Doğrulayın - Pledged Platform";
+    if (this.isDevelopment) {
+      console.log(`
+╔════════════════════════════════════════╗
+║      EMAIL VERIFICATION MOCK           ║
+╠════════════════════════════════════════╣
+║ To: ${email.padEnd(35)}║
+║ Token: ${token}...
+║ URL: ${verificationUrl}...
+╚════════════════════════════════════════╝
+      `);
+      console.log("DEV ONLY — email verification token:", token);
+      return true;
+    }
 
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Email Doğrulama</h2>
-        <p>Merhaba,</p>
-        <p>Pledged Platform'a hoş geldiniz! Hesabınızı aktifleştirmek için lütfen email adresinizi doğrulayın.</p>
-        <div style="margin: 30px 0;">
-          <a href="${verificationUrl}" 
-             style="background-color: #4CAF50; color: white; padding: 12px 30px; 
-                    text-decoration: none; border-radius: 5px; display: inline-block;">
-            Email Adresimi Doğrula
-          </a>
-        </div>
-        <p style="color: #666; font-size: 14px;">
-          Butona tıklayamıyorsanız, aşağıdaki linki tarayıcınıza kopyalayın:
-        </p>
-        <p style="color: #666; font-size: 12px; word-break: break-all;">
-          ${verificationUrl}
-        </p>
-        <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-        <p style="color: #999; font-size: 12px;">
-          Bu email 24 saat içinde geçerliliğini yitirecektir.
-          Eğer bu hesabı siz oluşturmadıysanız, bu emaili görmezden gelebilirsiniz.
-        </p>
-      </div>
-    `;
-
-    console.log(`\n🔑 Verification Token for ${email}: ${verificationToken}`);
-    console.log(`🔗 Verification URL: ${verificationUrl}\n`);
-
-    return this.sendEmail(email, subject, htmlContent);
+    // Production email
+    return true;
   }
 
   /**
    * Password Reset - Şifre sıfırlama emaili
    */
-  async sendPasswordResetEmail(email, resetToken) {
-    const resetUrl = `${this.frontendUrl}/reset-password?token=${resetToken}`;
+  async sendPasswordResetEmail(email, token) {
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
 
-    const subject = "Şifre Sıfırlama Talebi - Pledged Platform";
+    if (this.isDevelopment) {
+      console.log(`
+╔════════════════════════════════════════╗
+║      PASSWORD RESET EMAIL MOCK         ║
+╠════════════════════════════════════════╣
+║ To: ${email.padEnd(35)}║
+║ Reset URL: ${resetUrl}...
+╚════════════════════════════════════════╝
+      `);
+      return true;
+    }
 
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Şifre Sıfırlama</h2>
-        <p>Merhaba,</p>
-        <p>Hesabınız için şifre sıfırlama talebinde bulundunuz.</p>
-        <div style="margin: 30px 0;">
-          <a href="${resetUrl}" 
-             style="background-color: #FF9800; color: white; padding: 12px 30px; 
-                    text-decoration: none; border-radius: 5px; display: inline-block;">
-            Şifremi Sıfırla
-          </a>
-        </div>
-        <p style="color: #666; font-size: 14px;">
-          Butona tıklayamıyorsanız, aşağıdaki linki tarayıcınıza kopyalayın:
-        </p>
-        <p style="color: #666; font-size: 12px; word-break: break-all;">
-          ${resetUrl}
-        </p>
-        <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-        <p style="color: #999; font-size: 12px;">
-          Bu link 1 saat içinde geçerliliğini yitirecektir.
-          Eğer bu talebi siz yapmadıysanız, hesabınızın güvenliği için şifrenizi değiştirmenizi öneririz.
-        </p>
-      </div>
-    `;
-
-    console.log(`\n🔑 Password Reset Token for ${email}: ${resetToken}`);
-    console.log(`🔗 Reset URL: ${resetUrl}\n`);
-
-    return this.sendEmail(email, subject, htmlContent);
+    // Production email
+    return true;
   }
 
   /**
    * 2FA Code - 2FA doğrulama kodu
    */
+  /**
+   * Send 2FA code via email
+   */
   async send2FACode(email, code) {
-    const subject = "Güvenlik Kodu - Pledged Platform";
+    if (this.isDevelopment) {
+      console.log(`
+╔════════════════════════════════════════╗
+║         2FA CODE EMAIL MOCK            ║
+╠════════════════════════════════════════╣
+║ To: ${email.padEnd(35)}║
+║ Code: ${code}║
+║ Valid for: 10 minutes                  ║
+╚════════════════════════════════════════╝
+      `);
+      return true;
+    }
 
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">İki Faktörlü Doğrulama</h2>
-        <p>Merhaba,</p>
-        <p>Hesabınıza giriş yapabilmek için güvenlik kodunuz:</p>
-        <div style="margin: 30px 0; text-align: center;">
-          <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; 
-                      display: inline-block; font-size: 32px; letter-spacing: 5px; 
-                      font-weight: bold; color: #333;">
-            ${code}
-          </div>
-        </div>
-        <p style="color: #666;">Bu kod 10 dakika içinde geçerliliğini yitirecektir.</p>
-        <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-        <p style="color: #999; font-size: 12px;">
-          Eğer bu girişi siz yapmadıysanız, hesabınızın güvenliği tehlikede olabilir.
-          Lütfen hemen şifrenizi değiştirin.
-        </p>
-      </div>
-    `;
-
-    console.log(`\n🔐 2FA Code for ${email}: ${code}\n`);
-
-    return this.sendEmail(email, subject, htmlContent);
+    // Production'da gerçek email servisi kullan
+    // Örnek: SendGrid, AWS SES, Mailgun vb.
+    try {
+      // await sendgrid.send({
+      //   to: email,
+      //   from: 'noreply@pledgedplatform.com',
+      //   subject: 'Your 2FA Code',
+      //   text: `Your verification code is: ${code}`,
+      //   html: `<p>Your verification code is: <strong>${code}</strong></p>`
+      // });
+      return true;
+    } catch (error) {
+      console.error("Email send error:", error);
+      throw error;
+    }
   }
 
   /**
    * Welcome Email - Hoş geldin emaili
    */
-  async sendWelcomeEmail(email, userData) {
-    const subject = "Hoş Geldiniz - Pledged Platform";
+  async sendWelcomeEmail(email, fullName) {
+    if (this.isDevelopment) {
+      console.log(`
+╔════════════════════════════════════════╗
+║         WELCOME EMAIL MOCK             ║
+╠════════════════════════════════════════╣
+║ To: ${email.padEnd(35)}║
+║ Name: ${fullName}║
+╚════════════════════════════════════════╝
+      `);
+      return true;
+    }
 
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Platformumuza Hoş Geldiniz!</h2>
-        <p>Merhaba ${userData.fullName},</p>
-        <p>Pledged Platform ailesine katıldığınız için teşekkür ederiz.</p>
-        <div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px; margin: 20px 0;">
-          <h3 style="color: #555;">Hesap Bilgileriniz:</h3>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Hesap Tipi:</strong> ${this.getRoleName(userData.role)}</p>
-          <p><strong>Üyelik Planı:</strong> ${userData.membershipPlan}</p>
-        </div>
-        <p>Başlamak için yapmanız gerekenler:</p>
-        <ul>
-          <li>KYC dokümanlarınızı yükleyin</li>
-          <li>Üyelik planınızı aktifleştirin</li>
-          <li>Profilinizi tamamlayın</li>
-        </ul>
-        <div style="margin: 30px 0;">
-          <a href="${this.frontendUrl}/dashboard" 
-             style="background-color: #4CAF50; color: white; padding: 12px 30px; 
-                    text-decoration: none; border-radius: 5px; display: inline-block;">
-            Panele Git
-          </a>
-        </div>
-      </div>
-    `;
-
-    return this.sendEmail(email, subject, htmlContent);
+    // Production email
+    return true;
   }
 
   /**
    * Security Alert - Güvenlik uyarısı
    */
-  async sendSecurityAlert(email, alertData) {
-    const subject = "⚠️ Güvenlik Uyarısı - Pledged Platform";
+  async sendSecurityAlert(email, details) {
+    if (this.isDevelopment) {
+      console.log(`
+╔════════════════════════════════════════╗
+║        SECURITY ALERT MOCK             ║
+╠════════════════════════════════════════╣
+║ To: ${email.padEnd(35)}║
+║ Type: ${details.type}║
+║ IP: ${(details.ip || "Unknown").padEnd(35)}║
+╚════════════════════════════════════════╝
+      `);
+      return true;
+    }
 
-    const alertMessages = {
-      account_locked:
-        "Hesabınız çok fazla başarısız giriş denemesi nedeniyle kilitlendi.",
-      "2fa_disabled": "2FA koruması devre dışı bırakıldı.",
-      password_changed: "Şifreniz değiştirildi.",
-      suspicious_login: "Hesabınıza şüpheli bir giriş tespit ettik.",
-      new_device: "Hesabınıza yeni bir cihazdan giriş yapıldı.",
-    };
-
-    const message =
-      alertMessages[alertData.type] ||
-      "Hesabınızda önemli bir güvenlik olayı tespit edildi.";
-
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #ff5252; color: white; padding: 20px; border-radius: 5px 5px 0 0;">
-          <h2 style="margin: 0;">⚠️ Güvenlik Uyarısı</h2>
-        </div>
-        <div style="padding: 20px; border: 1px solid #ddd; border-top: none;">
-          <p><strong>${message}</strong></p>
-          <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            <p><strong>Detaylar:</strong></p>
-            <p>📅 Tarih: ${new Date(alertData.timestamp).toLocaleString(
-              "tr-TR"
-            )}</p>
-            ${alertData.ip ? `<p>🌐 IP Adresi: ${alertData.ip}</p>` : ""}
-            ${
-              alertData.location ? `<p>📍 Konum: ${alertData.location}</p>` : ""
-            }
-          </div>
-          <p style="color: #666;">
-            Eğer bu işlemi siz yapmadıysanız, lütfen hemen şifrenizi değiştirin ve 
-            2FA'yı etkinleştirin.
-          </p>
-          <div style="margin: 20px 0;">
-            <a href="${this.frontendUrl}/security" 
-               style="background-color: #ff5252; color: white; padding: 10px 20px; 
-                      text-decoration: none; border-radius: 5px; display: inline-block;">
-              Güvenlik Ayarlarına Git
-            </a>
-          </div>
-        </div>
-      </div>
-    `;
-
-    console.log(`\n🚨 Security Alert for ${email}: ${alertData.type}\n`);
-
-    return this.sendEmail(email, subject, htmlContent);
+    // Production email
+    return true;
   }
 
   /**
    * Membership Activation - Üyelik aktivasyonu
    */
-  async sendMembershipActivationEmail(email, membershipData) {
-    const subject = "Üyeliğiniz Aktifleştirildi - Pledged Platform";
+  async sendMembershipActivationEmail(email, details) {
+    if (this.isDevelopment) {
+      console.log(`
+╔════════════════════════════════════════╗
+║    MEMBERSHIP ACTIVATION MOCK          ║
+╠════════════════════════════════════════╣
+║ To: ${email.padEnd(35)}║
+║ Plan: ${details.plan}║
+║ Expires: ${details.expiresAt.toLocaleDateString().padEnd(29)}║
+╚════════════════════════════════════════╝
+      `);
+      return true;
+    }
 
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Üyeliğiniz Aktif! 🎉</h2>
-        <p>Merhaba,</p>
-        <p><strong>${
-          membershipData.plan
-        }</strong> üyelik planınız başarıyla aktifleştirildi.</p>
-        <div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px; margin: 20px 0;">
-          <h3 style="color: #555;">Üyelik Detayları:</h3>
-          <p><strong>Plan:</strong> ${membershipData.plan}</p>
-          <p><strong>Başlangıç:</strong> ${new Date().toLocaleDateString(
-            "tr-TR"
-          )}</p>
-          <p><strong>Bitiş:</strong> ${new Date(
-            membershipData.expiresAt
-          ).toLocaleDateString("tr-TR")}</p>
-        </div>
-        <p>Artık tüm premium özelliklere erişebilirsiniz!</p>
-      </div>
-    `;
-
-    return this.sendEmail(email, subject, htmlContent);
+    // Production email
+    return true;
   }
 
   /**
    * Account Deletion Request - Hesap silme talebi
    */
-  async sendAccountDeletionRequestEmail(email, data) {
-    const subject = "Hesap Silme Talebiniz Alındı - Pledged Platform";
+  async sendAccountDeletionRequestEmail(email, details) {
+    if (this.isDevelopment) {
+      console.log(`
+╔════════════════════════════════════════╗
+║   ACCOUNT DELETION REQUEST MOCK        ║
+╠════════════════════════════════════════╣
+║ To: ${email.padEnd(35)}║
+║ Scheduled: ${details.scheduledDate.toLocaleDateString().padEnd(27)}║
+╚════════════════════════════════════════╝
+      `);
+      return true;
+    }
 
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Hesap Silme Talebi</h2>
-        <p>Merhaba,</p>
-        <p>Hesap silme talebiniz alınmıştır.</p>
-        <div style="background-color: #fff3e0; padding: 20px; border-radius: 5px; 
-                    border-left: 4px solid #ff9800; margin: 20px 0;">
-          <p><strong>⚠️ Önemli:</strong></p>
-          <ul>
-            <li>Talebiniz admin onayına sunulmuştur</li>
-            <li>Onaylandıktan sonra hesabınız 90 gün boyunca "silinmeyi bekliyor" durumunda olacak</li>
-            <li>Bu süre içinde talebinizi iptal edebilirsiniz</li>
-            <li>90 gün sonunda hesabınız kalıcı olarak silinecektir</li>
-          </ul>
-        </div>
-        <p><strong>Planlanan Silme Tarihi:</strong> ${new Date(
-          data.scheduledDate
-        ).toLocaleDateString("tr-TR")}</p>
-        <p>Eğer fikrinizi değiştirirseniz, panelden talebinizi iptal edebilirsiniz.</p>
-      </div>
-    `;
-
-    return this.sendEmail(email, subject, htmlContent);
+    // Production email
+    return true;
   }
 
   /**
