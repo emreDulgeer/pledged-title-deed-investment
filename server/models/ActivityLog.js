@@ -33,6 +33,7 @@ const ActivityLogSchema = new mongoose.Schema(
         "membership_downgraded",
         "membership_cancelled",
         "revoke_all_sessions",
+        "sessions_invalidated",
 
         // Security actions
         "suspicious_login_attempt",

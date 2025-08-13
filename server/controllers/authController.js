@@ -1603,7 +1603,7 @@ class AuthController {
       user.is2FAEnabled = true;
       await user.save();
 
-      // Generate backup codes - Internal method kullan
+      // Generate backup codes
       const backupCodes = this.generateBackupCodesInternal();
       const hashedBackupCodes = backupCodes.map((code) =>
         crypto.createHash("sha256").update(code).digest("hex")
@@ -1612,21 +1612,34 @@ class AuthController {
       twoFactorAuth.backupCodes = hashedBackupCodes;
       await twoFactorAuth.save();
 
+      // TÜM OTURUMLARI SONLANDIR (güvenlik için)
+      await this.invalidateAllUserSessions(user._id, "2fa_enabled");
+
       // Log 2FA activation
       await ActivityLog.create({
         user: userId,
         action: "2fa_enabled",
         details: {
           method: twoFactorAuth.method,
+          allSessionsRevoked: true,
         },
         ip: req.ip,
         severity: "high",
       });
 
+      // Security alert
+      await emailService.sendSecurityAlert(user.email, {
+        type: "2fa_enabled",
+        method: twoFactorAuth.method,
+        ip: req.ip,
+        timestamp: new Date(),
+        note: "2FA etkinleştirildi. Güvenlik için tüm oturumlarınız sonlandırıldı.",
+      });
+
       return responseWrapper.success(res, {
         backupCodes,
         message:
-          "2FA başarıyla etkinleştirildi. Yedek kodlarınızı güvenli bir yerde saklayın.",
+          "2FA başarıyla etkinleştirildi. Yedek kodlarınızı güvenli bir yerde saklayın. Tüm cihazlarda tekrar giriş yapmanız gerekecek.",
       });
     } catch (error) {
       console.error("Enable 2FA error:", error);
@@ -1928,11 +1941,8 @@ class AuthController {
       // Delete token
       await storedToken.deleteOne();
 
-      // Invalidate all existing sessions
-      await Token.deleteMany({
-        user: user._id,
-        type: "refresh",
-      });
+      // TÜM OTURUMLARI SONLANDIR
+      await this.invalidateAllUserSessions(user._id, "password_reset");
 
       // Log password reset
       await ActivityLog.create({
@@ -1940,6 +1950,7 @@ class AuthController {
         action: "password_reset_completed",
         details: {
           ip: req.ip,
+          allSessionsRevoked: true,
         },
         ip: req.ip,
         severity: "high",
@@ -1948,10 +1959,18 @@ class AuthController {
       // Send confirmation email
       await emailService.sendPasswordResetConfirmation(user.email);
 
+      // Security alert
+      await emailService.sendSecurityAlert(user.email, {
+        type: "password_changed",
+        ip: req.ip,
+        timestamp: new Date(),
+        note: "Tüm oturumlarınız güvenlik nedeniyle sonlandırıldı. Lütfen tekrar giriş yapın.",
+      });
+
       return responseWrapper.success(
         res,
         null,
-        "Şifreniz başarıyla sıfırlandı"
+        "Şifreniz başarıyla sıfırlandı. Güvenlik için tüm oturumlarınız sonlandırıldı."
       );
     } catch (error) {
       console.error("Reset password error:", error);
@@ -1967,15 +1986,35 @@ class AuthController {
    */
   changePassword = async (req, res) => {
     try {
+      const { oldPassword, newPassword, confirmPassword } = req.body;
       const userId = req.user.id;
-      const { currentPassword, newPassword, confirmPassword } = req.body;
 
-      if (!currentPassword || !newPassword || !confirmPassword) {
+      if (!oldPassword || !newPassword || !confirmPassword) {
         return responseWrapper.badRequest(res, "Tüm alanlar zorunludur");
       }
 
       if (newPassword !== confirmPassword) {
         return responseWrapper.badRequest(res, "Yeni şifreler eşleşmiyor");
+      }
+
+      // Get user with password
+      const user = await User.findById(userId).select("+password");
+      if (!user) {
+        return responseWrapper.notFound(res, "Kullanıcı bulunamadı");
+      }
+
+      // Verify old password
+      const isValidPassword = await bcrypt.compare(oldPassword, user.password);
+      if (!isValidPassword) {
+        return responseWrapper.unauthorized(res, "Mevcut şifre hatalı");
+      }
+
+      // Check if new password is same as old
+      if (oldPassword === newPassword) {
+        return responseWrapper.badRequest(
+          res,
+          "Yeni şifre eski şifre ile aynı olamaz"
+        );
       }
 
       // Check password strength
@@ -1984,31 +2023,21 @@ class AuthController {
         return responseWrapper.badRequest(res, passwordStrength.message);
       }
 
-      // Get user
-      const user = await User.findById(userId).select("+password");
-
-      // Verify current password
-      const isPasswordValid = await bcrypt.compare(
-        currentPassword,
-        user.password
-      );
-      if (!isPasswordValid) {
-        return responseWrapper.unauthorized(res, "Mevcut şifre hatalı");
-      }
-
-      // Check if new password is same as current
-      const isSamePassword = await bcrypt.compare(newPassword, user.password);
-      if (isSamePassword) {
-        return responseWrapper.badRequest(
-          res,
-          "Yeni şifre mevcut şifre ile aynı olamaz"
-        );
-      }
-
       // Update password
       user.password = await bcrypt.hash(newPassword, 12);
       user.passwordChangedAt = new Date();
+      user.passwordResetRequired = false;
       await user.save();
+
+      // Mevcut token'ı al
+      const currentToken = req.headers.authorization?.replace("Bearer ", "");
+
+      // TÜM DİĞER OTURUMLARI SONLANDIR (mevcut hariç)
+      await this.invalidateAllUserSessions(
+        user._id,
+        "password_changed",
+        currentToken
+      );
 
       // Log password change
       await ActivityLog.create({
@@ -2016,24 +2045,33 @@ class AuthController {
         action: "password_changed",
         details: {
           ip: req.ip,
+          allOtherSessionsRevoked: true,
         },
         ip: req.ip,
         severity: "high",
       });
 
       // Send confirmation email
-      await emailService.sendPasswordChangeNotification(user.email);
+      await emailService.sendPasswordChangeConfirmation(user.email);
+
+      // Security alert
+      await emailService.sendSecurityAlert(user.email, {
+        type: "password_changed",
+        ip: req.ip,
+        timestamp: new Date(),
+        note: "Diğer tüm oturumlarınız güvenlik nedeniyle sonlandırıldı.",
+      });
 
       return responseWrapper.success(
         res,
         null,
-        "Şifreniz başarıyla değiştirildi"
+        "Şifreniz başarıyla değiştirildi. Diğer cihazlarda tekrar giriş yapmanız gerekecek."
       );
     } catch (error) {
       console.error("Change password error:", error);
       return responseWrapper.error(
         res,
-        "Şifre değiştirme sırasında bir hata oluştu"
+        "Şifre değiştirme sırasında hata oluştu"
       );
     }
   };
@@ -2703,19 +2741,59 @@ class AuthController {
 
       // Şifre doğrulama
       const user = await User.findById(userId).select("+password");
-      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!user) {
+        return responseWrapper.notFound(res, "Kullanıcı bulunamadı");
+      }
 
+      const isPasswordValid = await bcrypt.compare(password, user.password);
       if (!isPasswordValid) {
         return responseWrapper.unauthorized(res, "Şifre hatalı");
       }
 
-      // Mevcut token hariç tüm token'ları sil
-      const currentToken = req.headers.authorization?.replace("Bearer ", "");
+      // Mevcut token'ı bul
+      const authHeader = req.headers.authorization;
+      let currentTokenHash = null;
 
-      await Token.deleteMany({
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        const currentToken = authHeader.substring(7);
+        // Token'ı hash'le ki veritabanındaki ile karşılaştırabilelim
+        currentTokenHash = crypto
+          .createHash("sha256")
+          .update(currentToken)
+          .digest("hex");
+      }
+
+      // Tüm refresh token'ları sil (mevcut hariç)
+      const deleteQuery = {
         user: userId,
-        token: { $ne: currentToken },
+        type: { $in: ["refresh", "access"] },
+      };
+
+      // Eğer mevcut token varsa, onu hariç tut
+      if (currentTokenHash) {
+        deleteQuery.token = { $ne: currentTokenHash };
+      }
+
+      const result = await Token.deleteMany(deleteQuery);
+      console.log(`Deleted ${result.deletedCount} tokens for user ${userId}`);
+
+      // Tüm access token'ları blacklist'e ekle
+      const activeTokens = await Token.find({
+        user: userId,
+        type: "access",
+        expiresAt: { $gt: new Date() },
       });
+
+      for (const token of activeTokens) {
+        await BlacklistedToken.create({
+          token: token.token,
+          tokenType: "access",
+          user: userId,
+          expiresAt: token.expiresAt,
+          reason: "all_sessions_revoked",
+          ip: req.ip,
+        });
+      }
 
       // Activity log
       await ActivityLog.create({
@@ -2724,12 +2802,24 @@ class AuthController {
         details: {
           reason: "User initiated",
           ip: req.ip,
+          sessionsRevoked: result.deletedCount,
         },
         ip: req.ip,
         severity: "medium",
       });
 
-      return responseWrapper.success(res, null, "Tüm oturumlar sonlandırıldı");
+      // Email bildirimi gönder
+      await emailService.sendSecurityAlert(user.email, {
+        type: "all_sessions_revoked",
+        ip: req.ip,
+        timestamp: new Date(),
+      });
+
+      return responseWrapper.success(res, {
+        sessionsRevoked: result.deletedCount,
+        message:
+          "Tüm oturumlar sonlandırıldı. Güvenlik için tekrar giriş yapmanız gerekecek.",
+      });
     } catch (error) {
       console.error("Revoke all sessions error:", error);
       return responseWrapper.error(res, "Oturumlar sonlandırılamadı");
@@ -3023,13 +3113,13 @@ class AuthController {
       }
 
       // Pagination ayarları
-      const skip = (page - 1) * limit;
+      const skip = (parseInt(page) - 1) * parseInt(limit);
       const sort = { [sortBy]: sortOrder === "asc" ? 1 : -1 };
 
       // Kullanıcıları getir
       const users = await User.find(filter)
         .select(
-          "fullName email role country kycStatus createdAt membershipPlan"
+          "fullName email role country kycStatus createdAt membershipPlan phoneNumber"
         )
         .sort(sort)
         .skip(skip)
@@ -3044,7 +3134,9 @@ class AuthController {
           page: parseInt(page),
           limit: parseInt(limit),
           total,
-          pages: Math.ceil(total / limit),
+          pages: Math.ceil(total / parseInt(limit)),
+          hasNext: parseInt(page) < Math.ceil(total / parseInt(limit)),
+          hasPrev: parseInt(page) > 1,
         },
       });
     } catch (error) {
@@ -3119,6 +3211,46 @@ class AuthController {
       "Oturum iptal özelliği henüz aktif değil"
     );
   };
+  async invalidateAllUserSessions(
+    userId,
+    reason = "security_action",
+    excludeCurrentToken = null
+  ) {
+    try {
+      // Tüm refresh ve access token'ları sil
+      const deleteQuery = {
+        user: userId,
+        type: { $in: ["refresh", "access"] },
+      };
+
+      // Mevcut token'ı hariç tut (opsiyonel)
+      if (excludeCurrentToken) {
+        const hashedToken = crypto
+          .createHash("sha256")
+          .update(excludeCurrentToken)
+          .digest("hex");
+        deleteQuery.token = { $ne: hashedToken };
+      }
+
+      const result = await Token.deleteMany(deleteQuery);
+
+      // Activity log
+      await ActivityLog.create({
+        user: userId,
+        action: "sessions_invalidated",
+        details: {
+          reason,
+          sessionsRevoked: result.deletedCount,
+        },
+        severity: "high",
+      });
+
+      return result.deletedCount;
+    } catch (error) {
+      console.error("Invalidate sessions error:", error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new AuthController();
