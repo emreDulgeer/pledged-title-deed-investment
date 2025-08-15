@@ -81,15 +81,13 @@ const checkMembership = (options = {}) => {
           return responseWrapper.error(res, "Gerekli plan bilgisi bulunamadı");
         }
 
-        // Fiyat bazlı karşılaştırma
-        const userPlanPrice = userPlan.pricing.monthly.amount;
-        const requiredPlanPrice = requiredPlan.pricing.monthly.amount;
-
-        if (userPlanPrice < requiredPlanPrice) {
+        // tier bazlı karşılaştırma
+        const userTier = userPlan.tier ?? 1;
+        const requiredTier = requiredPlan.tier ?? 1;
+        if (userTier < requiredTier) {
           return responseWrapper.forbidden(
             res,
-            `Bu işlem için minimum ${requiredPlan.displayName} üyelik planı gereklidir. ` +
-              `Planınızı yükseltmeyi düşünebilirsiniz.`
+            `Bu işlem için minimum ${requiredPlan.displayName} üyelik planı gereklidir. Planınızı yükseltmeyi düşünebilirsiniz.`
           );
         }
       }

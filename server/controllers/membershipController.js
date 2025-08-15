@@ -64,77 +64,38 @@ class MembershipController {
       return responseWrapper.error(res, "Planlar getirilemedi");
     }
   }
-
-  /**
-   * Plan değişikliği talebi (Admin onayı gerekir)
-   */
-  async requestPlanChange(req, res) {
+  async activateNow(req, res, next) {
     try {
-      const { planId, reason } = req.body;
-      const userId = req.user.id;
-
-      // Plan kontrolü
-      const plan = await MembershipPlan.findById(planId);
-      if (!plan || !plan.isActive) {
-        return responseWrapper.badRequest(
-          res,
-          "Geçersiz veya aktif olmayan plan"
-        );
-      }
-
-      // Mevcut membership kontrolü
-      const membership = await Membership.findOne({ user: userId }).populate(
-        "plan"
-      );
-
-      if (!membership) {
-        // İlk kez membership oluşturuluyor
-        const newMembership = await membershipService.createMembership(
-          userId,
-          plan.name
-        );
-        return responseWrapper.success(
-          res,
-          { membership: newMembership },
-          "Üyelik oluşturuldu. Admin onayı bekleniyor."
-        );
-      }
-
-      if (membership.plan._id.toString() === planId) {
-        return responseWrapper.badRequest(
-          res,
-          "Zaten bu planda üyeliğiniz var"
-        );
-      }
-
-      // Plan değişiklik talebini kaydet
-      membership.metadata.planChangeRequest = {
-        requestedPlan: planId,
-        requestedAt: new Date(),
-        reason: reason || "Plan değişikliği talebi",
-        status: "pending",
-      };
-
-      await membership.save();
-
-      return responseWrapper.success(
-        res,
-        {
-          currentPlan: membership.plan.displayName,
-          requestedPlan: plan.displayName,
-          status: "pending",
-        },
-        "Plan değişiklik talebiniz alındı. Admin onayı bekleniyor."
-      );
-    } catch (error) {
-      console.error("Request plan change error:", error);
-      return responseWrapper.error(
-        res,
-        "Plan değişiklik talebi oluşturulamadı"
-      );
+      const { planId, interval = "monthly", promoCode } = req.body;
+      const membership = await membershipService.activateMembership({
+        userId: req.user.id,
+        planId,
+        interval,
+        promoCode,
+      });
+      res.json({
+        success: true,
+        data: membership,
+        message: "Membership activated",
+      });
+    } catch (err) {
+      next(err);
     }
   }
-
+  async changePlanNow(req, res, next) {
+    try {
+      const { planId, interval = "monthly", promoCode } = req.body;
+      const membership = await membershipService.changePlan({
+        userId: req.user.id,
+        newPlanId: planId,
+        interval,
+        promoCode,
+      });
+      res.json({ success: true, data: membership, message: "Plan changed" });
+    } catch (err) {
+      next(err);
+    }
+  }
   /**
    * Üyeliği iptal et (Basic plana geç)
    */
@@ -159,207 +120,6 @@ class MembershipController {
     } catch (error) {
       console.error("Cancel membership error:", error);
       return responseWrapper.error(res, "Üyelik iptal edilemedi");
-    }
-  }
-
-  /**
-   * Admin: Kullanıcıya üyelik ver/değiştir
-   */
-  async grantMembership(req, res) {
-    try {
-      const { userId, planId, duration = 30, reason } = req.body;
-      const adminId = req.user.id;
-
-      // Kullanıcı kontrolü
-      const User = require("../models/User");
-      const user = await User.findById(userId);
-      if (!user) {
-        return responseWrapper.notFound(res, "Kullanıcı bulunamadı");
-      }
-
-      // Plan kontrolü
-      const plan = await MembershipPlan.findById(planId);
-      if (!plan || !plan.isActive) {
-        return responseWrapper.badRequest(
-          res,
-          "Geçersiz veya aktif olmayan plan"
-        );
-      }
-
-      // Membership var mı kontrol et
-      let membership = await Membership.findOne({ user: userId });
-
-      if (membership) {
-        // Plan değiştir
-        membership = await membershipService.changePlan(
-          userId,
-          planId,
-          adminId
-        );
-      } else {
-        // Yeni membership oluştur ve aktifleştir
-        await membershipService.createMembership(userId, plan.name);
-        membership = await membershipService.activateMembership(
-          userId,
-          planId,
-          adminId
-        );
-      }
-
-      // Süre ekle
-      if (duration > 0) {
-        membership = await membershipService.renewMembership(
-          userId,
-          duration,
-          adminId
-        );
-      }
-
-      await membership.populate("plan");
-
-      return responseWrapper.success(
-        res,
-        {
-          user: {
-            id: user._id,
-            fullName: user.fullName,
-            email: user.email,
-          },
-          membership: {
-            plan: membership.plan.displayName,
-            status: membership.status,
-            expiresAt: membership.expiresAt,
-          },
-        },
-        "Üyelik başarıyla verildi/güncellendi"
-      );
-    } catch (error) {
-      console.error("Grant membership error:", error);
-      return responseWrapper.error(res, "Üyelik verilemedi");
-    }
-  }
-
-  /**
-   * Admin: Plan değişiklik taleplerini listele
-   */
-  async getPlanChangeRequests(req, res) {
-    try {
-      const pendingRequests = await Membership.find({
-        "metadata.planChangeRequest.status": "pending",
-      })
-        .populate("user", "fullName email")
-        .populate("plan")
-        .populate("metadata.planChangeRequest.requestedPlan");
-
-      const requests = pendingRequests.map((membership) => ({
-        id: membership._id,
-        user: {
-          id: membership.user._id,
-          fullName: membership.user.fullName,
-          email: membership.user.email,
-        },
-        currentPlan: membership.plan.displayName,
-        requestedPlan: membership.metadata.planChangeRequest.requestedPlan,
-        reason: membership.metadata.planChangeRequest.reason,
-        requestedAt: membership.metadata.planChangeRequest.requestedAt,
-      }));
-
-      return responseWrapper.success(
-        res,
-        { requests },
-        "Plan değişiklik talepleri"
-      );
-    } catch (error) {
-      console.error("Get plan change requests error:", error);
-      return responseWrapper.error(res, "Talepler getirilemedi");
-    }
-  }
-
-  /**
-   * Admin: Plan değişiklik talebini onayla
-   */
-  async approvePlanChange(req, res) {
-    try {
-      const { membershipId } = req.params;
-      const adminId = req.user.id;
-
-      const membership = await Membership.findById(membershipId);
-      if (!membership) {
-        return responseWrapper.notFound(res, "Üyelik bulunamadı");
-      }
-
-      if (
-        !membership.metadata.planChangeRequest ||
-        membership.metadata.planChangeRequest.status !== "pending"
-      ) {
-        return responseWrapper.badRequest(
-          res,
-          "Bekleyen plan değişiklik talebi yok"
-        );
-      }
-
-      const requestedPlanId =
-        membership.metadata.planChangeRequest.requestedPlan;
-
-      // Plan değiştir
-      await membershipService.changePlan(
-        membership.user,
-        requestedPlanId,
-        adminId
-      );
-
-      // Talebi güncelle
-      membership.metadata.planChangeRequest.status = "approved";
-      membership.metadata.planChangeRequest.approvedBy = adminId;
-      membership.metadata.planChangeRequest.approvedAt = new Date();
-      await membership.save();
-
-      return responseWrapper.success(res, null, "Plan değişikliği onaylandı");
-    } catch (error) {
-      console.error("Approve plan change error:", error);
-      return responseWrapper.error(res, "Plan değişikliği onaylanamadı");
-    }
-  }
-
-  /**
-   * Admin: Plan değişiklik talebini reddet
-   */
-  async rejectPlanChange(req, res) {
-    try {
-      const { membershipId } = req.params;
-      const { rejectionReason } = req.body;
-      const adminId = req.user.id;
-
-      const membership = await Membership.findById(membershipId);
-      if (!membership) {
-        return responseWrapper.notFound(res, "Üyelik bulunamadı");
-      }
-
-      if (
-        !membership.metadata.planChangeRequest ||
-        membership.metadata.planChangeRequest.status !== "pending"
-      ) {
-        return responseWrapper.badRequest(
-          res,
-          "Bekleyen plan değişiklik talebi yok"
-        );
-      }
-
-      // Talebi reddet
-      membership.metadata.planChangeRequest.status = "rejected";
-      membership.metadata.planChangeRequest.rejectedBy = adminId;
-      membership.metadata.planChangeRequest.rejectedAt = new Date();
-      membership.metadata.planChangeRequest.rejectionReason = rejectionReason;
-      await membership.save();
-
-      return responseWrapper.success(
-        res,
-        null,
-        "Plan değişiklik talebi reddedildi"
-      );
-    } catch (error) {
-      console.error("Reject plan change error:", error);
-      return responseWrapper.error(res, "Plan değişiklik talebi reddedilemedi");
     }
   }
 

@@ -74,7 +74,7 @@ class MembershipService {
   /**
    * Membership'i aktifleştir (Admin onayı veya ödeme sonrası)
    */
-  async activateMembership(userId, planId, adminId = null) {
+  async activateMembership(userId, planId) {
     try {
       // Plan bilgisini getir
       const plan = await MembershipPlan.findById(planId);
@@ -106,16 +106,6 @@ class MembershipService {
       expiryDate.setDate(expiryDate.getDate() + 30);
       membership.expiresAt = expiryDate;
       membership.nextBillingDate = expiryDate;
-
-      // Admin tarafından aktifleştirildiyse kaydet
-      if (adminId) {
-        membership.adminOverride = {
-          isOverridden: true,
-          overriddenBy: adminId,
-          overriddenAt: new Date(),
-          overrideReason: "Admin tarafından aktifleştirildi",
-        };
-      }
 
       await membership.save();
 
@@ -163,9 +153,9 @@ class MembershipService {
   }
 
   /**
-   * Plan değiştir (Admin onayı ile)
+   * Plan değiştir
    */
-  async changePlan(userId, newPlanId, adminId = null) {
+  async changePlan(userId, newPlanId) {
     try {
       const membership = await Membership.findOne({ user: userId }).populate(
         "plan"
@@ -254,15 +244,6 @@ class MembershipService {
         currency: newPlan.pricing.monthly.currency,
         interval: "monthly",
       };
-
-      if (adminId) {
-        membership.adminOverride = {
-          isOverridden: true,
-          overriddenBy: adminId,
-          overriddenAt: new Date(),
-          overrideReason: "Admin tarafından plan değiştirildi",
-        };
-      }
 
       await membership.save();
 
@@ -354,7 +335,7 @@ class MembershipService {
   /**
    * Üyeliği yenile (süre uzatma)
    */
-  async renewMembership(userId, days = 30, adminId = null) {
+  async renewMembership(userId, days = 30) {
     try {
       const membership = await Membership.findOne({ user: userId });
       if (!membership) {
@@ -369,16 +350,6 @@ class MembershipService {
       membership.expiresAt = newExpiry;
       membership.renewalDate = new Date();
       membership.status = "active";
-
-      if (adminId) {
-        membership.adminOverride = {
-          isOverridden: true,
-          overriddenBy: adminId,
-          overriddenAt: new Date(),
-          overrideReason: `${days} gün süre uzatıldı`,
-          overrideExpiresAt: newExpiry,
-        };
-      }
 
       await membership.save();
 

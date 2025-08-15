@@ -289,24 +289,4 @@ MembershipSchema.statics.getPlanByName = async function (planName) {
   });
 };
 
-// Hooks
-MembershipSchema.pre("save", function (next) {
-  // Otomatik olarak özellikleri güncelle
-  if (this.isModified("plan")) {
-    this.features = this.constructor.getPlanFeatures(this.plan);
-  }
-
-  // Fiyatlandırmayı güncelle
-  if (this.isModified("plan") || this.isModified("pricing.interval")) {
-    const pricing = this.constructor.getPlanPricing(
-      this.plan,
-      this.pricing.interval
-    );
-    this.pricing.amount = pricing.amount;
-    this.pricing.currency = pricing.currency;
-  }
-
-  next();
-});
-
 module.exports = mongoose.model("Membership", MembershipSchema);

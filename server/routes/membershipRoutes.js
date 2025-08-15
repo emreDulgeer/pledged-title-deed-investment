@@ -44,9 +44,6 @@ router.post(
   membershipController.cancel
 );
 
-// ==================== ADMIN ROUTES ====================
-
-// Admin: Kullanıcıya üyelik ver/değiştir
 router.post(
   "/activate",
   auth,
@@ -57,40 +54,6 @@ router.post(
   ],
   validateRequest,
   membershipController.activateNow
-);
-
-// Admin: Plan değişiklik taleplerini listele
-router.get(
-  "/admin/plan-change-requests",
-  auth,
-  authorize(["admin"]),
-  membershipController.getPlanChangeRequests
-);
-
-// Admin: Plan değişiklik talebini onayla
-router.post(
-  "/admin/approve-plan-change/:membershipId",
-  auth,
-  authorize(["admin"]),
-  [param("membershipId").isMongoId()],
-  validateRequest,
-  membershipController.approvePlanChange
-);
-
-// Admin: Plan değişiklik talebini reddet
-router.post(
-  "/admin/reject-plan-change/:membershipId",
-  auth,
-  authorize(["admin"]),
-  [
-    param("membershipId").isMongoId(),
-    body("rejectionReason")
-      .trim()
-      .isLength({ min: 10, max: 500 })
-      .withMessage("Red nedeni 10-500 karakter arasında olmalı"),
-  ],
-  validateRequest,
-  membershipController.rejectPlanChange
 );
 
 // Admin: Üyelik süresini uzat
