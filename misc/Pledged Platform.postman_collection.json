@@ -41,7 +41,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"amountInvested\": 200000\n}"
+							"raw": "{\n  \"amountInvested\": 75000\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/investments/property/:propertyId/offer",
@@ -57,7 +57,7 @@
 							"variable": [
 								{
 									"key": "propertyId",
-									"value": "{{propertyId}}"
+									"value": "{{propertyIdForInvestment}}"
 								}
 							]
 						}
@@ -91,7 +91,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/investments/my?sortBy=createdAt&sortOrder=desc&page=1&limit=5",
+							"raw": "{{baseUrl}}/investments/my?page=1&limit=5&country=Germany",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -107,11 +107,13 @@
 								},
 								{
 									"key": "sortBy",
-									"value": "createdAt"
+									"value": "createdAt",
+									"disabled": true
 								},
 								{
 									"key": "sortOrder",
-									"value": "desc"
+									"value": "desc",
+									"disabled": true
 								},
 								{
 									"key": "page",
@@ -123,8 +125,7 @@
 								},
 								{
 									"key": "country",
-									"value": "Spain",
-									"disabled": true
+									"value": "Germany"
 								}
 							]
 						}
@@ -137,12 +138,13 @@
 						{
 							"listen": "test",
 							"script": {
-								"type": "text/javascript",
 								"exec": [
 									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
 									"let json = pm.response.json();",
 									"pm.test('Investment detail exists', function() { pm.expect(json.data).to.have.property('property'); });"
-								]
+								],
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -167,7 +169,7 @@
 							"variable": [
 								{
 									"key": "id",
-									"value": "688c1644d57fb738557d3889"
+									"value": "{{investmentId}}"
 								}
 							]
 						}
@@ -180,12 +182,13 @@
 						{
 							"listen": "test",
 							"script": {
-								"type": "text/javascript",
 								"exec": [
 									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
 									"let json = pm.response.json();",
 									"pm.test('Offer accepted', function() { pm.expect(json.data.status).to.eql('contract_signed'); });"
-								]
+								],
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -211,7 +214,7 @@
 							"variable": [
 								{
 									"key": "id",
-									"value": "688c1644d57fb738557d3889"
+									"value": "{{SendedInvestmentId}}"
 								}
 							]
 						}
@@ -321,12 +324,13 @@
 						{
 							"listen": "test",
 							"script": {
-								"type": "text/javascript",
 								"exec": [
 									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
 									"let json = pm.response.json();",
 									"pm.test('Investments array', function () { pm.expect(Array.isArray(json.data)).to.be.true; });"
-								]
+								],
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -352,7 +356,7 @@
 							"variable": [
 								{
 									"key": "propertyId",
-									"value": "688c1644d57fb738557d3887"
+									"value": "{{propertyId}}"
 								}
 							]
 						}
@@ -392,7 +396,7 @@
 							"variable": [
 								{
 									"key": "id",
-									"value": "688c1644d57fb738557d3889"
+									"value": "{{SendedInvestmentId}}"
 								}
 							]
 						}
@@ -432,7 +436,7 @@
 							"variable": [
 								{
 									"key": "id",
-									"value": "688c1644d57fb738557d3889"
+									"value": "{{SendedInvestmentId}}"
 								}
 							]
 						}
@@ -607,7 +611,7 @@
 							"variable": [
 								{
 									"key": "id",
-									"value": "688c1644d57fb738557d3889"
+									"value": "{{SendedInvestmentId}}"
 								}
 							]
 						}
@@ -651,12 +655,13 @@
 						{
 							"listen": "test",
 							"script": {
-								"type": "text/javascript",
 								"exec": [
 									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
 									"let json = pm.response.json();",
 									"pm.test('Rental payment list paginated', function() { pm.expect(json).to.have.property('pagination'); });"
-								]
+								],
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -670,7 +675,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/investments/rental-payments/owner?status=paid&page=1&limit=5",
+							"raw": "{{baseUrl}}/investments/rental-payments/owner?page=1&limit=50",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -682,7 +687,8 @@
 							"query": [
 								{
 									"key": "status",
-									"value": "paid"
+									"value": "paid",
+									"disabled": true
 								},
 								{
 									"key": "page",
@@ -690,7 +696,7 @@
 								},
 								{
 									"key": "limit",
-									"value": "5"
+									"value": "50"
 								}
 							]
 						}
@@ -703,12 +709,13 @@
 						{
 							"listen": "test",
 							"script": {
-								"type": "text/javascript",
 								"exec": [
 									"pm.test('Status 200', function () { pm.response.to.have.status(200); });",
 									"let json = pm.response.json();",
 									"pm.test('Rental income paginated', function() { pm.expect(json).to.have.property('pagination'); });"
-								]
+								],
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -722,7 +729,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/investments/rental-payments/investor?status=paid&page=1&limit=5",
+							"raw": "{{baseUrl}}/investments/rental-payments/investor?page=1&limit=50",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -734,7 +741,8 @@
 							"query": [
 								{
 									"key": "status",
-									"value": "paid"
+									"value": "paid",
+									"disabled": true
 								},
 								{
 									"key": "page",
@@ -742,7 +750,7 @@
 								},
 								{
 									"key": "limit",
-									"value": "5"
+									"value": "50"
 								}
 							]
 						}
@@ -761,7 +769,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/investments/reports/upcoming-payments?days=10",
+							"raw": "{{baseUrl}}/investments/reports/upcoming-payments",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -773,7 +781,8 @@
 							"query": [
 								{
 									"key": "days",
-									"value": "10"
+									"value": "10",
+									"disabled": true
 								}
 							]
 						}
@@ -829,7 +838,7 @@
 							"variable": [
 								{
 									"key": "id",
-									"value": "688c1644d57fb738557d3889"
+									"value": "{{investmentId}}"
 								}
 							]
 						}
@@ -893,7 +902,7 @@
 								},
 								{
 									"key": "annualYieldPercentMin",
-									"value": "5",
+									"value": "15",
 									"disabled": true
 								},
 								{
@@ -979,7 +988,8 @@
 									"let json = pm.response.json();",
 									"pm.test('Created property has status draft', function() { pm.expect(json.data.status).to.eql('draft'); });"
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -999,7 +1009,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"country\": \"Portugal\",\n  \"city\": \"Lisbon\",\n  \"fullAddress\": \"Av. Liberdade, 100\",\n  \"propertyType\": \"apartment\",\n  \"size\": 120,\n  \"rooms\": 3,\n  \"estimatedValue\": 300000,\n  \"requestedInvestment\": 70000,\n  \"rentOffered\": 700,\n  \"contractPeriodMonths\": 36,\n  \"images\": [],\n  \"documents\": []\n}"
+							"raw": "{\n  \"country\": \"France\",\n  \"city\": \"Paris\",\n  \"fullAddress\": \"Av. Liberdade, 100\",\n  \"propertyType\": \"apartment\",\n  \"size\": 120,\n  \"rooms\": 3,\n  \"estimatedValue\": 300000,\n  \"requestedInvestment\": 70000,\n  \"rentOffered\": 700,\n  \"contractPeriodMonths\": 36,\n  \"images\": [],\n  \"documents\": []\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/properties",
@@ -1045,7 +1055,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"description\": \"Kiralık, manzaralı, çok merkezi!\",\n  \"rooms\": 4\n}"
+							"raw": "{\n  \"description\": \"Updated Kiralık, manzaralı, çok merkezi!\",\n  \"rooms\": 4\n}"
 						},
 						"url": {
 							"raw": "{{baseUrl}}/properties/:id",
@@ -1059,7 +1069,7 @@
 							"variable": [
 								{
 									"key": "id",
-									"value": "688c1644d57fb738557d3887"
+									"value": "{{propertyId}}"
 								}
 							]
 						}
@@ -1077,7 +1087,8 @@
 									"let json = pm.response.json();",
 									"pm.test('Delete message', function() { pm.expect(json.message).to.include('deleted'); });"
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -1101,7 +1112,8 @@
 							],
 							"variable": [
 								{
-									"key": "id"
+									"key": "id",
+									"value": "{{flagedPropertyId}}"
 								}
 							]
 						}
@@ -1119,7 +1131,8 @@
 									"let json = pm.response.json();",
 									"pm.test('Owner's property list paginated', function() { pm.expect(json).to.have.property('pagination'); });"
 								],
-								"type": "text/javascript"
+								"type": "text/javascript",
+								"packages": {}
 							}
 						}
 					],
@@ -1133,7 +1146,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/properties/my/properties?status=published&sortBy=createdAt&sortOrder=desc&page=1&limit=10",
+							"raw": "{{baseUrl}}/properties/my/properties?sortBy=createdAt&sortOrder=desc&page=1&limit=10&country=Germany",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -1145,7 +1158,8 @@
 							"query": [
 								{
 									"key": "status",
-									"value": "published"
+									"value": "published",
+									"disabled": true
 								},
 								{
 									"key": "sortBy",
@@ -1162,6 +1176,10 @@
 								{
 									"key": "limit",
 									"value": "10"
+								},
+								{
+									"key": "country",
+									"value": "Germany"
 								}
 							]
 						}
@@ -1192,7 +1210,8 @@
 							],
 							"variable": [
 								{
-									"key": "id"
+									"key": "id",
+									"value": "{{propertyId}}"
 								}
 							]
 						}
@@ -1222,7 +1241,8 @@
 							],
 							"variable": [
 								{
-									"key": "id"
+									"key": "id",
+									"value": "{{propertyId}}"
 								}
 							]
 						}
@@ -1286,7 +1306,8 @@
 							],
 							"variable": [
 								{
-									"key": "id"
+									"key": "id",
+									"value": "{{propertyId}}"
 								}
 							]
 						}
@@ -1305,7 +1326,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/properties/featured?page=1&limit=5",
+							"raw": "{{baseUrl}}/properties/featured?page=1&limit=5&city=Porto",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -1321,6 +1342,15 @@
 								{
 									"key": "limit",
 									"value": "5"
+								},
+								{
+									"key": "country",
+									"value": null,
+									"disabled": true
+								},
+								{
+									"key": "city",
+									"value": "Porto"
 								}
 							]
 						}
@@ -1384,7 +1414,8 @@
 							],
 							"variable": [
 								{
-									"key": "id"
+									"key": "id",
+									"value": "{{propertyId}}"
 								}
 							]
 						}
@@ -1403,7 +1434,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/properties/my/favorites",
+							"raw": "{{baseUrl}}/properties/my/favorites?propertyType=apartment&sortBy=annualYieldPercent&sortOrder=desc&page=1&limit=5",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -1411,6 +1442,48 @@
 								"properties",
 								"my",
 								"favorites"
+							],
+							"query": [
+								{
+									"key": "country",
+									"value": "Portugal",
+									"disabled": true
+								},
+								{
+									"key": "city",
+									"value": "Lisbon",
+									"disabled": true
+								},
+								{
+									"key": "propertyType",
+									"value": "apartment"
+								},
+								{
+									"key": "annualYieldPercentMin",
+									"value": "15",
+									"disabled": true
+								},
+								{
+									"key": "requestedInvestmentMax",
+									"value": "100000",
+									"disabled": true
+								},
+								{
+									"key": "sortBy",
+									"value": "annualYieldPercent"
+								},
+								{
+									"key": "sortOrder",
+									"value": "desc"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "5"
+								}
 							]
 						}
 					},
@@ -1428,7 +1501,7 @@
 							}
 						],
 						"url": {
-							"raw": "{{baseUrl}}/properties/admin/all?status=published&page=1&limit=10&sortBy=createdAt",
+							"raw": "{{baseUrl}}/properties/admin/all?country=Portugal&page=1&limit=5",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -1439,8 +1512,38 @@
 							],
 							"query": [
 								{
-									"key": "status",
-									"value": "published"
+									"key": "country",
+									"value": "Portugal"
+								},
+								{
+									"key": "city",
+									"value": "Lisbon",
+									"disabled": true
+								},
+								{
+									"key": "propertyType",
+									"value": "apartment",
+									"disabled": true
+								},
+								{
+									"key": "annualYieldPercentMin",
+									"value": "15",
+									"disabled": true
+								},
+								{
+									"key": "requestedInvestmentMax",
+									"value": "100000",
+									"disabled": true
+								},
+								{
+									"key": "sortBy",
+									"value": "annualYieldPercent",
+									"disabled": true
+								},
+								{
+									"key": "sortOrder",
+									"value": "desc",
+									"disabled": true
 								},
 								{
 									"key": "page",
@@ -1448,11 +1551,12 @@
 								},
 								{
 									"key": "limit",
-									"value": "10"
+									"value": "5"
 								},
 								{
-									"key": "sortBy",
-									"value": "createdAt"
+									"key": "status",
+									"value": "published",
+									"disabled": true
 								}
 							]
 						}
@@ -1491,7 +1595,8 @@
 							],
 							"variable": [
 								{
-									"key": "id"
+									"key": "id",
+									"value": "{{unPublishedPropertyId}}"
 								}
 							]
 						}
@@ -1530,7 +1635,8 @@
 							],
 							"variable": [
 								{
-									"key": "id"
+									"key": "id",
+									"value": "{{flagedPropertyId}}"
 								}
 							]
 						}
@@ -1636,7 +1742,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "{{baseUrl}}/notifications/my?type=offer_accepted&limit=3",
+							"raw": "{{baseUrl}}/notifications/my?limit=3",
 							"host": [
 								"{{baseUrl}}"
 							],
@@ -1647,7 +1753,8 @@
 							"query": [
 								{
 									"key": "type",
-									"value": "offer_accepted"
+									"value": "offer_accepted",
+									"disabled": true
 								},
 								{
 									"key": "limit",
@@ -1843,6 +1950,1962 @@
 					"response": []
 				}
 			]
+		},
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "1. PUBLIC ROUTES",
+					"item": [
+						{
+							"name": "1.1 Register - Investor",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 201', function () {",
+											"    pm.response.to.have.status(201);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"pm.test('Response has user data', function () {",
+											"    pm.expect(response.data.user).to.have.property('id');",
+											"    pm.expect(response.data.user).to.have.property('email');",
+											"});",
+											"",
+											"// Save userId for later tests",
+											"pm.collectionVariables.set('userId', response.data.user.id);",
+											"",
+											"// Check if email verification is skipped (dev mode)",
+											"if (response.data.user.emailVerified === true) {",
+											"    console.log('Email verification skipped (Development Mode)');",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"investortt.test@example.com\",\n    \"password\": \"Test123!@#\",\n    \"fullName\": \"Test Investor\",\n    \"phoneNumber\": \"+905551234567\",\n    \"country\": \"TR\",\n    \"role\": \"investor\",\n    \"acceptedTerms\": true,\n    \"acceptedGDPR\": true,\n    \"marketingConsent\": false\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/register",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"register"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "1.2 Register - Property Owner",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"owner.test@example.com\",\n    \"password\": \"Test123!@#\",\n    \"fullName\": \"Test Property Owner\",\n    \"phoneNumber\": \"+905551234568\",\n    \"country\": \"TR\",\n    \"role\": \"property_owner\",\n    \"acceptedTerms\": true,\n    \"acceptedGDPR\": true\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/register",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"register"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "1.3 Register - Local Representative",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"rep.test@example.com\",\n    \"password\": \"Test123!@#\",\n    \"fullName\": \"Test Representative\",\n    \"phoneNumber\": \"+905551234569\",\n    \"country\": \"TR\",\n    \"region\": \"Istanbul\",\n    \"role\": \"local_representative\",\n    \"acceptedTerms\": true,\n    \"acceptedGDPR\": true\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/register",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"register"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "1.4 Login - Success",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"pm.test('Response has tokens', function () {",
+											"    pm.expect(response.data).to.have.property('accessToken');",
+											"    pm.expect(response.data).to.have.property('refreshToken');",
+											"});",
+											"",
+											"// Save tokens for authenticated requests",
+											"pm.collectionVariables.set('accessToken', response.data.accessToken);",
+											"pm.collectionVariables.set('refreshToken', response.data.refreshToken);",
+											"",
+											"console.log('Login successful! Tokens saved.');",
+											"",
+											"// Check if 2FA is required",
+											"if (response.data.requiresTwoFactor) {",
+											"    console.log('2FA required. Method:', response.data.method);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"admin@admin.com\",\n    \"password\": \"Admin123!@#\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/login",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "1.5 Login - With Remember Me",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"investor.test@example.com\",\n    \"password\": \"NewPassword123!@#2\",\n    \"rememberMe\": true\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/login",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "1.6 Login - Wrong Password",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 401', function () {",
+											"    pm.response.to.have.status(401);",
+											"});",
+											"",
+											"pm.test('Error message is correct', function () {",
+											"    const response = pm.response.json();",
+											"    pm.expect(response.message).to.include('Email veya şifre hatalı');",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"investor.test@example.com\",\n    \"password\": \"WrongPassword123\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/login",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "1.7 Forgot Password",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"investor.test@example.com\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/forgot-password",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"forgot-password"
+									]
+								},
+								"description": "Console'da reset token görünecek (development mode)"
+							},
+							"response": []
+						},
+						{
+							"name": "1.8 Reset Password",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"password\": \"NewPassword123!@#2\",\n    \"confirmPassword\": \"NewPassword123!@#2\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/reset-password/{{resetToken}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"reset-password",
+										"{{resetToken}}"
+									]
+								},
+								"description": "resetToken'ı console'dan alın"
+							},
+							"response": []
+						},
+						{
+							"name": "1.9 Verify Email",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/auth/verify-email/{{verificationToken}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"verify-email",
+										"{{verificationToken}}"
+									]
+								},
+								"description": "verificationToken'ı console'dan alın (dev mode'da skip edilir)"
+							},
+							"response": []
+						},
+						{
+							"name": "1.10 Resend Verification Email",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"investor.test@example.com\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/resend-verification",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"resend-verification"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "2. AUTHENTICATED ROUTES",
+					"item": [
+						{
+							"name": "2.1 Get Current User",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test('User data is complete', function () {",
+											"    const response = pm.response.json();",
+											"    pm.expect(response.data).to.have.property('id');",
+											"    pm.expect(response.data).to.have.property('email');",
+											"    pm.expect(response.data).to.have.property('role');",
+											"    pm.expect(response.data).to.have.property('membershipPlan');",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/auth/me",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"me"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "2.2 Update Profile",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"fullName\": \"Updated Test User\",\n    \"phoneNumber\": \"+905559876543\",\n    \"country\": \"US\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/profile",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"profile"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "2.3 Change Password",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"currentPassword\": \"NewPassword123!@#2\",\n    \"newPassword\": \"NewTest1234!@#\",\n    \"confirmPassword\": \"NewTest1234!@#\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/change-password",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"change-password"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "2.4 Logout",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/logout",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"logout"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "2.5 Refresh Token",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('New tokens received', function () {",
+											"    const response = pm.response.json();",
+											"    pm.expect(response.data).to.have.property('accessToken');",
+											"    pm.expect(response.data).to.have.property('refreshToken');",
+											"    ",
+											"    // Update tokens",
+											"    pm.collectionVariables.set('accessToken', response.data.accessToken);",
+											"    pm.collectionVariables.set('refreshToken', response.data.refreshToken);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/refresh-token",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"refresh-token"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "3. 2FA ROUTES",
+					"item": [
+						{
+							"name": "3.1 Setup 2FA - Authenticator",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('QR code and secret received', function () {",
+											"    const response = pm.response.json();",
+											"    pm.expect(response.data).to.have.property('qrCode');",
+											"    pm.expect(response.data).to.have.property('manualEntryKey');",
+											"    ",
+											"    console.log('Manual Entry Key:', response.data.manualEntryKey);",
+											"    console.log('Use this key in Google Authenticator, Authy, etc.');",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"method\": \"authenticator\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/2fa/setup",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"2fa",
+										"setup"
+									]
+								},
+								"description": "QR kodu tarayın veya manual key'i authenticator app'e girin"
+							},
+							"response": []
+						},
+						{
+							"name": "3.2 Setup 2FA - Email",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"method\": \"email\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/2fa/setup",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"2fa",
+										"setup"
+									]
+								},
+								"description": "Console'da email kodu görünecek"
+							},
+							"response": []
+						},
+						{
+							"name": "3.3 Setup 2FA - SMS",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"method\": \"sms\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/2fa/setup",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"2fa",
+										"setup"
+									]
+								},
+								"description": "Console'da SMS kodu görünecek"
+							},
+							"response": []
+						},
+						{
+							"name": "3.4 Enable 2FA",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Backup codes received', function () {",
+											"    const response = pm.response.json();",
+											"    pm.expect(response.data).to.have.property('backupCodes');",
+											"    pm.expect(response.data.backupCodes).to.be.an('array');",
+											"    pm.expect(response.data.backupCodes).to.have.lengthOf(10);",
+											"    ",
+											"    console.log('BACKUP CODES - SAVE THESE:');",
+											"    response.data.backupCodes.forEach(code => console.log(code));",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"code\": \"600639\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/2fa/enable",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"2fa",
+										"enable"
+									]
+								},
+								"description": "Authenticator app'teki veya console'daki kodu girin"
+							},
+							"response": []
+						},
+						{
+							"name": "3.5 Login with 2FA",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"email\": \"investor.test@example.com\",\n    \"password\": \"NewPassword123!@#2\",\n    \"twoFactorCode\": \"640927\",\n    \"rememberMe\": true\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/login",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								},
+								"description": "2FA etkinse kod gerekli"
+							},
+							"response": []
+						},
+						{
+							"name": "3.6 Disable 2FA",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"password\": \"Test123!@#\",\n    \"code\": \"LBJFAVCMNM5U2RBGHR4XGVB4O5PGIMZYJQ3DGNTSLI7WS5SLI4TA\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/2fa/disable",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"2fa",
+										"disable"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "3.7 Generate New Backup Codes",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"password\": \"Test123!@#\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/2fa/backup-codes",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"2fa",
+										"backup-codes"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "4. MEMBERSHIP ROUTES",
+					"item": [
+						{
+							"name": "4.1 Get Membership Status",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/auth/membership/status",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"membership",
+										"status"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "4.2 Change Membership Plan",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"newPlan\": \"Enterprise\",\n    \"paymentId\": \"payment_123456\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/membership/change",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"membership",
+										"change"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "4.3 Cancel Membership",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"reason\": \"Too expensive\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/membership/cancel",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"membership",
+										"cancel"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "5. ACCOUNT DELETION",
+					"item": [
+						{
+							"name": "5.1 Request Account Deletion",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"reason\": \"I don't need the service anymore\",\n    \"password\": \"Test123!@#\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/account/delete-request",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"account",
+										"delete-request"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "5.2 Cancel Account Deletion",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/auth/account/cancel-deletion",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"account",
+										"cancel-deletion"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Admin - Account Deletion",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/auth/admin/account-deletion-requests?page=1&limit=10&status=all&sortBy=requestedAt&sortOrder=desc",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"admin",
+										"account-deletion-requests"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1"
+										},
+										{
+											"key": "limit",
+											"value": "10"
+										},
+										{
+											"key": "status",
+											"value": "all"
+										},
+										{
+											"key": "sortBy",
+											"value": "requestedAt"
+										},
+										{
+											"key": "sortOrder",
+											"value": "desc"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get Account Deletion Request By ID",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/auth/admin/account-deletion-requests/{{requestId}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"admin",
+										"account-deletion-requests",
+										"{{requestId}}"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "6. SECURITY ROUTES",
+					"item": [
+						{
+							"name": "6.1 Get Login History",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/auth/security/login-history?limit=20",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"security",
+										"login-history"
+									],
+									"query": [
+										{
+											"key": "limit",
+											"value": "20"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "6.2 Get Active Sessions",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/auth/security/sessions",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"security",
+										"sessions"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "6.3 Revoke All Sessions",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"password\": \"NewPassword123!@#2\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/security/revoke-all-sessions",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"security",
+										"revoke-all-sessions"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "6.4 Add Trusted IP",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"ip\": \"192.168.1.1\",\n    \"name\": \"Home IP\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/security/trusted-ip",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"security",
+										"trusted-ip"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get Trusted IPs",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/auth/security/trusted-ip",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"security",
+										"trusted-ip"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Add Trusted IP",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n\"ip\": \"192.168.1.1\",    \r\n\"name\": \"Ev IP Adresi\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/security/trusted-ip",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"security",
+										"trusted-ip"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Remove Trusted IP",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/auth/security/trusted-ip/192.168.1.1",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"security",
+										"trusted-ip",
+										"192.168.1.1"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "KycApproved",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAcessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/admin/users/{{userId}}/approve-kyc",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"admin",
+								"users",
+								"{{userId}}",
+								"approve-kyc"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Pending KYC Users (Paginated)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAcessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/admin/pending-kyc?page=1&limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"admin",
+								"pending-kyc"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "sortBy",
+									"value": "createdAt",
+									"disabled": true
+								},
+								{
+									"key": "sortOrder",
+									"value": "desc",
+									"disabled": true
+								},
+								{
+									"key": "search",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "country",
+									"value": "",
+									"disabled": true
+								},
+								{
+									"key": "role",
+									"value": "",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Pending KYC User By ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{adminAcessToken}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/admin/pending-kyc/{{userId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"admin",
+								"pending-kyc",
+								"{{userId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "MembershipPlans",
+			"item": [
+				{
+					"name": "Public Endpoints",
+					"item": [
+						{
+							"name": "Get All Public Plans",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status 200', function () { ",
+											"    pm.response.to.have.status(200); ",
+											"});",
+											"",
+											"let json = pm.response.json();",
+											"pm.test('Has plans array', function() { ",
+											"    pm.expect(json.data).to.be.an('array'); ",
+											"});",
+											"",
+											"if(json.data && json.data.length > 0) {",
+											"    pm.environment.set('planId', json.data[0]._id);",
+											"    if(json.data.length > 1) {",
+											"        pm.environment.set('planId2', json.data[1]._id);",
+											"    }",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get Plan By ID",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status 200', function () { ",
+											"    pm.response.to.have.status(200); ",
+											"});",
+											"",
+											"let json = pm.response.json();",
+											"pm.test('Has plan details', function() { ",
+											"    pm.expect(json.data).to.have.property('name');",
+											"    pm.expect(json.data).to.have.property('features');",
+											"    pm.expect(json.data).to.have.property('pricing');",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "{{planId}}"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get Featured Plans",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/featured",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										"featured"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get Trial Plans",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/trial",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										"trial"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get Plans By Feature",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/by-feature?feature=api.hasAccess&value=true",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										"by-feature"
+									],
+									"query": [
+										{
+											"key": "feature",
+											"value": "api.hasAccess"
+										},
+										{
+											"key": "value",
+											"value": "true"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Compare Plans",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"planIds\": [\"{{planId}}\", \"{{planId2}}\"]\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/compare",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										"compare"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Calculate Plan Price",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"interval\": \"monthly\",\n    \"promoCode\": \"SUMMER2025\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/:id/calculate-price",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										":id",
+										"calculate-price"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "{{planId2}}"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Admin Endpoints",
+					"item": [
+						{
+							"name": "Get All Plans (Admin)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{adminAccessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/admin/all?includeInactive=true",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										"admin",
+										"all"
+									],
+									"query": [
+										{
+											"key": "includeInactive",
+											"value": "true"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create New Plan (Admin)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status 201', function () { ",
+											"    pm.response.to.have.status(201); ",
+											"});",
+											"",
+											"let json = pm.response.json();",
+											"if(json.data && json.data._id) {",
+											"    pm.environment.set('newPlanId', json.data._id);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{adminAcessToken}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"name\": \"premium\",\n    \"displayName\": \"Premium\",\n    \"description\": \"Advanced features for professional investors\",\n    \"tier\": 4,\n    \"order\": 4,\n    \"isActive\": true,\n    \"isVisible\": true,\n    \"pricing\": {\n        \"monthly\": {\n            \"amount\": 49,\n            \"currency\": \"EUR\"\n        },\n        \"yearly\": {\n            \"amount\": 470,\n            \"currency\": \"EUR\",\n            \"discountPercentage\": 20\n        },\n        \"trial\": {\n            \"enabled\": true,\n            \"days\": 14,\n            \"requiresCard\": true\n        }\n    },\n    \"features\": {\n        \"investments\": {\n            \"maxActiveInvestments\": 10,\n            \"maxMonthlyInvestments\": 5,\n            \"minInvestmentAmount\": 2500,\n            \"maxInvestmentAmount\": 1000000,\n            \"allowBulkInvestments\": false\n        },\n        \"properties\": {\n            \"maxActiveProperties\": 5,\n            \"canListProperties\": true,\n            \"priorityListing\": true,\n            \"featuredListingDays\": 14\n        },\n        \"commissions\": {\n            \"platformCommissionDiscount\": 2,\n            \"rentalCommissionDiscount\": 1,\n            \"referralBonusMultiplier\": 1.3\n        },\n        \"support\": {\n            \"level\": \"priority\",\n            \"responseTime\": \"12h\",\n            \"hasPhoneSupport\": false,\n            \"hasDedicatedManager\": false,\n            \"hasLiveChat\": true\n        },\n        \"services\": {\n            \"includedServices\": [],\n            \"serviceDiscounts\": {\n                \"visa_consultancy\": 20,\n                \"legal_support\": 10,\n                \"tax_advisory\": 10,\n                \"property_management\": 15\n            }\n        },\n        \"analytics\": {\n            \"hasBasicAnalytics\": true,\n            \"hasAdvancedAnalytics\": true,\n            \"hasMarketReports\": false,\n            \"hasCustomReports\": false,\n            \"dataExportFormats\": [\"csv\", \"excel\"]\n        },\n        \"api\": {\n            \"hasAccess\": false,\n            \"rateLimit\": 0,\n            \"webhooksEnabled\": false\n        },\n        \"referral\": {\n            \"canEarnCommission\": true,\n            \"commissionRate\": 8,\n            \"maxReferrals\": 100,\n            \"bonusThresholds\": [\n                {\"count\": 10, \"bonus\": 75},\n                {\"count\": 25, \"bonus\": 200}\n            ]\n        },\n        \"notifications\": {\n            \"emailNotifications\": true,\n            \"smsNotifications\": true,\n            \"pushNotifications\": true,\n            \"whatsappNotifications\": false\n        },\n        \"security\": {\n            \"twoFactorAuth\": true,\n            \"ipWhitelisting\": false,\n            \"sessionManagement\": true,\n            \"auditLogs\": false\n        }\n    },\n    \"restrictions\": {\n        \"minAge\": 18,\n        \"allowedCountries\": [],\n        \"blockedCountries\": [],\n        \"requiredKycLevel\": \"advanced\",\n        \"maxUsersCount\": -1\n    },\n    \"metadata\": {\n        \"color\": \"#8B5CF6\",\n        \"icon\": \"star\",\n        \"badge\": \"Popular\"\n    }\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/admin/create",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										"admin",
+										"create"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Plan (Admin)",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{adminAcessToken}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"description\": \"Updated description for the plan\",\n    \"isHighlighted\": true,\n    \"metadata\": {\n        \"badge\": \"Best Value\",\n        \"color\": \"#22C55E\"\n    }\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/admin/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										"admin",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "{{planId}}"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Plan Features (Admin)",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{adminAcessToken}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"features\": {\n        \"investments\": {\n            \"maxActiveInvestments\": 15,\n            \"maxMonthlyInvestments\": 10,\n            \"minInvestmentAmount\": 1000,\n            \"maxInvestmentAmount\": -1,\n            \"allowBulkInvestments\": true\n        },\n        \"api\": {\n            \"hasAccess\": true,\n            \"rateLimit\": 5000,\n            \"webhooksEnabled\": true\n        },\n        \"support\": {\n            \"level\": \"dedicated\",\n            \"responseTime\": \"1h\",\n            \"hasPhoneSupport\": true,\n            \"hasDedicatedManager\": true,\n            \"hasLiveChat\": true\n        }\n    }\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/admin/:id/features",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										"admin",
+										":id",
+										"features"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "{{planId}}"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Plan Pricing (Admin)",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{adminAcessToken}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"pricing\": {\n        \"monthly\": {\n            \"amount\": 29,\n            \"currency\": \"EUR\",\n            \"originalAmount\": 49\n        },\n        \"yearly\": {\n            \"amount\": 278,\n            \"currency\": \"EUR\",\n            \"discountPercentage\": 20,\n            \"originalAmount\": 348\n        },\n        \"trial\": {\n            \"enabled\": true,\n            \"days\": 7,\n            \"requiresCard\": false\n        }\n    }\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/admin/:id/pricing",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										"admin",
+										":id",
+										"pricing"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "{{planId}}"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Add/Update Promotion (Admin)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{adminAcessToken}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"code\": \"NEWYEAR2025\",\n    \"discountPercentage\": 25,\n    \"validUntil\": \"2025-11-28T23:59:59Z\",\n    \"maxUses\": 100\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/admin/:id/promotion",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										"admin",
+										":id",
+										"promotion"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "{{planId}}"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update Plans Order (Admin)",
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{adminAcessToken}}",
+										"type": "text"
+									},
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"orders\": [\n        {\n            \"planId\": \"{{planId}}\",\n            \"order\": 1\n        },\n        {\n            \"planId\": \"{{planId2}}\",\n            \"order\": 2\n        },\n        {\n            \"planId\": \"{{newPlanId}}\",\n            \"order\": 3\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/admin/order",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										"admin",
+										"order"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get Plan Statistics (Admin)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{adminAcessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/admin/:id/statistics?startDate=2025-01-01&endDate=2025-12-31",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										"admin",
+										":id",
+										"statistics"
+									],
+									"query": [
+										{
+											"key": "startDate",
+											"value": "2025-01-01"
+										},
+										{
+											"key": "endDate",
+											"value": "2025-12-31"
+										}
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "{{planId}}"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Plan (Admin)",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{adminAcessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/admin/:id",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										"admin",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "{{newPlanId}}"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Authenticated Endpoints",
+					"item": [
+						{
+							"name": "Get Upgrade Recommendations",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/membership-plans/recommendations",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership-plans",
+										"recommendations"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
 		}
 	],
 	"event": [
@@ -1875,8 +3938,82 @@
 		},
 		{
 			"key": "propertyId",
-			"value": "688c1644d57fb738557d3887",
+			"value": "6893a0d7434a45479a4b6f17",
 			"type": "string"
+		},
+		{
+			"key": "investmentId",
+			"value": "6893a462bec3006224cb9124",
+			"type": "string"
+		},
+		{
+			"key": "propertyIdForInvestment",
+			"value": "6893a0d7434a45479a4b6f1b",
+			"type": "string"
+		},
+		{
+			"key": "unPublishedPropertyId",
+			"value": "6893a1f9bec3006224cb908a",
+			"type": "string"
+		},
+		{
+			"key": "flagedPropertyId",
+			"value": "6893a3d6bec3006224cb90fc",
+			"type": "string"
+		},
+		{
+			"key": "SendedInvestmentId",
+			"value": "6893a462bec3006224cb9124",
+			"type": "string"
+		},
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "refreshToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "userId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "verificationToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "resetToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "adminAcessToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "planId",
+			"value": "689e067d02a492275db9a3a8",
+			"type": "default"
+		},
+		{
+			"key": "planId2",
+			"value": "689e067d02a492275db9a3ab",
+			"type": "default"
+		},
+		{
+			"key": "planId2",
+			"value": ""
+		},
+		{
+			"key": "newPlanId",
+			"value": "689f764f372dab3e3018a01f",
+			"type": "default"
 		}
 	]
 }
