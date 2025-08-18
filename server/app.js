@@ -59,6 +59,8 @@ app.use("/api/v1/auth", require("./routes/authRoutes"));
 app.use("/api/v1/properties", require("./routes/propertyRoutes"));
 app.use("/api/v1/investments", require("./routes/investmentRoutes"));
 app.use("/api/v1/notifications", require("./routes/notificationRoutes"));
+app.use("/api/v1/membership-plans", require("./routes/membershipPlanRoutes"));
+app.use("/api/v1/membership", require("./routes/membershipRoutes"));
 // app.use("/api/v1/users", require("./routes/userRoutes")); // Sonra eklenecek
 
 // 404 handler
