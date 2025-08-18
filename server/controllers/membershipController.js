@@ -85,13 +85,15 @@ class MembershipController {
   async changePlanNow(req, res, next) {
     try {
       const { planId, interval = "monthly", promoCode } = req.body;
-      const membership = await membershipService.changePlan({
-        userId: req.user.id,
-        newPlanId: planId,
+
+      const result = await membershipService.changePlan({
+        userId: req.user.id, // <- JWT’den
+        newPlanId: planId, // <- body’deki planId’i service’in beklediği newPlanId’e map’liyoruz
         interval,
         promoCode,
+        // adminId: req.user.role === 'admin' ? req.user.id : undefined, // (opsiyonel)
       });
-      res.json({ success: true, data: membership, message: "Plan changed" });
+      res.json({ success: true, data: result, message: "Plan changed" });
     } catch (err) {
       next(err);
     }

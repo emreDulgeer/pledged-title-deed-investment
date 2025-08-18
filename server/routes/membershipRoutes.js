@@ -48,10 +48,7 @@ router.post(
   "/activate",
   auth,
   rateLimiter.strict,
-  [
-    body("userId").isMongoId().withMessage("Geçerli kullanıcı ID gerekli"),
-    body("planId").isMongoId().withMessage("Geçerli plan ID gerekli"),
-  ],
+  [body("planId").isMongoId().withMessage("Geçerli plan ID gerekli")],
   validateRequest,
   membershipController.activateNow
 );
