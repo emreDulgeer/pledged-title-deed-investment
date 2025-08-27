@@ -26,18 +26,18 @@ connectDB();
 // Initialize express app
 const app = express();
 
-// ===== TEMEL MIDDLEWARE'LER =====
+// ===== Basic MIDDLEWARES =====
 
-// Compression middleware - Performans için
+// Compression middleware - For performance
 app.use(compression());
 
-// Body parser middleware - Dosya yükleme limitleri güncellenmiş
+// Body parser middleware - Updated file upload limits
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// ===== GÜVENLİK MIDDLEWARE'LERİ =====
+// ===== SECURITY MIDDLEWARES =====
 
-// Helmet - Güvenlik başlıkları
+// Helmet - Security headers
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -57,12 +57,12 @@ app.use(
   })
 );
 
-// Mevcut güvenlik middleware'leri
+// security middlewares
 app.use(securityHeaders);
 app.use(deviceDetection);
 app.use(ipGeolocation);
 
-// CORS middleware - Upload için güncellendi
+// CORS middlewares
 app.use(
   cors({
     origin: function (origin, callback) {
@@ -105,8 +105,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// ===== STATIC FILES - Upload klasörü =====
-// Uploads klasörünü static olarak serve et
+// ===== STATIC FILES - Upload folder =====
+// Uploads folder static serve
 app.use(
   "/uploads",
   express.static(path.join(__dirname, "../uploads"), {
@@ -114,14 +114,14 @@ app.use(
     etag: true,
     lastModified: true,
     setHeaders: (res, filePath) => {
-      // Dosya tiplerine göre cache ayarları
+      // cache settings
       if (filePath.endsWith(".pdf")) {
         res.setHeader("Cache-Control", "public, max-age=604800"); // 7 gün
       } else if (filePath.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
         res.setHeader("Cache-Control", "public, max-age=2592000"); // 30 gün
       }
 
-      // Güvenlik başlıkları
+      // Security headers
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader("X-Frame-Options", "DENY");
     },
@@ -132,10 +132,10 @@ app.use(
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 } else {
-  // Production için daha detaylı loglama
+  // Production logging middleware - for error logging
   app.use(
     morgan("combined", {
-      skip: (req, res) => res.statusCode < 400, // Sadece hataları logla
+      skip: (req, res) => res.statusCode < 400, // just logging errors
     })
   );
 }
@@ -157,7 +157,7 @@ app.get("/", (req, res) => {
   });
 });
 
-// API versiyonlama ve dokümantasyon
+// API versions and documentation
 app.get("/api/v1", (req, res) => {
   res.json({
     version: "1.0.0",
@@ -173,15 +173,15 @@ app.get("/api/v1", (req, res) => {
   });
 });
 
-// Route tanımlamaları
+// Routes
 app.use("/api/v1/auth", require("./routes/authRoutes"));
 app.use("/api/v1/properties", require("./routes/propertyRoutes"));
 app.use("/api/v1/investments", require("./routes/investmentRoutes"));
 app.use("/api/v1/notifications", require("./routes/notificationRoutes"));
 app.use("/api/v1/membership-plans", require("./routes/membershipPlanRoutes"));
-
-// ===== YENİ: File Management Routes =====
-app.use("/api/v1/files", require("./routes/fileRoutes"));
+app.use("/api/v1/membership", require("./routes/membershipRoutes"));
+// ===== New: File Management Routes =====
+app.use("/api/v1/files", require("./routes/fileRoutesV2"));
 
 // ===== ERROR HANDLING =====
 
@@ -227,7 +227,7 @@ const server = app.listen(PORT, () => {
   }
 
   // File storage service initialization
-  const fileStorageService = require("./services/fileStorageService");
+  const fileStorageService = require("./services/FileUploadManager");
   console.log("📁 File storage service initialized");
 });
 
@@ -257,4 +257,4 @@ process.on("SIGINT", () => {
   });
 });
 
-module.exports = app; // Test için export
+module.exports = app; // export for testing

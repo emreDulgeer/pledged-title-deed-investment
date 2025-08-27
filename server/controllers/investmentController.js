@@ -7,7 +7,21 @@ class InvestmentController {
   constructor() {
     this.investmentService = new InvestmentService();
   }
-
+  approveTitleDeed = async (req, res) => {
+    try {
+      const adminId = req.user.id;
+      const investmentId = req.params.id;
+      const result = await this.investmentService.approveTitleDeed(
+        investmentId,
+        adminId
+      );
+      return responseWrapper.success(res, result, "Title deed approved");
+    } catch (error) {
+      if (error.message.includes("not found"))
+        return responseWrapper.notFound(res, error.message);
+      return responseWrapper.error(res, error.message);
+    }
+  };
   // Yeni yatırım teklifi gönder
   createInvestmentOffer = async (req, res) => {
     try {
@@ -97,84 +111,84 @@ class InvestmentController {
   };
 
   // Kontrat yükle
-  uploadContract = async (req, res) => {
-    try {
-      const userId = req.user.id;
-      const userRole = req.user.role;
-      const investmentId = req.params.id;
-      const contractFile = req.body.contractFile; // File upload middleware'den gelecek
+  // uploadContract = async (req, res) => {
+  //   try {
+  //     const userId = req.user.id;
+  //     const userRole = req.user.role;
+  //     const investmentId = req.params.id;
+  //     const contractFile = req.body.contractFile; // File upload middleware'den gelecek
 
-      const investment = await this.investmentService.uploadContract(
-        investmentId,
-        userId,
-        contractFile,
-        userRole
-      );
+  //     const investment = await this.investmentService.uploadContract(
+  //       investmentId,
+  //       userId,
+  //       contractFile,
+  //       userRole
+  //     );
 
-      return responseWrapper.success(
-        res,
-        investment,
-        "Contract uploaded successfully"
-      );
-    } catch (error) {
-      if (error.message === "Investment not found") {
-        return responseWrapper.notFound(res, "Investment not found");
-      }
-      if (
-        error.message.includes("Unauthorized") ||
-        error.message.includes("not in contract")
-      ) {
-        return responseWrapper.forbidden(res, error.message);
-      }
-      return responseWrapper.error(res, error.message);
-    }
-  };
+  //     return responseWrapper.success(
+  //       res,
+  //       investment,
+  //       "Contract uploaded successfully"
+  //     );
+  //   } catch (error) {
+  //     if (error.message === "Investment not found") {
+  //       return responseWrapper.notFound(res, "Investment not found");
+  //     }
+  //     if (
+  //       error.message.includes("Unauthorized") ||
+  //       error.message.includes("not in contract")
+  //     ) {
+  //       return responseWrapper.forbidden(res, error.message);
+  //     }
+  //     return responseWrapper.error(res, error.message);
+  //   }
+  // };
 
   // Tapu kaydı yükle
-  uploadTitleDeed = async (req, res) => {
-    try {
-      const userId = req.user.id;
-      const userRole = req.user.role;
-      const investmentId = req.params.id;
-      const titleDeedDocument = req.body.titleDeedDocument;
+  // uploadTitleDeed = async (req, res) => {
+  //   try {
+  //     const userId = req.user.id;
+  //     const userRole = req.user.role;
+  //     const investmentId = req.params.id;
+  //     const titleDeedDocument = req.body.titleDeedDocument;
 
-      const investment = await this.investmentService.uploadTitleDeed(
-        investmentId,
-        userId,
-        titleDeedDocument,
-        userRole
-      );
+  //     const investment = await this.investmentService.uploadTitleDeed(
+  //       investmentId,
+  //       userId,
+  //       titleDeedDocument,
+  //       userRole
+  //     );
 
-      return responseWrapper.success(
-        res,
-        investment,
-        "Title deed uploaded successfully"
-      );
-    } catch (error) {
-      if (error.message === "Investment not found") {
-        return responseWrapper.notFound(res, "Investment not found");
-      }
-      if (
-        error.message.includes("Unauthorized") ||
-        error.message.includes("Contract must be")
-      ) {
-        return responseWrapper.forbidden(res, error.message);
-      }
-      return responseWrapper.error(res, error.message);
-    }
-  };
+  //     return responseWrapper.success(
+  //       res,
+  //       investment,
+  //       "Title deed uploaded successfully"
+  //     );
+  //   } catch (error) {
+  //     if (error.message === "Investment not found") {
+  //       return responseWrapper.notFound(res, "Investment not found");
+  //     }
+  //     if (
+  //       error.message.includes("Unauthorized") ||
+  //       error.message.includes("Contract must be")
+  //     ) {
+  //       return responseWrapper.forbidden(res, error.message);
+  //     }
+  //     return responseWrapper.error(res, error.message);
+  //   }
+  // };
 
   // Kira ödemesi yap
   makeRentalPayment = async (req, res) => {
     try {
       const propertyOwnerId = req.user.id;
       const investmentId = req.params.id;
-      const { month, paymentReceipt } = req.body;
-
+      const { rentalPaymentId, amountPaid } = req.body;
       const investment = await this.investmentService.makeRentalPayment(
         investmentId,
-        month,
-        propertyOwnerId
+        rentalPaymentId,
+        amountPaid,
+        null // receiptFileId (rental receipt upload akışına bağlayacağız)
       );
 
       return responseWrapper.success(
@@ -270,9 +284,9 @@ class InvestmentController {
   getMyInvestments = async (req, res) => {
     try {
       const investorId = req.user.id;
-      const result = await this.investmentService.getInvestorInvestments(
+      const result = await this.investmentService.getMyInvestments(
         investorId,
-        req.query // Direkt query'yi gönder, service'de işleyeceğiz
+        req.query
       );
 
       return responseWrapper.paginated(
@@ -360,8 +374,9 @@ class InvestmentController {
   getUpcomingPayments = async (req, res) => {
     try {
       const days = parseInt(req.query.days) || 7;
-      const investments =
-        await this.investmentService.getUpcomingRentalPayments(days);
+      const investments = await this.investmentService.getUpcomingPayments({
+        days,
+      });
 
       return responseWrapper.success(
         res,

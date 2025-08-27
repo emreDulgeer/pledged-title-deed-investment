@@ -1,3 +1,5 @@
+// server/models/Property.js
+
 const mongoose = require("mongoose");
 
 const PropertySchema = new mongoose.Schema(
@@ -25,8 +27,83 @@ const PropertySchema = new mongoose.Schema(
 
     contractPeriodMonths: Number,
 
-    images: [String],
-    documents: [String],
+    // Görsel dosyalar - FileMetadata ile ilişkili
+    images: [
+      {
+        fileId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "FileMetadata",
+        },
+        url: String,
+        isPrimary: {
+          type: Boolean,
+          default: false,
+        },
+        order: Number,
+        uploadedAt: Date,
+      },
+    ],
+
+    // Dökümanlar - FileMetadata ile ilişkili
+    documents: [
+      {
+        type: {
+          type: String,
+          enum: [
+            "title_deed",
+            "annotation",
+            "valuation_report",
+            "tax_document",
+            "floor_plan",
+            "other",
+          ],
+          required: true,
+        },
+        fileId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "FileMetadata",
+          required: true,
+        },
+        url: String,
+        fileName: String,
+        description: String,
+        uploadedAt: Date,
+        uploadedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        verifiedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        verifiedAt: Date,
+      },
+    ],
+
+    // Ana dökümanlar için hızlı erişim
+    titleDeedDocument: {
+      fileId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "FileMetadata",
+      },
+      url: String,
+      verified: {
+        type: Boolean,
+        default: false,
+      },
+    },
+
+    annotationDocument: {
+      fileId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "FileMetadata",
+      },
+      url: String,
+      hasAnnotation: {
+        type: Boolean,
+        default: false,
+      },
+    },
 
     status: {
       type: String,
@@ -59,7 +136,7 @@ const PropertySchema = new mongoose.Schema(
     lastStatusChange: Date,
     flaggedIssues: [String],
 
-    // Öne çıkarma özellikleri - PDF'e göre
+    // Öne Çıkarma özellikleri - PDF'e göre
     isFeatured: { type: Boolean, default: false },
     featuredAt: Date,
     featuredUntil: Date,
@@ -86,8 +163,17 @@ PropertySchema.pre("save", function (next) {
     const expected = ((this.rentOffered * 12) / this.requestedInvestment) * 100;
     if (Math.abs(expected - this.annualYieldPercent) > 1) {
       console.warn(
-        `⚠️ UYARI: Girilen kira ve getiri tutarsız olabilir. Rent = ${this.rentOffered}, Yield = ${this.annualYieldPercent}`
+        `⚠️ UYARI: Girilen kira ve getiri tutarsız olabilir. 
+Rent = ${this.rentOffered}, Yield = ${this.annualYieldPercent}`
       );
+    }
+  }
+
+  // Ana resmi belirle
+  if (this.images && this.images.length > 0) {
+    const hasPrimary = this.images.some((img) => img.isPrimary);
+    if (!hasPrimary) {
+      this.images[0].isPrimary = true;
     }
   }
 
@@ -109,5 +195,6 @@ PropertySchema.index({ owner: 1, status: 1 });
 PropertySchema.index({ annualYieldPercent: -1, status: 1 });
 PropertySchema.index({ requestedInvestment: 1, status: 1 });
 PropertySchema.index({ createdAt: -1 });
+PropertySchema.index({ isFeatured: 1, featuredUntil: 1 });
 
 module.exports = mongoose.model("Property", PropertySchema);

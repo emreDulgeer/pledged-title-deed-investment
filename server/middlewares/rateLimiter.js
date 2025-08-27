@@ -44,8 +44,8 @@ const strict = rateLimit({
 
 // Upload limiter - Dosya yükleme için
 const uploadLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 dakika
-  max: 10, // Dakikada 10 yükleme
+  windowMs: 15 * 60 * 1000, // 15 dakika
+  max: 50, // Dakikada 10 yükleme
   message: {
     success: false,
     message: "Çok fazla dosya yükleme isteği. Lütfen 1 dakika bekleyin",
@@ -68,8 +68,8 @@ const uploadLimiter = rateLimit({
 
 // Download limiter - Dosya indirme için
 const downloadLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 dakika
-  max: 30, // Dakikada 30 indirme
+  windowMs: 15 * 60 * 1000, // 15 dakika
+  max: 100, // Dakikada 30 indirme
   message: {
     success: false,
     message: "Çok fazla indirme isteği. Lütfen biraz bekleyin",

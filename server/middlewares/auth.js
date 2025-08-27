@@ -129,6 +129,7 @@ const auth = async (req, res, next) => {
 
     // User bilgisini request'e ekle
     req.user = {
+      _id: user._id,
       id: user._id.toString(),
       email: user.email,
       role: user.role,

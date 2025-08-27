@@ -73,6 +73,7 @@ const ActivityLogSchema = new mongoose.Schema(
         "kyc_approved",
         "kyc_rejected",
         "kyc_verification_requested",
+        "file_download",
       ],
     },
     details: {
