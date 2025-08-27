@@ -2,121 +2,227 @@
 
 const router = require("express").Router();
 const investmentController = require("../controllers/investmentController");
-const fakeAuth = require("../middlewares/fakeAuth");
+const investmentFileController = require("../controllers/investmentFileController");
+const auth = require("../middlewares/auth");
+const authorize = require("../middlewares/authorize");
 
-// Public routes - Yok (tüm investment işlemleri auth gerektirir)
+// ===== INVESTOR ROUTES =====
 
-// Investor routes
+// Yatırım teklifi gönder
 router.post(
   "/property/:propertyId/offer",
-  fakeAuth("investor"),
+  auth,
+  authorize(["investor"]),
   investmentController.createInvestmentOffer
 );
 
-router.get("/my", fakeAuth("investor"), investmentController.getMyInvestments);
-
-// Property Owner routes
-router.post(
-  "/:id/accept",
-  fakeAuth("property_owner"),
-  investmentController.acceptOffer
-);
-
-router.post(
-  "/:id/reject",
-  fakeAuth("property_owner"),
-  investmentController.rejectOffer
-);
-
-router.post(
-  "/:id/payment",
-  fakeAuth("property_owner"),
-  investmentController.makeRentalPayment
-);
-
+// Investor'ın yatırımlarını listele
 router.get(
-  "/property/:propertyId",
-  fakeAuth(["property_owner", "admin"]),
-  investmentController.getPropertyInvestments
+  "/my",
+  auth,
+  authorize(["investor"]),
+  investmentController.getMyInvestments
 );
 
-// Shared routes (Investor & Property Owner)
-router.post(
-  "/:id/contract",
-  fakeAuth(["investor", "property_owner", "admin"]),
-  investmentController.uploadContract
-);
-
-router.get(
-  "/:id",
-  fakeAuth(["investor", "property_owner", "admin", "local_representative"]),
-  investmentController.getInvestmentById
-);
-
-// Property Owner & Local Representative routes
-router.post(
-  "/:id/title-deed",
-  fakeAuth(["property_owner", "local_representative", "admin"]),
-  investmentController.uploadTitleDeed
-);
-
-// Admin routes
-router.get("/", fakeAuth("admin"), investmentController.getAllInvestments);
-
-router.post(
-  "/:id/assign-representative",
-  fakeAuth("admin"),
-  investmentController.assignLocalRepresentative
-);
-
-router.post(
-  "/:id/refund",
-  fakeAuth(["property_owner", "admin"]),
-  investmentController.processRefund
-);
-
-router.post(
-  "/:id/transfer",
-  fakeAuth("admin"),
-  investmentController.transferProperty
-);
-
-// Rental payment endpoints
-router.get(
-  "/rental-payments/owner",
-  fakeAuth("property_owner"),
-  investmentController.getPropertyOwnerRentalPayments
-);
-
+// Investor'ın kira gelirlerini listele
 router.get(
   "/rental-payments/investor",
-  fakeAuth("investor"),
+  auth,
+  authorize(["investor"]),
   investmentController.getInvestorRentalPayments
 );
 
-// Representative request endpoint
+// ===== PROPERTY OWNER ROUTES =====
+
+// Teklifi kabul et
+router.post(
+  "/:id/accept",
+  auth,
+  authorize(["property_owner"]),
+  investmentController.acceptOffer
+);
+
+// Teklifi reddet
+router.post(
+  "/:id/reject",
+  auth,
+  authorize(["property_owner"]),
+  investmentController.rejectOffer
+);
+
+// Kira ödemesi kaydet
+router.post(
+  "/:id/payment",
+  auth,
+  authorize(["property_owner"]),
+  investmentController.makeRentalPayment
+);
+
+// Property'ye ait yatırımları listele
+router.get(
+  "/property/:propertyId",
+  auth,
+  authorize(["property_owner", "admin"]),
+  investmentController.getPropertyInvestments
+);
+
+// Property Owner'ın kira ödemelerini listele
+router.get(
+  "/rental-payments/owner",
+  auth,
+  authorize(["property_owner"]),
+  investmentController.getPropertyOwnerRentalPayments
+);
+
+// ===== FILE OPERATIONS (Separate Controller) =====
+
+// Kontrat yükle (Investor & Property Owner)
+router.post(
+  "/:id/contract",
+  auth,
+  authorize(["investor", "property_owner", "admin"]),
+  investmentFileController.uploadContract
+);
+
+// Tapu kaydı yükle (Property Owner & Local Rep)
+router.post(
+  "/:id/title-deed",
+  auth,
+  authorize(["property_owner", "local_representative", "admin"]),
+  investmentFileController.uploadTitleDeed
+);
+
+// Payment receipt yükle (Investor)
+router.post(
+  "/:id/payment-receipt",
+  auth,
+  authorize(["investor", "admin"]),
+  investmentFileController.uploadPaymentReceipt
+);
+
+// Rental receipt yükle (Property Owner)
+router.post(
+  "/:id/rental-receipt",
+  auth,
+  authorize(["property_owner", "admin"]),
+  investmentFileController.uploadRentalReceipt
+);
+
+// Additional document yükle
+router.post(
+  "/:id/documents",
+  auth,
+  authorize(["investor", "property_owner", "admin", "local_representative"]),
+  investmentFileController.uploadAdditionalDocument
+);
+
+// Investment dökümanlarını listele
+router.get(
+  "/:id/documents",
+  auth,
+  authorize(["investor", "property_owner", "admin", "local_representative"]),
+  investmentFileController.getInvestmentDocuments
+);
+
+// Investment dökümanını indir
+router.get(
+  "/:investmentId/documents/:fileId/download",
+  auth,
+  authorize(["investor", "property_owner", "admin", "local_representative"]),
+  investmentFileController.downloadInvestmentDocument
+);
+
+// Investment dökümanını sil (Admin only)
+router.delete(
+  "/:investmentId/documents/:fileId",
+  auth,
+  authorize(["admin"]),
+  investmentFileController.deleteInvestmentDocument
+);
+
+// ===== SHARED ROUTES =====
+
+// Investment detayını getir
+router.get(
+  "/:id",
+  auth,
+  authorize(["investor", "property_owner", "admin", "local_representative"]),
+  investmentController.getInvestmentById
+);
+
+// Representative talep et
 router.post(
   "/:id/request-representative",
-  fakeAuth(["investor", "property_owner"]),
+  auth,
+  authorize(["investor", "property_owner"]),
   investmentController.requestLocalRepresentative
 );
 
-// Reports
+// ===== ADMIN ROUTES =====
+
+// Tüm yatırımları listele
+router.get(
+  "/",
+  auth,
+  authorize(["admin"]),
+  investmentController.getAllInvestments
+);
+
+// Title deed'i onayla
+router.post(
+  "/:id/approve-title-deed",
+  auth,
+  authorize(["admin"]),
+  investmentController.approveTitleDeed
+);
+
+// Local representative ata
+router.post(
+  "/:id/assign-representative",
+  auth,
+  authorize(["admin"]),
+  investmentController.assignLocalRepresentative
+);
+
+// İade işlemi
+router.post(
+  "/:id/refund",
+  auth,
+  authorize(["property_owner", "admin"]),
+  investmentController.processRefund
+);
+
+// Property transferi
+router.post(
+  "/:id/transfer",
+  auth,
+  authorize(["admin"]),
+  investmentController.transferProperty
+);
+
+// ===== REPORTS =====
+
+// Yaklaşan ödemeler
 router.get(
   "/reports/upcoming-payments",
-  fakeAuth(["admin", "local_representative"]),
+  auth,
+  authorize(["admin", "local_representative"]),
   investmentController.getUpcomingPayments
 );
 
+// Geciken ödemeler
 router.get(
   "/reports/delayed-payments",
-  fakeAuth(["admin", "local_representative"]),
+  auth,
+  authorize(["admin", "local_representative"]),
   investmentController.getDelayedPayments
 );
 
+// Investment istatistikleri
 router.get(
   "/:id/statistics",
-  fakeAuth(["admin", "property_owner", "investor"]),
+  auth,
+  authorize(["admin", "property_owner", "investor"]),
   investmentController.getInvestmentStatistics
 );
 
