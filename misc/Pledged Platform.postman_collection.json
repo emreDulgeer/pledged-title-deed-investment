@@ -2138,7 +2138,7 @@
 								],
 								"body": {
 									"mode": "raw",
-									"raw": "{\n    \"email\": \"investor.test@example.com\",\n    \"password\": \"NewPassword123!@#2\",\n    \"rememberMe\": true\n}"
+									"raw": "{\n    \"email\": \"emre@investor.com\",\n    \"password\": \"Test123!@#\",\n    \"rememberMe\": true\n}"
 								},
 								"url": {
 									"raw": "{{baseUrl}}/auth/login",
@@ -3906,6 +3906,2102 @@
 					]
 				}
 			]
+		},
+		{
+			"name": "Membership",
+			"item": [
+				{
+					"name": "Public Routes",
+					"item": [
+						{
+							"name": "Get Available Plans",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test('Response has plans array', function () {",
+											"    const response = pm.response.json();",
+											"    pm.expect(response.data).to.have.property('plans');",
+											"    pm.expect(response.data.plans).to.be.an('array');",
+											"});",
+											"",
+											"// İlk planın ID'sini kaydet",
+											"const response = pm.response.json();",
+											"if (response.data.plans && response.data.plans.length > 0) {",
+											"    pm.collectionVariables.set('planId', response.data.plans[0].id);",
+											"    console.log('Plan ID saved:', response.data.plans[0].id);",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/membership/plans",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership",
+										"plans"
+									]
+								},
+								"description": "Herkesin görebileceği aktif ve görünür planları listeler"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Admin Routes",
+					"item": [
+						{
+							"name": "Extend Membership",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response received', function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"if (pm.response.code === 200) {",
+											"    pm.test('Membership extended', function () {",
+											"        const response = pm.response.json();",
+											"        pm.expect(response.success).to.be.true;",
+											"        pm.expect(response.data).to.have.property('membership');",
+											"        pm.expect(response.data.membership).to.have.property('newExpiryDate');",
+											"    });",
+											"} else if (pm.response.code === 403) {",
+											"    console.log('Admin authorization required');",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"userId\": \"{{userId}}\",\n    \"days\": 30,\n    \"reason\": \"Özel kampanya nedeniyle süre uzatıldı\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership/admin/extend",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership",
+										"admin",
+										"extend"
+									]
+								},
+								"description": "Admin yetkisiyle bir kullanıcının üyelik süresini uzatır"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Membership Statistics",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response received', function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"if (pm.response.code === 200) {",
+											"    pm.test('Statistics retrieved', function () {",
+											"        const response = pm.response.json();",
+											"        pm.expect(response.success).to.be.true;",
+											"        pm.expect(response.data).to.have.property('totalMembers');",
+											"        pm.expect(response.data).to.have.property('activeMembers');",
+											"        pm.expect(response.data).to.have.property('byPlan');",
+											"    });",
+											"    ",
+											"    pm.test('Statistics structure is correct', function () {",
+											"        const stats = pm.response.json().data;",
+											"        pm.expect(stats.byPlan).to.be.an('array');",
+											"        if (stats.byPlan.length > 0) {",
+											"            pm.expect(stats.byPlan[0]).to.have.property('name');",
+											"            pm.expect(stats.byPlan[0]).to.have.property('active');",
+											"            pm.expect(stats.byPlan[0]).to.have.property('monthlyRevenue');",
+											"        }",
+											"    });",
+											"} else if (pm.response.code === 403) {",
+											"    console.log('Admin authorization required');",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{adminAcessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/membership/admin/statistics",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership",
+										"admin",
+										"statistics"
+									]
+								},
+								"description": "Üyelik istatistiklerini getirir (Admin yetkisi gerekli)"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Error Test Cases",
+					"item": [
+						{
+							"name": "Invalid Plan ID",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Should return error for invalid plan', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 404]);",
+											"    const response = pm.response.json();",
+											"    pm.expect(response.success).to.be.false;",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"planId\": \"invalid_id_123456789\",\n    \"interval\": \"monthly\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership/activate",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership",
+										"activate"
+									]
+								},
+								"description": "Geçersiz plan ID ile aktivasyon denemesi"
+							},
+							"response": []
+						},
+						{
+							"name": "Unauthorized Access",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Should return 401 without auth', function () {",
+											"    pm.response.to.have.status(401);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/membership/status",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership",
+										"status"
+									]
+								},
+								"description": "Auth token olmadan erişim denemesi"
+							},
+							"response": []
+						},
+						{
+							"name": "Invalid Interval",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Should handle invalid interval', function () {",
+											"    const response = pm.response.json();",
+											"    pm.expect(response.success).to.be.false;",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"planId\": \"{{planId}}\",\n    \"interval\": \"daily\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership/change-plan",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership",
+										"change-plan"
+									]
+								},
+								"description": "Geçersiz interval değeri ile plan değişimi"
+							},
+							"response": []
+						},
+						{
+							"name": "Cancel Without Reason",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Should accept cancellation without reason', function () {",
+											"    if (pm.response.code === 200) {",
+											"        const response = pm.response.json();",
+											"        pm.expect(response.success).to.be.true;",
+											"    }",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership/cancel",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership",
+										"cancel"
+									]
+								},
+								"description": "Sebep belirtmeden iptal denemesi"
+							},
+							"response": []
+						},
+						{
+							"name": "Extend Invalid User",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Should return error for invalid user', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 404]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"userId\": \"invalid_user_id\",\n    \"days\": 30\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership/admin/extend",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership",
+										"admin",
+										"extend"
+									]
+								},
+								"description": "Geçersiz kullanıcı ID ile süre uzatma"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "User Routes (Auth Required)",
+					"item": [
+						{
+							"name": "Get Membership Status",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test('Response has membership data', function () {",
+											"    const response = pm.response.json();",
+											"    pm.expect(response).to.have.property('success', true);",
+											"    pm.expect(response).to.have.property('data');",
+											"    pm.expect(response.data).to.have.property('status');",
+											"    pm.expect(response.data).to.have.property('features');",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/membership/status",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership",
+										"status"
+									]
+								},
+								"description": "Kullanıcının mevcut üyelik durumunu getirir"
+							},
+							"response": []
+						},
+						{
+							"name": "Activate Membership",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200 or 400', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+											"});",
+											"",
+											"if (pm.response.code === 200) {",
+											"    pm.test('Membership activated successfully', function () {",
+											"        const response = pm.response.json();",
+											"        pm.expect(response.success).to.be.true;",
+											"        pm.expect(response.data).to.have.property('membership');",
+											"    });",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"planId\": \"{{planId}}\",\n    \"interval\": \"monthly\",\n    \"promoCode\": \"\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership/activate",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership",
+										"activate"
+									]
+								},
+								"description": "Üyeliği aktifleştirir (ilk aktivasyon için)"
+							},
+							"response": []
+						},
+						{
+							"name": "Change Plan",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response received', function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"if (pm.response.code === 200) {",
+											"    pm.test('Plan changed successfully', function () {",
+											"        pm.expect(response.success).to.be.true;",
+											"        pm.expect(response.message).to.include('Plan');",
+											"    });",
+											"} else {",
+											"    console.log('Plan change failed:', response.message);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"planId\": \"{{planId}}\",\n    \"interval\": \"monthly\",\n    \"promoCode\": \"\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership/change-plan",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership",
+										"change-plan"
+									]
+								},
+								"description": "Mevcut planı değiştirir"
+							},
+							"response": []
+						},
+						{
+							"name": "Cancel Membership",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Response received', function () {",
+											"    pm.response.to.be.json;",
+											"});",
+											"",
+											"if (pm.response.code === 200) {",
+											"    pm.test('Membership cancelled', function () {",
+											"        const response = pm.response.json();",
+											"        pm.expect(response.success).to.be.true;",
+											"        pm.expect(response.data.plan).to.equal('Basic');",
+											"    });",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"reason\": \"Artık premium özelliklere ihtiyacım kalmadı\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/membership/cancel",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"membership",
+										"cancel"
+									]
+								},
+								"description": "Üyeliği iptal eder ve Basic plana geçirir"
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Download/Upload",
+			"item": [
+				{
+					"name": "2. File Upload Tests",
+					"item": [
+						{
+							"name": "Upload Single Image",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"if (response.success) {",
+											"    // Dosya bilgilerini kaydet",
+											"    pm.environment.set('uploadedFileName', response.data.fileName);",
+											"    pm.environment.set('uploadedFileUrl', response.data.url);",
+											"    ",
+											"    pm.test('File upload successful', function () {",
+											"        pm.expect(response.data).to.have.property('fileName');",
+											"        pm.expect(response.data).to.have.property('checksum');",
+											"        pm.expect(response.data).to.have.property('url');",
+											"    });",
+											"    ",
+											"    pm.test('File has checksum for integrity', function () {",
+											"        pm.expect(response.data.checksum).to.be.a('string');",
+											"        pm.expect(response.data.checksum).to.have.lengthOf(64); // SHA-256",
+											"    });",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"description": "Yüklenecek resim dosyası (JPG, PNG, GIF)",
+											"type": "file",
+											"src": []
+										},
+										{
+											"key": "directory",
+											"value": "images",
+											"description": "Hedef klasör",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{baseUrl}}/files/upload",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"files",
+										"upload"
+									]
+								},
+								"description": "Tek bir resim dosyası yükler. Magic number kontrolü yapılır."
+							},
+							"response": []
+						},
+						{
+							"name": "Upload Single Document",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"if (response.success) {",
+											"    pm.environment.set('uploadedDocumentName', response.data.fileName);",
+											"    ",
+											"    pm.test('Document upload successful', function () {",
+											"        pm.expect(response.data.fileType).to.include('pdf');",
+											"    });",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"description": "PDF, DOC, DOCX dosyası",
+											"type": "file",
+											"src": "/C:/Users/jarva/Downloads/Documents/Rehinli Tapu Yatırım Platformu en tr.pdf"
+										},
+										{
+											"key": "directory",
+											"value": "documents",
+											"type": "text"
+										},
+										{
+											"key": "relatedModel",
+											"value": "Investment",
+											"description": "İlişkili model (opsiyonel)",
+											"type": "text"
+										},
+										{
+											"key": "relatedId",
+											"value": "68992ba41a77ec64e7a41b39",
+											"description": "İlişkili kayıt ID (opsiyonel)",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{baseUrl}}/files/upload",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"files",
+										"upload"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Upload Multiple Files",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"pm.test('Multiple files processed', function () {",
+											"    pm.expect(response.data).to.be.an('array');",
+											"    pm.expect(response.data.length).to.be.above(0);",
+											"});",
+											"",
+											"// Başarılı yüklemeleri kontrol et",
+											"const successfulUploads = response.data.filter(f => f.success);",
+											"pm.test('At least one file uploaded successfully', function () {",
+											"    pm.expect(successfulUploads.length).to.be.above(0);",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "files",
+											"description": "Birden fazla dosya seçin (max 10)",
+											"type": "file",
+											"src": [
+												"/C:/Users/jarva/Downloads/Documents/Anna Williams Guide.pdf",
+												"/C:/Users/jarva/Downloads/Documents/Rehinli Tapu Yatırım Platformu en tr.pdf",
+												"/C:/Users/jarva/Downloads/Documents/Ultimate-2C-Wireless-Controller.pdf"
+											]
+										},
+										{
+											"key": "directory",
+											"value": "general",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{baseUrl}}/files/upload-multiple",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"files",
+										"upload-multiple"
+									]
+								},
+								"description": "Maksimum 10 dosya aynı anda yüklenebilir"
+							},
+							"response": []
+						},
+						{
+							"name": "Upload Property Document (Title Deed)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200) {",
+											"    const response = pm.response.json();",
+											"    ",
+											"    pm.test('Property document uploaded', function () {",
+											"        pm.expect(response.success).to.be.true;",
+											"    });",
+											"    ",
+											"    pm.test('Document linked to property', function () {",
+											"        pm.expect(response.data.relatedModel).to.equal('Property');",
+											"    });",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "document",
+											"description": "Tapu belgesi (PDF)",
+											"type": "file",
+											"src": "/C:/Users/jarva/Downloads/Documents/CreditNote-9EWLIOSG-0002-CN-01.pdf"
+										},
+										{
+											"key": "propertyId",
+											"value": "{{propertyId}}",
+											"description": "Property ID",
+											"type": "text"
+										},
+										{
+											"key": "documentType",
+											"value": "other",
+											"description": "title_deed, annotation, valuation, contract, other",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{baseUrl}}/files/property-document",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"files",
+										"property-document"
+									]
+								},
+								"description": "Property owner veya admin yetkisi gerektirir"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "4. File Management",
+					"item": [
+						{
+							"name": "List Files",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"pm.test('Files list returned', function () {",
+											"    pm.expect(response.data).to.have.property('files');",
+											"    pm.expect(response.data.files).to.be.an('array');",
+											"});",
+											"",
+											"pm.test('Pagination info present', function () {",
+											"    pm.expect(response.data).to.have.property('total');",
+											"    pm.expect(response.data).to.have.property('page');",
+											"    pm.expect(response.data).to.have.property('totalPages');",
+											"});"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/files/list?directory=images&page=1&limit=10",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"files",
+										"list"
+									],
+									"query": [
+										{
+											"key": "directory",
+											"value": "images",
+											"description": "Klasör adı"
+										},
+										{
+											"key": "page",
+											"value": "1",
+											"description": "Sayfa numarası"
+										},
+										{
+											"key": "limit",
+											"value": "10",
+											"description": "Sayfa başına dosya sayısı"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get File Info",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"if (pm.response.code === 200) {",
+											"    const response = pm.response.json();",
+											"    ",
+											"    pm.test('File metadata returned', function () {",
+											"        pm.expect(response.data).to.have.property('fileName');",
+											"        pm.expect(response.data).to.have.property('checksum');",
+											"        pm.expect(response.data).to.have.property('size');",
+											"    });",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/files/info/{{uploadedFileName}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"files",
+										"info",
+										"{{uploadedFileName}}"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Delete File (Soft)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('File deleted', function () {",
+											"    pm.response.to.have.status(200);",
+											"    const response = pm.response.json();",
+											"    pm.expect(response.success).to.be.true;",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/v1/files/delete/{{uploadedFileName}}?directory=images&hard=false",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"files",
+										"delete",
+										"{{uploadedFileName}}"
+									],
+									"query": [
+										{
+											"key": "directory",
+											"value": "images"
+										},
+										{
+											"key": "hard",
+											"value": "false",
+											"description": "false: trash'e taşı, true: kalıcı sil"
+										}
+									]
+								},
+								"description": "Dosyayı trash klasörüne taşır (soft delete)"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "5. Security Tests",
+					"item": [
+						{
+							"name": "TEST: Upload EXE File (Should Fail)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Should reject executable file', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 413, 422]);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"pm.test('Error message mentions security', function () {",
+											"    const message = response.message || response.error || '';",
+											"    pm.expect(message.toLowerCase()).to.satisfy((msg) => {",
+											"        return msg.includes('güvenlik') || ",
+											"               msg.includes('engellen') || ",
+											"               msg.includes('security') ||",
+											"               msg.includes('blocked');",
+											"    });",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"description": "EXE dosyası - engellenecek",
+											"type": "file",
+											"src": "test.exe"
+										},
+										{
+											"key": "directory",
+											"value": "test",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/v1/files/upload",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"files",
+										"upload"
+									]
+								},
+								"description": "Güvenlik: EXE dosyası yükleme engellenmeli"
+							},
+							"response": []
+						},
+						{
+							"name": "TEST: Upload Fake JPG (EXE renamed)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Should detect fake file extension', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 422]);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"pm.test('Magic number validation should fail', function () {",
+											"    pm.expect(response.success).to.be.false;",
+											"    const message = response.message || '';",
+											"    pm.expect(message.toLowerCase()).to.satisfy((msg) => {",
+											"        return msg.includes('magic') || ",
+											"               msg.includes('içerik') || ",
+											"               msg.includes('format') ||",
+											"               msg.includes('uyuşm');",
+											"    });",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"description": "EXE dosyası .jpg olarak yeniden adlandırılmış",
+											"type": "file",
+											"src": "fake_image.jpg"
+										},
+										{
+											"key": "directory",
+											"value": "test",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/v1/files/upload",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"files",
+										"upload"
+									]
+								},
+								"description": "Magic number kontrolü sahte uzantıyı tespit etmeli"
+							},
+							"response": []
+						},
+						{
+							"name": "TEST: Upload >100MB File (Should Fail)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Should reject oversized file', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 413]);",
+											"});",
+											"",
+											"const response = pm.response.json();",
+											"",
+											"pm.test('Error mentions file size', function () {",
+											"    const message = response.message || response.error || '';",
+											"    pm.expect(message.toLowerCase()).to.satisfy((msg) => {",
+											"        return msg.includes('boyut') || ",
+											"               msg.includes('size') || ",
+											"               msg.includes('büyük') ||",
+											"               msg.includes('large');",
+											"    });",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"description": "101MB dosya - limit aşımı",
+											"type": "file",
+											"src": "large_file_101mb.zip"
+										},
+										{
+											"key": "directory",
+											"value": "test",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/v1/files/upload",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"files",
+										"upload"
+									]
+								},
+								"description": "100MB limitini aşan dosya reddedilmeli"
+							},
+							"response": []
+						},
+						{
+							"name": "TEST: Path Traversal Attack",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Should prevent path traversal', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 403]);",
+											"});",
+											"",
+											"pm.test('Security error returned', function () {",
+											"    const response = pm.response.json();",
+											"    pm.expect(response.success).to.be.false;",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/v1/files/download/../../etc/passwd",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"files",
+										"download",
+										"..",
+										"..",
+										"etc",
+										"passwd"
+									]
+								},
+								"description": "Path traversal saldırısı engellenmeli"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "6. Rate Limit Tests",
+					"item": [
+						{
+							"name": "TEST: Rapid Upload (Rate Limit)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"// 10'dan fazla istek sonrası rate limit devreye girmeli",
+											"if (pm.response.code === 429) {",
+											"    pm.test('Rate limit activated', function () {",
+											"        pm.expect(pm.response.code).to.equal(429);",
+											"    });",
+											"    ",
+											"    pm.test('Retry-After header present', function () {",
+											"        pm.response.to.have.header('X-RateLimit-Limit');",
+											"    });",
+											"} else {",
+											"    pm.test('Request within rate limit', function () {",
+											"        pm.expect(pm.response.code).to.be.below(429);",
+											"    });",
+											"}"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"description": "Küçük test dosyası",
+											"type": "file",
+											"src": "small_test.txt"
+										},
+										{
+											"key": "directory",
+											"value": "test",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/v1/files/upload",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"files",
+										"upload"
+									]
+								},
+								"description": "Bu isteği 15 kez çalıştırın - 10'dan sonra rate limit devreye girmeli"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "3. File Download Tests",
+					"item": [
+						{
+							"name": "Download File",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test('Content-Disposition header present', function () {",
+											"    pm.response.to.have.header('Content-Disposition');",
+											"});",
+											"",
+											"pm.test('File content received', function () {",
+											"    pm.expect(pm.response.text()).to.not.be.empty;",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/v1/files/download/{{uploadedFileName}}?directory=images",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"files",
+										"download",
+										"{{uploadedFileName}}"
+									],
+									"query": [
+										{
+											"key": "directory",
+											"value": "images"
+										}
+									]
+								},
+								"description": "Önceden yüklenen dosyayı indirir"
+							},
+							"response": []
+						},
+						{
+							"name": "Preview File (Inline)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test('Content-Type header is image', function () {",
+											"    const contentType = pm.response.headers.get('Content-Type');",
+											"    pm.expect(contentType).to.include('image');",
+											"});",
+											"",
+											"pm.test('Content-Disposition is inline for preview', function () {",
+											"    const disposition = pm.response.headers.get('Content-Disposition');",
+											"    if (disposition) {",
+											"        pm.expect(disposition).to.include('inline');",
+											"    }",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/v1/files/preview/{{uploadedFileName}}?directory=images",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"v1",
+										"files",
+										"preview",
+										"{{uploadedFileName}}"
+									],
+									"query": [
+										{
+											"key": "directory",
+											"value": "images"
+										}
+									]
+								},
+								"description": "Resim dosyalarını tarayıcıda görüntüler"
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Investment & Property Upload/Download",
+			"item": [
+				{
+					"name": "Investment File Operations",
+					"item": [
+						{
+							"name": "Upload Contract",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"description": "Contract PDF file",
+											"type": "file",
+											"src": []
+										}
+									]
+								},
+								"url": {
+									"raw": "{{baseUrl}}/investments/{{investmentId}}/contract",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"investments",
+										"{{investmentId}}",
+										"contract"
+									]
+								},
+								"description": "Upload a signed contract for the investment. File must be PDF."
+							},
+							"response": []
+						},
+						{
+							"name": "Upload Title Deed",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"description": "Title deed document",
+											"type": "file",
+											"src": []
+										}
+									]
+								},
+								"url": {
+									"raw": "{{baseUrl}}/investments/{{investmentId}}/title-deed",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"investments",
+										"{{investmentId}}",
+										"title-deed"
+									]
+								},
+								"description": "Upload title deed annotation document for the investment"
+							},
+							"response": []
+						},
+						{
+							"name": "Upload Payment Receipt",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"description": "Payment receipt file",
+											"type": "file",
+											"src": []
+										}
+									]
+								},
+								"url": {
+									"raw": "{{baseUrl}}/investments/{{investmentId}}/payment-receipt",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"investments",
+										"{{investmentId}}",
+										"payment-receipt"
+									]
+								},
+								"description": "Upload payment receipt for the investment"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Investment Documents",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/investments/{{investmentId}}/documents",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"investments",
+										"{{investmentId}}",
+										"documents"
+									]
+								},
+								"description": "List all documents related to an investment"
+							},
+							"response": []
+						},
+						{
+							"name": "Download Investment Document",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/investments/{{investmentId}}/documents/:fileId/download",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"investments",
+										"{{investmentId}}",
+										"documents",
+										":fileId",
+										"download"
+									],
+									"variable": [
+										{
+											"key": "fileId",
+											"value": "68af71fc2fe94e97ad88c5d0",
+											"description": "File ID to download"
+										}
+									]
+								},
+								"description": "Download any file by ID (requires authentication)"
+							},
+							"response": []
+						},
+						{
+							"name": "Approve Title Deed (Admin)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{adminAcessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/investments/{{investmentId}}/approve-title-deed",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"investments",
+										"{{investmentId}}",
+										"approve-title-deed"
+									]
+								},
+								"description": "Admin endpoint to approve uploaded title deed"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Property File Operations",
+					"item": [
+						{
+							"name": "Upload Property Images",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "images",
+											"description": "Property images (max 10, jpg/png/webp, max 10MB each)",
+											"type": "file",
+											"src": []
+										}
+									]
+								},
+								"url": {
+									"raw": "{{baseUrl}}/properties/{{propertyId}}/images",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"properties",
+										"{{propertyId}}",
+										"images"
+									]
+								},
+								"description": "Upload multiple images for a property"
+							},
+							"response": []
+						},
+						{
+							"name": "Upload Property Document",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "file",
+											"description": "Document file (PDF or image)",
+											"type": "file",
+											"src": []
+										},
+										{
+											"key": "documentType",
+											"value": "title_deed",
+											"description": "Type: title_deed, annotation, valuation_report, tax_document, floor_plan, other",
+											"type": "text"
+										},
+										{
+											"key": "description",
+											"value": "Property title deed document",
+											"description": "Optional description",
+											"type": "text"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{baseUrl}}/properties/{{propertyId}}/documents",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"properties",
+										"{{propertyId}}",
+										"documents"
+									]
+								},
+								"description": "Upload a document for the property"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Property Files",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/properties/{{propertyId}}/files",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"properties",
+										"{{propertyId}}",
+										"files"
+									]
+								},
+								"description": "Get all files (images and documents) for a property"
+							},
+							"response": []
+						},
+						{
+							"name": "Set Primary Image",
+							"request": {
+								"method": "PATCH",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/properties/{{propertyId}}/images/:imageId/primary",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"properties",
+										"{{propertyId}}",
+										"images",
+										":imageId",
+										"primary"
+									],
+									"variable": [
+										{
+											"key": "imageId",
+											"value": "",
+											"description": "Image file ID to set as primary"
+										}
+									]
+								},
+								"description": "Set an image as the primary image for the property"
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Property Image",
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/properties/{{propertyId}}/images/:imageId",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"properties",
+										"{{propertyId}}",
+										"images",
+										":imageId"
+									],
+									"variable": [
+										{
+											"key": "imageId",
+											"value": "68af6c6582e3d2227d484670",
+											"description": "Image file ID to delete"
+										}
+									]
+								},
+								"description": "Delete a property image"
+							},
+							"response": []
+						},
+						{
+							"name": "Delete Property Document",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/properties/{{propertyId}}/documents/:documentId",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"properties",
+										"{{propertyId}}",
+										"documents",
+										":documentId"
+									],
+									"variable": [
+										{
+											"key": "documentId",
+											"value": "68af67bd3e4cc488d388dced",
+											"description": "Document file ID to delete"
+										}
+									]
+								},
+								"description": "Delete a property document"
+							},
+							"response": []
+						},
+						{
+							"name": "Verify Document (Admin)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{adminAcessToken}}",
+										"type": "text"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/properties/{{propertyId}}/documents/:documentId/verify",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"properties",
+										"{{propertyId}}",
+										"documents",
+										":documentId",
+										"verify"
+									],
+									"variable": [
+										{
+											"key": "documentId",
+											"value": "",
+											"description": "Document ID to verify"
+										}
+									]
+								},
+								"description": "Admin/Local Rep endpoint to verify property documents"
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "General File Operations",
+					"item": [
+						{
+							"name": "Download File",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/files/download/:fileId",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"files",
+										"download",
+										":fileId"
+									],
+									"variable": [
+										{
+											"key": "fileId",
+											"value": "",
+											"description": "File ID to download"
+										}
+									]
+								},
+								"description": "Download any file by ID (requires authentication)"
+							},
+							"response": []
+						},
+						{
+							"name": "List My Files",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/files/list?page=1&limit=10&documentType=contract",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"files",
+										"list"
+									],
+									"query": [
+										{
+											"key": "page",
+											"value": "1"
+										},
+										{
+											"key": "limit",
+											"value": "10"
+										},
+										{
+											"key": "documentType",
+											"value": "contract",
+											"description": "Optional: filter by document type"
+										}
+									]
+								},
+								"description": "List all files uploaded by the authenticated user"
+							},
+							"response": []
+						},
+						{
+							"name": "Get Storage Stats",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/files/stats",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"files",
+										"stats"
+									]
+								},
+								"description": "Get storage statistics for the authenticated user"
+							},
+							"response": []
+						},
+						{
+							"name": "Delete File",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/files/:fileId",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"files",
+										":fileId"
+									],
+									"variable": [
+										{
+											"key": "fileId",
+											"value": "",
+											"description": "File ID to delete"
+										}
+									]
+								},
+								"description": "Delete a file (soft delete)"
+							},
+							"response": []
+						},
+						{
+							"name": "Preview File",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/files/preview/:fileId",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"files",
+										"preview",
+										":fileId"
+									],
+									"variable": [
+										{
+											"key": "fileId",
+											"value": "",
+											"description": "File ID to preview"
+										}
+									]
+								},
+								"description": "Preview public or shared files"
+							},
+							"response": []
+						}
+					]
+				}
+			]
 		}
 	],
 	"event": [
@@ -3933,87 +6029,71 @@
 	"variable": [
 		{
 			"key": "baseUrl",
-			"value": "http://localhost:5000/api/v1",
-			"type": "string"
+			"value": "http://localhost:5000/api/v1"
 		},
 		{
 			"key": "propertyId",
-			"value": "6893a0d7434a45479a4b6f17",
-			"type": "string"
+			"value": "6893a0d7434a45479a4b6f17"
 		},
 		{
 			"key": "investmentId",
-			"value": "6893a462bec3006224cb9124",
-			"type": "string"
+			"value": "6893a462bec3006224cb9124"
 		},
 		{
 			"key": "propertyIdForInvestment",
-			"value": "6893a0d7434a45479a4b6f1b",
-			"type": "string"
+			"value": "6893a0d7434a45479a4b6f1b"
 		},
 		{
 			"key": "unPublishedPropertyId",
-			"value": "6893a1f9bec3006224cb908a",
-			"type": "string"
+			"value": "6893a1f9bec3006224cb908a"
 		},
 		{
 			"key": "flagedPropertyId",
-			"value": "6893a3d6bec3006224cb90fc",
-			"type": "string"
+			"value": "6893a3d6bec3006224cb90fc"
 		},
 		{
 			"key": "SendedInvestmentId",
-			"value": "6893a462bec3006224cb9124",
-			"type": "string"
+			"value": "6893a462bec3006224cb9124"
 		},
 		{
 			"key": "accessToken",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "refreshToken",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "userId",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "verificationToken",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "resetToken",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "adminAcessToken",
-			"value": "",
-			"type": "string"
-		},
-		{
-			"key": "planId",
-			"value": "689e067d02a492275db9a3a8",
-			"type": "default"
-		},
-		{
-			"key": "planId2",
-			"value": "689e067d02a492275db9a3ab",
-			"type": "default"
-		},
-		{
-			"key": "planId2",
 			"value": ""
 		},
 		{
+			"key": "refreshToken",
+			"value": ""
+		},
+		{
+			"key": "userId",
+			"value": ""
+		},
+		{
+			"key": "verificationToken",
+			"value": ""
+		},
+		{
+			"key": "resetToken",
+			"value": ""
+		},
+		{
+			"key": "adminAcessToken",
+			"value": ""
+		},
+		{
+			"key": "planId",
+			"value": "689e067d02a492275db9a3a8"
+		},
+		{
+			"key": "planId2",
+			"value": "689e067d02a492275db9a3ab"
+		},
+		{
 			"key": "newPlanId",
-			"value": "689f764f372dab3e3018a01f",
-			"type": "default"
+			"value": "689f764f372dab3e3018a01f"
+		},
+		{
+			"key": "uploadedFileName",
+			"value": "Figure_1"
 		}
 	]
 }
