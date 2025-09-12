@@ -626,12 +626,19 @@ class InvestmentService {
       allowedFilters: { ...investmentFilters, status: "exact" },
       allowedSortFields: [...investmentSortFields, "status", "createdAt"],
     };
-    const result = await this.investmentRepository.paginate(
+    // İKİ parametre ver: (query, options). Üçüncü argüman zaten yok sayılıyordu.
+    const raw = await this.investmentRepository.paginate(
       paginationOptions,
-      {},
       options
     );
-    return toInvestmentListDto(result);
+    return {
+      data: raw.data.map((x) =>
+        toInvestmentAdminViewDto
+          ? toInvestmentAdminViewDto(x)
+          : toInvestmentListDto(x)
+      ),
+      pagination: raw.pagination,
+    };
   }
 
   // Kira ödemesi yap
@@ -710,7 +717,10 @@ class InvestmentService {
       {},
       "property investor propertyOwner"
     );
-    return toInvestmentListDto(result);
+    return {
+      data: result.data.map(toInvestmentListDto),
+      pagination: result.pagination,
+    };
   }
 
   async getInvestmentById(investmentId, userId, userRole) {
@@ -750,17 +760,24 @@ class InvestmentService {
       filter,
       "property propertyOwner"
     );
-    return toInvestmentListDto(result);
+    return {
+      data: result.data.map(toInvestmentListDto),
+      pagination: result.pagination,
+    };
   }
 
   async getPropertyInvestments(propertyId, paginationOptions = {}) {
     const filter = { property: propertyId };
-    const result = await this.investmentRepository.findWithPagination(
-      paginationOptions,
-      filter,
-      "investor"
-    );
-    return toInvestmentListDto(result);
+    const result = await this.investmentRepository.paginate(paginationOptions, {
+      populate: "investor",
+      // Bu endpoint'te dışardan filtre almak istersen:
+      allowedFilters: require("../utils/paginationHelper").investmentFilters,
+      allowedSortFields: require("../utils/paginationHelper")
+        .investmentSortFields,
+      customFilters: filter,
+    });
+    // Controller bu endpoint'te paginated dönmüyor, mevcut davranışı koru:
+    return result.data.map(toInvestmentListDto);
   }
 
   // Local representative ata

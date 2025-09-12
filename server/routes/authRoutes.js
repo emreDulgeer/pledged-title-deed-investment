@@ -138,6 +138,22 @@ router.get(
   validateRequest,
   authController.verifyEmail
 );
+router.get("/verify-token", auth, authController.verifyToken);
+
+// Lightweight token check route
+router.get(
+  "/check-token",
+  auth,
+  authController.checkToken ||
+    ((req, res) => {
+      // Auth middleware başarılıysa token geçerlidir
+      return responseWrapper.success(res, {
+        valid: true,
+        userId: req.user.id,
+        role: req.user.role,
+      });
+    })
+);
 
 // Send Phone Verification (Stub for now)
 router.post(

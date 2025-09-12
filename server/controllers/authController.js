@@ -96,7 +96,7 @@ class AuthController {
         country,
         role,
         membershipPlan: "Basic", // Default plan
-        membershipStatus: "inactive", // Ödeme yapılana kadar inactive
+        membershipStatus: "active", // Ödeme yapılana kadar inactive olacak şimdilik active
         kycStatus: "Pending",
         is2FAEnabled: false,
         emailVerified: false,
@@ -184,6 +184,64 @@ class AuthController {
     }
   };
 
+  verifyToken = async (req, res) => {
+    try {
+      const userId = req.user?.id || req.user?._id;
+      if (!userId) {
+        return responseWrapper.unauthorized(res, "Yetkilendirme bilgisi yok");
+      }
+
+      const user = await User.findById(userId).select("-password");
+      if (!user) {
+        return responseWrapper.unauthorized(res, "Kullanıcı bulunamadı");
+      }
+
+      if (["suspended", "deleted"].includes(user.accountStatus)) {
+        return responseWrapper.forbidden(res, "Hesap erişilemez durumda");
+      }
+
+      const userDetails = await this.getUserDetails(user);
+
+      // Token'ı header'dan çek
+      const authHeader = req.headers.authorization || "";
+      const raw = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+      let expiresIn = null;
+      let requiresRefresh = false;
+
+      if (raw) {
+        const decoded = jwt.decode(raw); // auth middleware zaten verify etmiş sayıyoruz
+        if (decoded && typeof decoded.exp === "number") {
+          const now = Math.floor(Date.now() / 1000);
+          expiresIn = Math.max(decoded.exp - now, 0);
+          requiresRefresh = expiresIn < 3600; // < 1 saat
+        }
+      }
+
+      return responseWrapper.success(res, {
+        valid: true,
+        user: userDetails,
+        expiresIn,
+        requiresRefresh,
+      });
+    } catch (error) {
+      console.error("Verify token error:", error);
+      return responseWrapper.error(res, "Token doğrulama hatası");
+    }
+  };
+
+  checkToken = async (req, res) => {
+    try {
+      // Auth middleware başarılı olduysa token geçerlidir
+      return responseWrapper.success(res, {
+        valid: true,
+        userId: req.user.id,
+        role: req.user.role,
+      });
+    } catch (error) {
+      return responseWrapper.unauthorized(res, "Token geçersiz");
+    }
+  };
   /**
    * LOGIN - Giriş işlemi
    */
