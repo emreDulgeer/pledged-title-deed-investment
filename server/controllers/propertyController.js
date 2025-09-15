@@ -242,9 +242,12 @@ class PropertyController {
   getMyPropertyById = async (req, res) => {
     try {
       const ownerId = req.user.id;
+      const isAdmin = req.user.role === "admin";
+
       const property = await this.propertyService.getOwnerPropertyById(
         req.params.id,
-        ownerId
+        ownerId,
+        isAdmin
       );
 
       return responseWrapper.success(res, property, "Property details fetched");

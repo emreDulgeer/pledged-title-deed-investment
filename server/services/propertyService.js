@@ -44,6 +44,7 @@ class PropertyService {
   }
 
   // Property detayını getir
+  // Property detayını getir
   async getPropertyById(propertyId, userId = null, isAdmin = false) {
     const property = await this.propertyRepository.findById(
       propertyId,
@@ -54,12 +55,24 @@ class PropertyService {
       throw new Error("Property not found");
     }
 
-    // View count'u artır (sadece published ise)
+    // PUBLIC endpoint güvenliği:
+    // published değilse ve admin/owner değilse 404 ver
+    const isOwner =
+      userId &&
+      property.owner &&
+      property.owner.toString() === userId.toString();
+
+    if (property.status !== "published" && !isAdmin && !isOwner) {
+      // Varlığı gizlemek için 404
+      throw new Error("Property not found");
+    }
+
+    // View count sadece published için artsın
     if (property.status === "published") {
       await this.propertyRepository.incrementViewCount(propertyId);
     }
 
-    // Role göre DTO seç
+    // Role/kimlik durumuna göre DTO seçimi
     if (isAdmin) {
       return toPropertyAdminViewDto(property);
     } else if (userId) {
@@ -185,17 +198,28 @@ class PropertyService {
       pagination: result.pagination,
     };
   }
-  async getOwnerPropertyById(propertyId, ownerId) {
-    const property = await this.propertyRepository.findOne({
-      _id: propertyId,
-      owner: ownerId,
-    });
+  async getOwnerPropertyById(propertyId, ownerId, isAdmin = false) {
+    let property;
+
+    if (isAdmin) {
+      // Admin: sahibine bakmadan kaydı getir
+      property = await this.propertyRepository.findById(propertyId, "owner");
+    } else {
+      // Owner: sadece kendine ait property'yi görebilir
+      property = await this.propertyRepository.findOne({
+        _id: propertyId,
+        owner: ownerId,
+      });
+    }
 
     if (!property) {
       throw new Error("Property not found");
     }
 
-    return toPropertyOwnerViewDto(property); // flagIssues, reviewNotes, adminStatus vs. içerir
+    // Admin'e admin DTO, sahibi olana owner DTO
+    return isAdmin
+      ? toPropertyAdminViewDto(property)
+      : toPropertyOwnerViewDto(property);
   }
 
   // Admin için tüm property'ler - PAGINATION VE FİLTRELEME EKLENDİ

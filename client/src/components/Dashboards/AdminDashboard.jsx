@@ -37,6 +37,7 @@ const AdminDashboard = () => {
         sortBy: "createdAt",
         sortOrder: "desc",
       });
+      console.log("Fetched pending properties:", res);
       if (res?.success) setPendingProperties(res.data ?? []);
     } catch (e) {
       console.error("Error fetching pending properties:", e);
@@ -254,7 +255,7 @@ const AdminDashboard = () => {
                       </div>
                       <button
                         onClick={() =>
-                          navigate(`/properties/my/properties/${property._id}`)
+                          navigate(`/properties/my/properties/${property.id}`)
                         }
                         className="p-2 rounded-lg transition-colors hover:bg-day-border/40 dark:hover:bg-night-border/40"
                         title={t("common.view")}

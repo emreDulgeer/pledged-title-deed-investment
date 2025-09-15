@@ -20,8 +20,9 @@ import "./i18n/config";
 import AdminLayout from "./views/layouts/AdminLayout";
 import PublicLayout from "./views/layouts/PublicLayout";
 import LoginPage from "./views/auth/LoginPage";
+import AdminPendingKycDetail from "./views/admin/AdminPendingKycDetail";
+import AdminPropertyDetail from "./views/admin/AdminPropertyDetail";
 
-// ⚠️ DOĞRU import yolları
 import PrivateRoute from "./routes/PrivateRoute";
 import RoleBasedRoute from "./routes/RoleBasedRoute";
 
@@ -154,7 +155,14 @@ const AppContent = () => {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboard />} />
         </Route>
-
+        <Route
+          path="/auth/admin/pending-kyc/:userId"
+          element={<AdminPendingKycDetail />}
+        />
+        <Route
+          path="/properties/my/properties/:propertyId"
+          element={<AdminPropertyDetail />}
+        />
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
