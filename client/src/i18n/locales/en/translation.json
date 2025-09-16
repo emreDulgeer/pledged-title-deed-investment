@@ -245,7 +245,19 @@
       "reject_success": "Property has been rejected.",
       "reject_error": "Failed to reject the property.",
       "reject_reason_required": "Please enter a rejection reason.",
-      "not_found": "Property not found."
+      "not_found": "Property not found.",
+      "flag": "Add Flag",
+      "flag_title": "Flag this property",
+      "flag_placeholder": "Type an issue/flag and press Enter (e.g. 'Missing title deed scan')",
+      "flag_add": "Add",
+      "flag_submit": "Save Flags",
+      "flag_success": "Flags saved.",
+      "flag_error": "Failed to save flags.",
+      "flag_validation_required": "Please enter at least one flag/issue.",
+      "approve_with_note_title": "Approve Property",
+      "approve_with_note_hint": "Optionally add a note for the property owner (will be saved as review notes).",
+      "approve_note_placeholder": "Type an optional approval note...",
+      "confirm_approval": "Confirm Approval"
     }
   },
   "errors": {
@@ -268,6 +280,7 @@
     "create_success": "Created successfully",
     "operation_failed": "Operation failed"
   },
+
   "languages": {
     "en": "English",
     "pt": "Português"

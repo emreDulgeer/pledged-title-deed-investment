@@ -245,7 +245,19 @@
       "reject_success": "Propriedade rejeitada.",
       "reject_error": "Falha ao rejeitar a propriedade.",
       "reject_reason_required": "Por favor, insira um motivo de rejeição.",
-      "not_found": "Propriedade não encontrada."
+      "not_found": "Propriedade não encontrada.",
+      "flag": "Adicionar Flag",
+      "flag_title": "Sinalizar esta propriedade",
+      "flag_placeholder": "Digite um problema/flag e pressione Enter (ex.: 'Falta comprovante da escritura')",
+      "flag_add": "Adicionar",
+      "flag_submit": "Salvar Flags",
+      "flag_success": "Flags salvas.",
+      "flag_error": "Falha ao salvar as flags.",
+      "flag_validation_required": "Insira ao menos uma flag/problema.",
+      "approve_with_note_title": "Aprovar Propriedade",
+      "approve_with_note_hint": "Opcionalmente adicione uma observação para o proprietário (será salva como nota de revisão).",
+      "approve_note_placeholder": "Digite uma observação opcional de aprovação...",
+      "confirm_approval": "Confirmar Aprovação"
     }
   },
   "errors": {

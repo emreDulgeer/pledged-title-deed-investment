@@ -115,6 +115,7 @@ const PropertySchema = new mongoose.Schema(
         "active",
         "completed",
         "on_resale",
+        "rejected",
       ],
       default: "draft",
     },

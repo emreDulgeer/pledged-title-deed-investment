@@ -247,6 +247,7 @@ class PropertyService {
       "active",
       "completed",
       "on_resale",
+      "rejected",
     ];
 
     if (!validStatuses.includes(newStatus)) {

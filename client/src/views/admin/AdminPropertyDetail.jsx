@@ -29,15 +29,18 @@ const AdminPropertyDetail = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { propertyId } = useParams();
-
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [property, setProperty] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectModal, setShowRejectModal] = useState(false);
-
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [approveNote, setApproveNote] = useState("");
+  const [showFlagModal, setShowFlagModal] = useState(false);
+  const [flagInput, setFlagInput] = useState("");
+  const [flags, setFlags] = useState([]);
 
   useEffect(() => {
     fetchProperty();
@@ -61,7 +64,48 @@ const AdminPropertyDetail = () => {
       setLoading(false);
     }
   };
+  // NEW: add flag chip locally
+  const addFlagLocal = () => {
+    const v = flagInput.trim();
+    if (!v) return;
+    setFlags((prev) => Array.from(new Set([...prev, v])));
+    setFlagInput("");
+  };
 
+  // NEW: remove flag chip locally
+  const removeFlagLocal = (value) => {
+    setFlags((prev) => prev.filter((f) => f !== value));
+  };
+
+  // NEW: send flags to backend
+  const handleAddFlags = async () => {
+    if (flags.length === 0) {
+      alert(t("admin.property.flag_validation_required"));
+      return;
+    }
+    setProcessing(true);
+    try {
+      const res = await bridge.properties.flagProperty(
+        property.id,
+        flags,
+        "add"
+      );
+      if (res?.success) {
+        alert(t("admin.property.flag_success"));
+        setShowFlagModal(false);
+        setFlags([]);
+        // opsiyonel: property'yi tazele
+        fetchProperty();
+      } else {
+        alert(t("admin.property.flag_error"));
+      }
+    } catch (e) {
+      console.error(e);
+      alert(t("admin.property.flag_error"));
+    } finally {
+      setProcessing(false);
+    }
+  };
   const formatCurrency = (amount, currency = "USD", locale = "en-US") => {
     if (amount === undefined || amount === null) return "-";
     try {
@@ -122,12 +166,17 @@ const AdminPropertyDetail = () => {
   const canDecide = property?.status === "draft";
 
   const handleApprove = async () => {
-    if (!window.confirm(t("admin.property.confirm_approve"))) return;
+    // Not girmek istiyorsa modalı açalım (eski confirm yerine modal kullanacağız)
+    setShowApproveModal(true);
+  };
+  const submitApprove = async () => {
     setProcessing(true);
     try {
+      // reviewNotes = approveNote (opsiyonel)
       const res = await bridge.properties.updateStatus(
         property.id,
-        "published"
+        "published",
+        approveNote?.trim() || null
       );
       if (res?.success) {
         alert(t("admin.property.approve_success"));
@@ -140,9 +189,10 @@ const AdminPropertyDetail = () => {
       alert(t("admin.property.approve_error"));
     } finally {
       setProcessing(false);
+      setShowApproveModal(false);
+      setApproveNote("");
     }
   };
-
   const handleReject = async () => {
     if (!rejectReason.trim()) {
       alert(t("admin.property.reject_reason_required"));
@@ -549,7 +599,7 @@ const AdminPropertyDetail = () => {
           {/* Actions */}
           <div className="space-y-3">
             <button
-              onClick={handleApprove}
+              onClick={() => handleApprove()}
               disabled={!canDecide || processing}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
             >
@@ -559,6 +609,27 @@ const AdminPropertyDetail = () => {
                 <CheckCircle className="h-5 w-5" />
               )}
               {t("admin.property.approve")}
+            </button>
+            <button
+              onClick={() => setShowFlagModal(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors"
+            >
+              {/* küçük bir bayrak ikonu istersen: */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 6v16m0-12a4 4 0 004-4h8l-2 4 2 4H8a4 4 0 01-4-4z"
+                />
+              </svg>
+              {t("admin.property.flag")}
             </button>
 
             <button
@@ -627,6 +698,111 @@ const AdminPropertyDetail = () => {
             >
               <XCircle className="h-6 w-6" />
             </button>
+          </div>
+        </div>
+      )}
+      {showFlagModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-day-surface dark:bg-night-surface rounded-lg p-6 max-w-lg w-full">
+            <h3 className="text-xl font-semibold mb-4">
+              {t("admin.property.flag_title")}
+            </h3>
+
+            <div className="flex gap-2 mb-3">
+              <input
+                value={flagInput}
+                onChange={(e) => setFlagInput(e.target.value)}
+                className="flex-1 px-3 py-2 border border-day-border dark:border-night-border rounded-lg bg-day-background dark:bg-night-background"
+                placeholder={t("admin.property.flag_placeholder")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addFlagLocal();
+                }}
+              />
+              <button
+                onClick={addFlagLocal}
+                className="px-4 py-2 border border-day-border dark:border-night-border rounded-lg hover:bg-day-border/20 dark:hover:bg-night-border/20 transition-colors"
+              >
+                {t("admin.property.flag_add")}
+              </button>
+            </div>
+
+            {/* chips */}
+            {flags.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {flags.map((f) => (
+                  <span
+                    key={f}
+                    className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                  >
+                    {f}
+                    <button
+                      className="hover:opacity-70"
+                      onClick={() => removeFlagLocal(f)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowFlagModal(false)}
+                className="flex-1 px-4 py-2 border border-day-border dark:border-night-border rounded-lg hover:bg-day-border/20 dark:hover:bg-night-border/20 transition-colors"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                onClick={handleAddFlags}
+                disabled={processing}
+                className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+              >
+                {processing
+                  ? t("common.loading")
+                  : t("admin.property.flag_submit")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showApproveModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-day-surface dark:bg-night-surface rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-semibold mb-4">
+              {t("admin.property.approve_with_note_title")}
+            </h3>
+            <p className="text-sm text-day-text/70 dark:text-night-text/70 mb-3">
+              {t("admin.property.approve_with_note_hint")}
+            </p>
+            <textarea
+              value={approveNote}
+              onChange={(e) => setApproveNote(e.target.value)}
+              className="w-full h-28 px-3 py-2 border border-day-border dark:border-night-border rounded-lg bg-day-background dark:bg-night-background resize-none"
+              placeholder={t("admin.property.approve_note_placeholder")}
+            />
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => {
+                  setShowApproveModal(false);
+                  setApproveNote("");
+                }}
+                className="flex-1 px-4 py-2 border border-day-border dark:border-night-border rounded-lg hover:bg-day-border/20 dark:hover:bg-night-border/20 transition-colors"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                onClick={submitApprove}
+                disabled={processing}
+                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+              >
+                {processing ? (
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+                ) : (
+                  t("admin.property.confirm_approval")
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
