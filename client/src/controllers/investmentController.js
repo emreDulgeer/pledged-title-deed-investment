@@ -2,110 +2,75 @@
 import apiClient from "../api/client";
 
 const investmentController = {
-  // Admin endpoints
-  getAll: async (params = {}) => {
+  // Admin - Tüm yatırımları listele
+  getAllInvestments: async (params = {}) => {
     return await apiClient.get("/investments", { params });
   },
 
-  getById: async (id) => {
+  // Investment detayı
+  getInvestmentById: async (id) => {
     return await apiClient.get(`/investments/${id}`);
   },
 
-  updateStatus: async (id, status) => {
-    return await apiClient.patch(`/investments/${id}/status`, { status });
-  },
-
-  // Document management
-  uploadDocument: async (id, type, formData) => {
-    return await apiClient.post(
-      `/investments/${id}/documents/${type}`,
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      }
-    );
-  },
-
-  deleteDocument: async (id, type) => {
-    return await apiClient.delete(`/investments/${id}/documents/${type}`);
-  },
-
-  // Payment management
-  updatePayment: async (investmentId, paymentId, data) => {
-    return await apiClient.patch(
-      `/investments/${investmentId}/payments/${paymentId}`,
-      data
-    );
-  },
-
-  uploadPaymentReceipt: async (investmentId, paymentId, formData) => {
-    return await apiClient.post(
-      `/investments/${investmentId}/payments/${paymentId}/receipt`,
-      formData,
-      { headers: { "Content-Type": "multipart/form-data" } }
-    );
-  },
-
-  // Refund operations
-  initiateRefund: async (id, reason) => {
-    return await apiClient.post(`/investments/${id}/refund`, { reason });
-  },
-
-  uploadRefundReceipt: async (id, formData) => {
-    return await apiClient.post(`/investments/${id}/refund/receipt`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-  },
-
-  // Transfer operations
-  initiateTransfer: async (id, data) => {
-    return await apiClient.post(`/investments/${id}/transfer`, data);
-  },
-
-  uploadTransferDocument: async (id, formData) => {
-    return await apiClient.post(
-      `/investments/${id}/transfer/document`,
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      }
-    );
-  },
-
-  // Investor specific endpoints
-  getMyInvestments: async (params = {}) => {
-    return await apiClient.get("/investments/my", { params });
-  },
-
-  createInvestment: async (propertyId, data) => {
-    return await apiClient.post(`/properties/${propertyId}/invest`, data);
-  },
-
-  getInvestmentDetails: async (id) => {
-    return await apiClient.get(`/investments/my/${id}`);
-  },
-
-  // Statistics
-  getStatistics: async (params = {}) => {
-    return await apiClient.get("/investments/statistics", { params });
-  },
-
-  getPaymentStatistics: async (id) => {
-    return await apiClient.get(`/investments/${id}/payment-statistics`);
-  },
-
-  // Export
-  exportInvestments: async (params = {}) => {
-    return await apiClient.get("/investments/export", {
+  // Property'ye ait yatırımları getir
+  getPropertyInvestments: async (propertyId, params = {}) => {
+    return await apiClient.get(`/investments/property/${propertyId}`, {
       params,
-      responseType: "blob",
     });
   },
 
-  exportInvestmentReport: async (id) => {
-    return await apiClient.get(`/investments/${id}/report`, {
-      responseType: "blob",
+  // Investment dökümanlarını listele
+  getInvestmentDocuments: async (id) => {
+    return await apiClient.get(`/investments/${id}/documents`);
+  },
+
+  // Investment istatistikleri
+  getInvestmentStatistics: async (id) => {
+    return await apiClient.get(`/investments/${id}/statistics`);
+  },
+
+  // Yaklaşan ödemeler
+  getUpcomingPayments: async (params = {}) => {
+    return await apiClient.get("/investments/reports/upcoming-payments", {
+      params,
     });
+  },
+
+  // Geciken ödemeler
+  getDelayedPayments: async (params = {}) => {
+    return await apiClient.get("/investments/reports/delayed-payments", {
+      params,
+    });
+  },
+
+  // Title deed onayla (Admin)
+  approveTitleDeed: async (id) => {
+    return await apiClient.post(`/investments/${id}/approve-title-deed`);
+  },
+
+  // Local representative ata (Admin)
+  assignLocalRepresentative: async (id, representativeId) => {
+    return await apiClient.post(`/investments/${id}/assign-representative`, {
+      representativeId,
+    });
+  },
+
+  // İade işlemi (Admin)
+  processRefund: async (id, refundData) => {
+    return await apiClient.post(`/investments/${id}/refund`, refundData);
+  },
+
+  // Mülk transferi (Admin)
+  transferProperty: async (id, transferData) => {
+    return await apiClient.post(`/investments/${id}/transfer`, transferData);
+  },
+
+  // Investment dökümanı indir
+  downloadDocument: async (investmentId, fileId) => {
+    return await apiClient.get(
+      `/investments/${investmentId}/documents/${fileId}/download`,
+      { responseType: "blob" }
+    );
   },
 };
 

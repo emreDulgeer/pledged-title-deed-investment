@@ -4,6 +4,7 @@ import propertyController from "./propertyController";
 import investmentController from "./investmentController";
 import userController from "./userController";
 import fileController from "./fileController";
+import membershipPlanController from "./membershipPlanController";
 import { tokenManager } from "../api/client";
 
 // Bridge pattern - Single point of access for all API operations
@@ -13,6 +14,7 @@ const bridge = {
   investments: investmentController,
   users: userController,
   files: fileController,
+  membershipPlans: membershipPlanController,
 
   // Utility methods
   utils: {

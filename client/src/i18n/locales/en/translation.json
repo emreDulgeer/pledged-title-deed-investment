@@ -1,6 +1,8 @@
 {
   "common": {
     "loading": "Loading...",
+    "selected_count": "{{count}} selected",
+    "apply_filters": "Apply Filters",
     "save": "Save",
     "cancel": "Cancel",
     "delete": "Delete",
@@ -46,7 +48,34 @@
     "country": "Country",
     "role": "Role",
     "joined_date": "Joined Date",
-    "file": "file"
+    "file": "file",
+    "locale": "Locale",
+    "filters": "Filters",
+    "export": "Export",
+    "refresh": "Refresh",
+    "apply": "Apply",
+    "clear": "Clear",
+    "order": "Order",
+    "ascending": "Ascending",
+    "descending": "Descending",
+    "sort_by": "Sort by",
+    "created_date": "Created Date",
+    "updated_date": "Updated Date",
+    "city": "City",
+    "type": "Type"
+  },
+
+  "documents": {
+    "types": {
+      "contract": "Contract",
+      "title_deed": "Title Deed",
+      "payment_receipt": "Payment Receipt",
+      "rental_receipt": "Rental Receipt",
+      "notary_document": "Notary Document",
+      "power_of_attorney": "Power of Attorney",
+      "tax_receipt": "Tax Receipt",
+      "other": "Other"
+    }
   },
   "auth": {
     "login": "Login",
@@ -74,6 +103,7 @@
     "investments": "Investments",
     "investors": "Investors",
     "property_owners": "Property Owners",
+    "membership_plans": "Membership Plans",
     "users": "Users",
     "reports": "Reports",
     "settings": "Settings",
@@ -105,6 +135,12 @@
     "no_properties_pending": "No properties pending publish"
   },
   "properties": {
+    "type": "Property Type",
+    "value": "Value",
+    "min_price": "Min Price",
+    "max_price": "Max Price",
+    "min_size": "Min Size (m²)",
+    "max_size": "Max Size (m²)",
     "title": "Properties",
     "property_details": "Property Details",
     "basic_info": "Basic Information",
@@ -147,7 +183,18 @@
     "status": {
       "draft": "Draft",
       "published": "Published",
-      "rejected": "Rejected"
+      "rejected": "Rejected",
+      "pending_review": "Pending Review",
+      "sold": "Sold",
+      "in_contract": "In Contract"
+    },
+    "types": {
+      "apartment": "Apartment",
+      "villa": "Villa",
+      "commercial": "Commercial",
+      "land": "Land",
+      "house": "House",
+      "other": "Other"
     }
   },
   "investments": {
@@ -173,7 +220,9 @@
       "active": "Active",
       "completed": "Completed",
       "cancelled": "Cancelled",
-      "refunded": "Refunded"
+      "refunded": "Refunded",
+      "offer_sent": "Offer Sent",
+      "defaulted": "Defaulted"
     }
   },
   "users": {
@@ -202,6 +251,7 @@
       "suspended": "Suspended"
     }
   },
+
   "admin": {
     "kyc": {
       "user_verification": "User Verification",
@@ -232,6 +282,119 @@
       "reject_error": "KYC rejection failed.",
       "user_not_found": "User not found."
     },
+    "investments": {
+      "title": "Investments (Read-only)",
+      "subtitle": "View and filter all investments",
+      "investment_id": "Investment ID",
+      "no_investments": "No investments found",
+      "not_found": "Investment not found",
+      "to_list": "back to investments list",
+      "tab_overview": "Overview",
+      "tab_payments": "Payments",
+      "paid_at": "Paid At",
+      "payment_statistics": "Payment Statistics",
+      "total_payments": "Total Payments",
+      "paid_payments": "Paid",
+      "pending_payments": "Pending",
+      "delayed_payments": "Delayed",
+      "payment_rate": "Payment Rate",
+      "on_time_rate": "On-Time Rate",
+      "min_amount": "Min Amount",
+      "max_amount": "Max Amount",
+      "highest_amount": "Highest Amount",
+      "lowest_amount": "Lowest Amount",
+      "meta": "Meta"
+    },
+    "membership": {
+      "show_inactive": "Show Inactive Plans",
+      "title": "Membership Plans",
+      "subtitle": "Manage subscription plans and pricing",
+      "add_plan": "Add New Plan",
+      "fetch_error": "Failed to fetch membership plans",
+      "create_success": "Plan created successfully",
+      "update_success": "Plan updated successfully",
+      "save_error": "Failed to save plan",
+      "delete_success": "Plan deleted successfully",
+      "delete_error": "Failed to delete plan",
+      "status_updated": "Plan status updated",
+      "status_error": "Failed to update status",
+      "reorder_success": "Plans reordered successfully",
+      "reorder_error": "Failed to reorder plans",
+      "delete_title": "Delete Membership Plan",
+      "delete_message": "Are you sure you want to delete the \"{{name}}\" plan? This action cannot be undone.",
+      "tabs": {
+        "basic": "Basic Info",
+        "pricing": "Pricing",
+        "features": "Features",
+        "limits": "Limits",
+        "support": "Support",
+        "advanced": "Advanced"
+      },
+      "form": {
+        "create_title": "Create New Plan",
+        "edit_title": "Edit Plan",
+        "name": "Internal Name",
+        "displayName": "Display Name",
+        "description": "Description",
+        "tier": "Tier Level",
+        "order": "Display Order",
+        "active": "Active",
+        "visible": "Visible to Users",
+        "default": "Default Plan",
+        "highlighted": "Highlighted (Popular)",
+        "featured": "Featured",
+        "monthly_pricing": "Monthly Pricing",
+        "yearly_pricing": "Yearly Pricing",
+        "trial": "Trial Period",
+        "enable_trial": "Enable Trial",
+        "trial_days": "Trial Days",
+        "trial_requires_card": "Require Card for Trial",
+        "investment_features": "Investment Features",
+        "commission_discounts": "Commission Discounts",
+        "analytics_reporting": "Analytics & Reporting",
+        "property_limits": "Property Limits",
+        "api_access": "API Access",
+        "support_level": "Support Level",
+        "notifications": "Notifications",
+        "security_features": "Security Features",
+        "referral_system": "Referral System"
+      },
+      "list": {
+        "reorder": "Reorder",
+        "tier": "Tier",
+        "default_badge": "Default",
+        "popular_badge": "Popular",
+        "featured_badge": "Featured",
+        "inactive_badge": "Inactive",
+        "monthly": "Monthly",
+        "yearly": "Yearly",
+        "trial": "Trial",
+        "days_suffix": "days",
+        "statistics": "Statistics",
+        "active_users": "Active Users",
+        "monthly_revenue": "Monthly Revenue",
+        "churn_rate": "Churn Rate",
+        "conversion_rate": "Conversion Rate",
+        "key_features": "Key Features",
+        "max_investments": "Max Investments",
+        "support_level": "Support Level",
+        "commission_discount": "Commission Discount",
+        "api_access": "API Access",
+        "analytics": "Analytics",
+        "analytics_basic": "Basic",
+        "analytics_advanced": "Advanced",
+        "promotion_title": "Active Promotion",
+        "valid_until": "Valid until",
+        "expand": "Expand",
+        "collapse": "Collapse",
+        "activate": "Activate",
+        "deactivate": "Deactivate",
+        "edit": "Edit",
+        "delete": "Delete",
+        "yes": "Yes",
+        "no": "No"
+      }
+    },
     "property": {
       "review": "Property Review",
       "approve": "Approve for Publish",
@@ -258,6 +421,21 @@
       "approve_with_note_hint": "Optionally add a note for the property owner (will be saved as review notes).",
       "approve_note_placeholder": "Type an optional approval note...",
       "confirm_approval": "Confirm Approval"
+    },
+    "properties": {
+      "title": "Manage Properties",
+      "add_new": "Add New Property",
+      "filter_properties": "Filter Properties",
+      "search_placeholder": "Search by title, city, owner...",
+      "select_action": "Select Action",
+      "bulk_publish": "Bulk Publish",
+      "bulk_draft": "Move to Draft (Bulk)",
+      "bulk_delete": "Delete (Bulk)",
+      "confirm_status_change": "Are you sure you want to change the status?",
+      "confirm_delete": "Are you sure you want to delete the selected property(ies)?",
+      "confirm_bulk_action": "Apply this action to all selected items?",
+      "no_properties": "No properties found.",
+      "subtitle": "Review, approve, reject, and manage all properties"
     }
   },
   "errors": {

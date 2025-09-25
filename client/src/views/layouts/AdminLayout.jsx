@@ -1,6 +1,5 @@
 // src/views/layouts/AdminLayout.jsx  (container)
 import React from "react";
-
 import { useSelector, useDispatch } from "react-redux";
 import { useTranslation } from "react-i18next";
 import LayoutShell from "../../components/Layouts/common/LayoutShell";
@@ -11,6 +10,7 @@ import { toggleSidebar, selectSidebarOpen } from "../../store/slices/uiSlice";
 import { useTheme } from "../../utils/hooks/useTheme";
 import { useLanguage } from "../../utils/hooks/useLanguage";
 import { Outlet } from "react-router-dom";
+
 const AdminLayout = () => {
   console.log("Rendering AdminLayout");
   const { t } = useTranslation();
@@ -50,6 +50,11 @@ const AdminLayout = () => {
       title: t("navigation.users"),
       path: "/admin/users",
       icon: <IconUsers2 />,
+    },
+    {
+      title: t("navigation.membership_plans") || "Membership Plans",
+      path: "/admin/membership-plans",
+      icon: <IconCrown />,
     },
     {
       title: t("navigation.reports"),
@@ -105,6 +110,7 @@ const IconHome = () => (
     />
   </svg>
 );
+
 const IconBldg = () => (
   <svg
     className="w-5 h-5"
@@ -120,6 +126,7 @@ const IconBldg = () => (
     />
   </svg>
 );
+
 const IconCoin = () => (
   <svg
     className="w-5 h-5"
@@ -135,6 +142,7 @@ const IconCoin = () => (
     />
   </svg>
 );
+
 const IconUsers = () => (
   <svg
     className="w-5 h-5"
@@ -150,6 +158,7 @@ const IconUsers = () => (
     />
   </svg>
 );
+
 const IconUser = () => (
   <svg
     className="w-5 h-5"
@@ -165,6 +174,7 @@ const IconUser = () => (
     />
   </svg>
 );
+
 const IconUsers2 = () => (
   <svg
     className="w-5 h-5"
@@ -180,6 +190,23 @@ const IconUsers2 = () => (
     />
   </svg>
 );
+
+const IconCrown = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M5 13l4 4L19 7M5 13l-1-5 4 2 4-7 4 7 4-2-1 5M5 13h14v7a1 1 0 01-1 1H6a1 1 0 01-1-1v-7z"
+    />
+  </svg>
+);
+
 const IconReport = () => (
   <svg
     className="w-5 h-5"
@@ -195,6 +222,7 @@ const IconReport = () => (
     />
   </svg>
 );
+
 const IconCog = () => (
   <svg
     className="w-5 h-5"
@@ -216,4 +244,5 @@ const IconCog = () => (
     />
   </svg>
 );
+
 export default AdminLayout;

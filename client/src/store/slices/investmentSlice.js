@@ -7,8 +7,12 @@ export const fetchInvestments = createAsyncThunk(
   "investments/fetchAll",
   async (params = {}, { rejectWithValue }) => {
     try {
-      const response = await bridge.investments.getAll(params);
-      return response;
+      // controller: getAllInvestments(params)
+      const response = await bridge.investments.getAllInvestments(params);
+      // interceptor VARSA response == payload, YOKSA response.data == payload
+      const payload = response?.data ?? response;
+      console.log("Fetched investments payload:", payload);
+      return payload;
     } catch (error) {
       return rejectWithValue(error);
     }
@@ -19,8 +23,8 @@ export const fetchInvestmentById = createAsyncThunk(
   "investments/fetchById",
   async (id, { rejectWithValue }) => {
     try {
-      const response = await bridge.investments.getById(id);
-      return response.data;
+      const response = await bridge.investments.getInvestmentById(id);
+      return response.data; // tek kayıt
     } catch (error) {
       return rejectWithValue(error);
     }
@@ -138,11 +142,23 @@ const investmentSlice = createSlice({
       })
       .addCase(fetchInvestments.fulfilled, (state, action) => {
         state.loading = false;
-        state.list = action.payload.data;
-        state.pagination = action.payload.pagination || initialState.pagination;
+        const p = action.payload || {};
+        // Dizi'yi sağlam al: data[] || items[] || results[] || doğrudan []
+        const list = Array.isArray(p.data)
+          ? p.data
+          : Array.isArray(p.items)
+          ? p.items
+          : Array.isArray(p.results)
+          ? p.results
+          : Array.isArray(p)
+          ? p
+          : [];
+
+        state.list = list;
+        state.pagination = p.pagination || initialState.pagination;
         // Calculate statistics
-        if (action.payload.statistics) {
-          state.statistics = action.payload.statistics;
+        if (p.statistics) {
+          state.statistics = p.statistics;
         }
       })
       .addCase(fetchInvestments.rejected, (state, action) => {
@@ -227,13 +243,13 @@ export const {
 export default investmentSlice.reducer;
 
 // Selectors
-export const selectInvestments = (state) => state.investments.list;
+export const selectInvestments = (state) => state.investments.list || [];
 export const selectCurrentInvestment = (state) =>
   state.investments.currentInvestment;
 export const selectInvestmentPagination = (state) =>
-  state.investments.pagination;
+  state.investments.pagination || { totalItems: 0 };
 export const selectInvestmentFilters = (state) => state.investments.filters;
 export const selectInvestmentStatistics = (state) =>
   state.investments.statistics;
-export const selectInvestmentLoading = (state) => state.investments.loading;
+export const selectInvestmentLoading = (state) => state.investments?.loading;
 export const selectInvestmentError = (state) => state.investments.error;

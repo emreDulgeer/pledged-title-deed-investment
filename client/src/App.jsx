@@ -22,7 +22,11 @@ import PublicLayout from "./views/layouts/PublicLayout";
 import LoginPage from "./views/auth/LoginPage";
 import AdminPendingKycDetail from "./views/admin/AdminPendingKycDetail";
 import AdminPropertyDetail from "./views/admin/AdminPropertyDetail";
-
+import AdminInvestments from "./views/admin/AdminInvestments";
+import AdminInvestmentDetail from "./views/admin/AdminInvestmentDetail";
+import AdminMembershipPlans from "./views/admin/AdminMembershipPlans";
+import PropertyDetail from "./views/property/PropertyDetail";
+import AdminProperties from "./views/admin/AdminProperties";
 import PrivateRoute from "./routes/PrivateRoute";
 import RoleBasedRoute from "./routes/RoleBasedRoute";
 
@@ -140,7 +144,6 @@ const AppContent = () => {
             }
           />
         </Route>
-
         {/* Admin (nested) */}
         <Route
           path="/admin"
@@ -154,11 +157,18 @@ const AppContent = () => {
         >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="properties" element={<AdminProperties />} />
+          <Route path="membership-plans" element={<AdminMembershipPlans />} />
+          <Route path="investments" element={<AdminInvestments />} />
+          <Route path="investments/:id" element={<AdminInvestmentDetail />} />
         </Route>
         <Route
           path="/auth/admin/pending-kyc/:userId"
           element={<AdminPendingKycDetail />}
         />
+        <Route path="/admin/properties/:id" element={<PropertyDetail />} />
+        <Route path="/owner/properties/:id" element={<PropertyDetail />} />
+
         <Route
           path="/properties/my/properties/:propertyId"
           element={<AdminPropertyDetail />}
