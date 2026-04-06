@@ -1,136 +1,288 @@
-// server/controllers/notificationController.js
-
-const NotificationService = require("../services/notificationService");
-const responseWrapper = require("../utils/responseWrapper");
+const notificationService = require("../services/notificationService");
+const catchAsync = require("../utils/catchAsync");
+const AppError = require("../utils/AppError");
 
 class NotificationController {
-  constructor() {
-    this.notificationService = new NotificationService();
-  }
+  /**
+   * Kullanıcının bildirimlerini getir
+   */
+  getMyNotifications = catchAsync(async (req, res) => {
+    const userId = req.user._id;
+    const { page = 1, limit = 20, type, isRead, priority } = req.query;
 
-  // Kullanıcının bildirimlerini getir
-  getMyNotifications = async (req, res) => {
-    try {
-      const userId = req.user.id;
-      const options = {
-        unreadOnly: req.query.unreadOnly === "true",
-        type: req.query.type,
-        limit: parseInt(req.query.limit) || 50,
-      };
+    const options = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      type,
+      isRead: isRead === "true" ? true : isRead === "false" ? false : null,
+      priority,
+    };
 
-      const notifications = await this.notificationService.getUserNotifications(
-        userId,
-        options
-      );
+    const result = await notificationService.getUserNotifications(
+      userId,
+      options
+    );
 
-      return responseWrapper.success(
-        res,
-        notifications,
-        "Notifications fetched successfully"
-      );
-    } catch (error) {
-      return responseWrapper.error(res, error.message);
+    res.status(200).json({
+      success: true,
+      data: result.notifications,
+      pagination: result.pagination,
+    });
+  });
+
+  /**
+   * Okunmamış bildirim sayısını getir
+   */
+  getUnreadCount = catchAsync(async (req, res) => {
+    const userId = req.user._id;
+    const Notification = require("../models/Notification");
+    const count = await Notification.getUnreadCount(userId);
+
+    res.status(200).json({
+      success: true,
+      data: { unreadCount: count },
+    });
+  });
+
+  /**
+   * Bildirimi okundu olarak işaretle
+   */
+  markAsRead = catchAsync(async (req, res) => {
+    const userId = req.user._id;
+    const { notificationId } = req.params;
+
+    const notification = await notificationService.markAsRead(
+      notificationId,
+      userId
+    );
+
+    if (!notification) {
+      throw new AppError("Bildirim bulunamadı", 404);
     }
-  };
 
-  // Okunmamış bildirim sayısını getir
-  getUnreadCount = async (req, res) => {
-    try {
-      const userId = req.user.id;
-      const count = await this.notificationService.getUnreadCount(userId);
+    res.status(200).json({
+      success: true,
+      message: "Bildirim okundu olarak işaretlendi",
+      data: notification.toClient(),
+    });
+  });
 
-      return responseWrapper.success(res, count);
-    } catch (error) {
-      return responseWrapper.error(res, error.message);
+  /**
+   * Tüm bildirimleri okundu olarak işaretle
+   */
+  markAllAsRead = catchAsync(async (req, res) => {
+    const userId = req.user._id;
+    const result = await notificationService.markAllAsRead(userId);
+
+    res.status(200).json({
+      success: true,
+      message: "Tüm bildirimler okundu olarak işaretlendi",
+      data: { modifiedCount: result.modifiedCount },
+    });
+  });
+
+  /**
+   * Bildirimi sil
+   */
+  deleteNotification = catchAsync(async (req, res) => {
+    const userId = req.user._id;
+    const { notificationId } = req.params;
+
+    await notificationService.deleteNotification(notificationId, userId);
+
+    res.status(200).json({
+      success: true,
+      message: "Bildirim silindi",
+    });
+  });
+
+  /**
+   * Birden fazla bildirimi sil
+   */
+  deleteMultipleNotifications = catchAsync(async (req, res) => {
+    const userId = req.user._id;
+    const { notificationIds } = req.body;
+
+    if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
+      throw new AppError("Geçerli bildirim ID'leri sağlanmalıdır", 400);
     }
-  };
 
-  // Bildirimi okundu olarak işaretle
-  markAsRead = async (req, res) => {
-    try {
-      const userId = req.user.id;
-      const notificationId = req.params.id;
+    const Notification = require("../models/Notification");
+    const result = await Notification.deleteMany({
+      _id: { $in: notificationIds },
+      recipient: userId,
+    });
 
-      const notification = await this.notificationService.markAsRead(
-        notificationId,
-        userId
-      );
+    res.status(200).json({
+      success: true,
+      message: `${result.deletedCount} bildirim silindi`,
+      data: { deletedCount: result.deletedCount },
+    });
+  });
 
-      return responseWrapper.success(
-        res,
-        notification,
-        "Notification marked as read"
-      );
-    } catch (error) {
-      if (error.message.includes("not found")) {
-        return responseWrapper.notFound(res, error.message);
-      }
-      return responseWrapper.error(res, error.message);
+  /**
+   * Admin: Toplu bildirim gönder
+   */
+  sendBulkNotification = catchAsync(async (req, res) => {
+    // Admin kontrolü middleware'de yapılmalı
+    if (req.user.role !== "admin") {
+      throw new AppError("Bu işlem için yetkiniz yok", 403);
     }
-  };
 
-  // Tüm bildirimleri okundu olarak işaretle
-  markAllAsRead = async (req, res) => {
-    try {
-      const userId = req.user.id;
-      const result = await this.notificationService.markAllAsRead(userId);
+    const {
+      recipientFilter,
+      title,
+      message,
+      type = "system_announcement",
+      priority = "normal",
+      channels = { inApp: true, email: false },
+    } = req.body;
 
-      return responseWrapper.success(res, result, result.message);
-    } catch (error) {
-      return responseWrapper.error(res, error.message);
+    if (!title || !message) {
+      throw new AppError("Başlık ve mesaj zorunludur", 400);
     }
-  };
 
-  // Admin: Toplu bildirim gönder
-  sendBulkNotification = async (req, res) => {
-    try {
-      const { filters, notification } = req.body;
+    const result = await notificationService.sendBulkNotification({
+      recipientFilter,
+      type,
+      title,
+      message,
+      priority,
+      channels,
+    });
 
-      if (!notification || !notification.message) {
-        return responseWrapper.badRequest(
-          res,
-          "Notification message is required"
-        );
-      }
+    res.status(200).json({
+      success: true,
+      message: `${result.totalSent} kullanıcıya bildirim gönderildi`,
+      data: result,
+    });
+  });
 
-      const result = await this.notificationService.sendBulkNotification(
-        filters || {},
-        notification
-      );
-
-      return responseWrapper.success(res, result, result.message);
-    } catch (error) {
-      return responseWrapper.error(res, error.message);
+  /**
+   * Admin: Belirli bir kullanıcıya bildirim gönder
+   */
+  sendNotificationToUser = catchAsync(async (req, res) => {
+    // Admin kontrolü middleware'de yapılmalı
+    if (req.user.role !== "admin") {
+      throw new AppError("Bu işlem için yetkiniz yok", 403);
     }
-  };
 
-  // Admin: Sistem bildirimi gönder
-  sendSystemNotification = async (req, res) => {
-    try {
-      const { title, message, priority, type } = req.body;
+    const { userId } = req.params;
+    const {
+      type = "custom",
+      title,
+      message,
+      priority = "normal",
+      actions = [],
+      channels = { inApp: true },
+    } = req.body;
 
-      if (!title || !message) {
-        return responseWrapper.badRequest(
-          res,
-          "Title and message are required"
-        );
-      }
-
-      const result = await this.notificationService.sendBulkNotification(
-        {}, // Tüm kullanıcılara
-        {
-          type: type || "general_announcement",
-          title,
-          message,
-          priority: priority || "medium",
-        }
-      );
-
-      return responseWrapper.success(res, result, result.message);
-    } catch (error) {
-      return responseWrapper.error(res, error.message);
+    if (!title || !message) {
+      throw new AppError("Başlık ve mesaj zorunludur", 400);
     }
-  };
+
+    const User = require("../models/User");
+    const recipient = await User.findById(userId);
+
+    if (!recipient) {
+      throw new AppError("Kullanıcı bulunamadı", 404);
+    }
+
+    const notification = await notificationService.createNotification({
+      recipientId: userId,
+      recipientRole: recipient.role,
+      type,
+      title,
+      message,
+      priority,
+      actions,
+      channels,
+      senderId: req.user._id,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Bildirim gönderildi",
+      data: notification.toClient(),
+    });
+  });
+
+  /**
+   * Admin: Bildirim istatistiklerini getir
+   */
+  getNotificationStats = catchAsync(async (req, res) => {
+    // Admin kontrolü middleware'de yapılmalı
+    if (req.user.role !== "admin") {
+      throw new AppError("Bu işlem için yetkiniz yok", 403);
+    }
+
+    const Notification = require("../models/Notification");
+
+    const stats = await Notification.aggregate([
+      {
+        $facet: {
+          byType: [
+            { $group: { _id: "$type", count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+          ],
+          byPriority: [
+            { $group: { _id: "$priority", count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+          ],
+          readStatus: [{ $group: { _id: "$isRead", count: { $sum: 1 } } }],
+          last30Days: [
+            {
+              $match: {
+                createdAt: {
+                  $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+                },
+              },
+            },
+            {
+              $group: {
+                _id: {
+                  $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+                },
+                count: { $sum: 1 },
+              },
+            },
+            { $sort: { _id: 1 } },
+          ],
+          totalCount: [{ $count: "total" }],
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        byType: stats[0].byType,
+        byPriority: stats[0].byPriority,
+        readStatus: stats[0].readStatus,
+        last30Days: stats[0].last30Days,
+        total: stats[0].totalCount[0]?.total || 0,
+      },
+    });
+  });
+
+  /**
+   * Admin: Eski bildirimleri temizle
+   */
+  cleanupOldNotifications = catchAsync(async (req, res) => {
+    // Admin kontrolü middleware'de yapılmalı
+    if (req.user.role !== "admin") {
+      throw new AppError("Bu işlem için yetkiniz yok", 403);
+    }
+
+    const { daysOld = 30 } = req.body;
+    const result = await notificationService.cleanupOldNotifications(daysOld);
+
+    res.status(200).json({
+      success: true,
+      message: `${result.deletedCount} eski bildirim temizlendi`,
+      data: { deletedCount: result.deletedCount },
+    });
+  });
 }
 
 module.exports = new NotificationController();

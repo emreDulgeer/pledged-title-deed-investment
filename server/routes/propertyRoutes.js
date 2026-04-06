@@ -11,8 +11,6 @@ const authorize = require("../middlewares/authorize");
 router.get("/", propertyController.getProperties);
 router.get("/featured", propertyController.getFeaturedProperties);
 router.get("/map", propertyController.getPropertiesForMap);
-router.get("/:id", propertyController.getPropertyById);
-router.get("/:id/files", optionalAuth, propertyFileController.getPropertyFiles); // Public or Auth
 
 // ===== PROPERTY OWNER ROUTES =====
 // Property CRUD
@@ -20,19 +18,19 @@ router.post(
   "/",
   auth,
   authorize(["property_owner"]),
-  propertyController.createProperty
+  propertyController.createProperty,
 );
 router.put(
   "/:id",
   auth,
   authorize(["property_owner"]),
-  propertyController.updateProperty
+  propertyController.updateProperty,
 );
 router.delete(
   "/:id",
   auth,
   authorize(["property_owner"]),
-  propertyController.deleteProperty
+  propertyController.deleteProperty,
 );
 
 // Property listeleme
@@ -40,13 +38,13 @@ router.get(
   "/my/properties",
   auth,
   authorize(["property_owner"]),
-  propertyController.getMyProperties
+  propertyController.getMyProperties,
 );
 router.get(
   "/my/properties/:id",
   auth,
   authorize(["property_owner"]),
-  propertyController.getMyPropertyById
+  propertyController.getMyPropertyById,
 );
 
 // Property istatistikleri
@@ -54,13 +52,13 @@ router.get(
   "/:id/statistics",
   auth,
   authorize(["property_owner"]),
-  propertyController.getPropertyStatistics
+  propertyController.getPropertyStatistics,
 );
 router.get(
   "/my/statistics",
   auth,
   authorize(["property_owner"]),
-  propertyController.getMyPropertiesStatistics
+  propertyController.getMyPropertiesStatistics,
 );
 
 // Property öne çıkarma
@@ -68,7 +66,7 @@ router.post(
   "/:id/feature",
   auth,
   authorize(["property_owner"]),
-  propertyController.featureProperty
+  propertyController.featureProperty,
 );
 
 // ===== PROPERTY FILE OPERATIONS =====
@@ -77,7 +75,7 @@ router.post(
   "/:id/images",
   auth,
   authorize(["property_owner", "admin"]),
-  propertyFileController.uploadPropertyImage
+  propertyFileController.uploadPropertyImage,
 );
 
 // Döküman yükleme (Property Owner, Admin & Local Rep)
@@ -85,7 +83,7 @@ router.post(
   "/:id/documents",
   auth,
   authorize(["property_owner", "admin", "local_representative"]),
-  propertyFileController.uploadPropertyDocument
+  propertyFileController.uploadPropertyDocument,
 );
 
 // Primary görsel ayarlama
@@ -93,7 +91,7 @@ router.patch(
   "/:propertyId/images/:imageId/primary",
   auth,
   authorize(["property_owner", "admin"]),
-  propertyFileController.setPrimaryImage
+  propertyFileController.setPrimaryImage,
 );
 
 // Görsel silme
@@ -101,7 +99,7 @@ router.delete(
   "/:propertyId/images/:imageId",
   auth,
   authorize(["property_owner", "admin"]),
-  propertyFileController.deletePropertyImage
+  propertyFileController.deletePropertyImage,
 );
 
 // Döküman silme
@@ -109,7 +107,7 @@ router.delete(
   "/:propertyId/documents/:documentId",
   auth,
   authorize(["property_owner", "admin"]),
-  propertyFileController.deletePropertyDocument
+  propertyFileController.deletePropertyDocument,
 );
 
 // ===== ADMIN ROUTES =====
@@ -118,19 +116,19 @@ router.get(
   "/admin/all",
   auth,
   authorize(["admin"]),
-  propertyController.getAllProperties
+  propertyController.getAllProperties,
 );
 router.patch(
   "/:id/status",
   auth,
   authorize(["admin"]),
-  propertyController.updatePropertyStatus
+  propertyController.updatePropertyStatus,
 );
 router.post(
   "/:id/flag",
   auth,
   authorize(["admin"]),
-  propertyController.flagProperty
+  propertyController.flagProperty,
 );
 
 // Admin döküman onayı (title deed, annotation verification)
@@ -149,19 +147,19 @@ router.post(
       if (!property) {
         return require("../utils/responseWrapper").notFound(
           res,
-          "Property not found"
+          "Property not found",
         );
       }
 
       // Dökümanı bul ve onayla
       const document = property.documents.find(
-        (doc) => doc.fileId.toString() === documentId
+        (doc) => doc.fileId.toString() === documentId,
       );
 
       if (!document) {
         return require("../utils/responseWrapper").notFound(
           res,
-          "Document not found"
+          "Document not found",
         );
       }
 
@@ -185,12 +183,12 @@ router.post(
           documentId: documentId,
           verified: true,
         },
-        "Document verified successfully"
+        "Document verified successfully",
       );
     } catch (error) {
       return require("../utils/responseWrapper").error(res, error.message);
     }
-  }
+  },
 );
 
 // ===== INVESTOR ROUTES (favorites) =====
@@ -198,13 +196,48 @@ router.post(
   "/:id/favorite",
   auth,
   authorize(["investor"]),
-  propertyController.toggleFavorite
+  propertyController.toggleFavorite,
 );
 router.get(
   "/my/favorites",
   auth,
   authorize(["investor"]),
-  propertyController.getFavoriteProperties
+  propertyController.getFavoriteProperties,
 );
+
+// ===== GEOCODING & MAP ROUTES =====
+// Yakındaki property'leri getir - Public (optionalAuth ile)
+router.get(
+  "/nearby/search",
+  optionalAuth,
+  propertyController.getNearbyProperties,
+);
+
+// Harita bounds içindeki property'leri getir - Public
+router.get(
+  "/bounds/search",
+  optionalAuth,
+  propertyController.getPropertiesInBounds,
+);
+
+// Reverse geocoding - Admin & Owner
+router.post(
+  "/:id/geocode/reverse",
+  auth,
+  authorize(["admin", "property_owner"]),
+  propertyController.fillAddressFromCoordinates,
+);
+
+// Admin: Toplu geocoding - koordinatı eksik property'leri geocode et
+router.post(
+  "/admin/geocode/missing",
+  auth,
+  authorize(["admin"]),
+  propertyController.geocodeMissingProperties,
+);
+
+// ===== DYNAMIC ROUTES - EN SONA =====
+router.get("/:id/files", optionalAuth, propertyFileController.getPropertyFiles);
+router.get("/:id", propertyController.getPropertyById);
 
 module.exports = router;

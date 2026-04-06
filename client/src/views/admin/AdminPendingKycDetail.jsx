@@ -1,4 +1,4 @@
-// src/pages/AdminPendingKycDetail.jsx
+// client/src/views/admin/AdminPendingKycDetail.jsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -159,13 +159,13 @@ const AdminPendingKycDetail = () => {
                 user.kycStatus === "Pending"
                   ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
                   : user.kycStatus === "Approved"
-                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                  : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                    : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
               }`}
             >
               <Clock className="inline h-4 w-4 mr-1" />
               {t(
-                `admin.kyc.status.${user.kycStatus?.toLowerCase() || "pending"}`
+                `admin.kyc.status.${user.kycStatus?.toLowerCase() || "pending"}`,
               )}
             </span>
           </div>

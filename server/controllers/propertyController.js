@@ -2,7 +2,7 @@
 
 const PropertyService = require("../services/propertyService");
 const responseWrapper = require("../utils/responseWrapper");
-
+const notificationService = require("../services/notificationService");
 class PropertyController {
   constructor() {
     this.propertyService = new PropertyService();
@@ -21,7 +21,7 @@ class PropertyController {
 
       const result = await this.propertyService.getPublicProperties(
         req.query,
-        userId
+        userId,
       );
 
       return responseWrapper.paginated(
@@ -30,7 +30,7 @@ class PropertyController {
         result.pagination.page,
         result.pagination.limit,
         result.pagination.total,
-        "Properties fetched successfully"
+        "Properties fetched successfully",
       );
     } catch (error) {
       return responseWrapper.error(res, error.message);
@@ -45,13 +45,13 @@ class PropertyController {
       // Harita için sadece lokasyon bilgileri ve temel bilgiler döndürülür
       const properties = await this.propertyService.getPropertiesForMap(
         req.query,
-        userId
+        userId,
       );
 
       return responseWrapper.success(
         res,
         properties,
-        "Properties for map fetched successfully"
+        "Properties for map fetched successfully",
       );
     } catch (error) {
       return responseWrapper.error(res, error.message);
@@ -64,13 +64,13 @@ class PropertyController {
       const userId = req.user?.id || null;
       const featured = await this.propertyService.getFeaturedProperties(
         req.query,
-        userId
+        userId,
       );
 
       return responseWrapper.success(
         res,
         featured,
-        "Featured properties fetched successfully"
+        "Featured properties fetched successfully",
       );
     } catch (error) {
       return responseWrapper.error(res, error.message);
@@ -86,7 +86,7 @@ class PropertyController {
       const property = await this.propertyService.getPropertyById(
         req.params.id,
         userId,
-        isAdmin
+        isAdmin,
       );
 
       return responseWrapper.success(res, property, "Property details fetched");
@@ -104,13 +104,13 @@ class PropertyController {
       const ownerId = req.user.id; // Auth middleware'den geliyor
       const property = await this.propertyService.createProperty(
         req.body,
-        ownerId
+        ownerId,
       );
-
+      await notificationService.notifyAdminsAboutPendingProperty(property.id);
       return responseWrapper.created(
         res,
         property,
-        "Property created successfully"
+        "Property created successfully",
       );
     } catch (error) {
       if (error.message.includes("Minimum")) {
@@ -130,13 +130,13 @@ class PropertyController {
         req.params.id,
         req.body,
         ownerId,
-        isAdmin
+        isAdmin,
       );
 
       return responseWrapper.updated(
         res,
         property,
-        "Property updated successfully"
+        "Property updated successfully",
       );
     } catch (error) {
       if (error.message === "Property not found") {
@@ -158,7 +158,7 @@ class PropertyController {
       const result = await this.propertyService.deleteProperty(
         req.params.id,
         ownerId,
-        isAdmin
+        isAdmin,
       );
 
       return responseWrapper.deleted(res, result.message);
@@ -182,7 +182,7 @@ class PropertyController {
       const userId = req.user.id;
       const result = await this.propertyService.toggleFavorite(
         req.params.id,
-        userId
+        userId,
       );
 
       return responseWrapper.success(res, result, result.message);
@@ -200,7 +200,7 @@ class PropertyController {
       const userId = req.user.id;
       const result = await this.propertyService.getFavoriteProperties(
         userId,
-        req.query
+        req.query,
       );
 
       return responseWrapper.paginated(
@@ -209,7 +209,7 @@ class PropertyController {
         result.pagination.page,
         result.pagination.limit,
         result.pagination.total,
-        "Favorite properties fetched successfully"
+        "Favorite properties fetched successfully",
       );
     } catch (error) {
       return responseWrapper.error(res, error.message);
@@ -218,11 +218,14 @@ class PropertyController {
 
   // Owner'ın kendi property'leri - Pagination ve filtreleme destekli
   getMyProperties = async (req, res) => {
+    console.log("REQ.USER =", req.user);
+    console.log("REQ.USER.ID =", req.user.id);
+    console.log("REQ.USER._ID =", req.user._id);
     try {
       const ownerId = req.user.id;
       const result = await this.propertyService.getPropertiesByOwner(
         ownerId,
-        req.query
+        req.query,
       );
 
       return responseWrapper.paginated(
@@ -231,7 +234,7 @@ class PropertyController {
         result.pagination.page,
         result.pagination.limit,
         result.pagination.total,
-        "Your properties fetched successfully"
+        "Your properties fetched successfully",
       );
     } catch (error) {
       return responseWrapper.error(res, error.message);
@@ -247,7 +250,7 @@ class PropertyController {
       const property = await this.propertyService.getOwnerPropertyById(
         req.params.id,
         ownerId,
-        isAdmin
+        isAdmin,
       );
 
       return responseWrapper.success(res, property, "Property details fetched");
@@ -266,7 +269,7 @@ class PropertyController {
   getAllProperties = async (req, res) => {
     try {
       const result = await this.propertyService.getAllPropertiesForAdmin(
-        req.query
+        req.query,
       );
 
       return responseWrapper.paginated(
@@ -275,7 +278,7 @@ class PropertyController {
         result.pagination.page,
         result.pagination.limit,
         result.pagination.total,
-        "All properties fetched"
+        "All properties fetched",
       );
     } catch (error) {
       return responseWrapper.error(res, error.message);
@@ -289,7 +292,7 @@ class PropertyController {
       const property = await this.propertyService.updatePropertyStatus(
         req.params.id,
         status,
-        reviewNotes
+        reviewNotes,
       );
 
       return responseWrapper.success(res, property, "Property status updated");
@@ -308,13 +311,13 @@ class PropertyController {
       const property = await this.propertyService.flagProperty(
         req.params.id,
         issues,
-        action
+        action,
       );
 
       return responseWrapper.success(
         res,
         property,
-        "Property flagged successfully"
+        "Property flagged successfully",
       );
     } catch (error) {
       return responseWrapper.error(res, error.message);
@@ -325,7 +328,7 @@ class PropertyController {
   getPropertyStatistics = async (req, res) => {
     try {
       const stats = await this.propertyService.getPropertyStatistics(
-        req.params.id
+        req.params.id,
       );
 
       return responseWrapper.success(res, stats, "Property statistics fetched");
@@ -338,14 +341,13 @@ class PropertyController {
   getMyPropertiesStatistics = async (req, res) => {
     try {
       const ownerId = req.user.id;
-      const stats = await this.propertyService.getOwnerPropertiesStatistics(
-        ownerId
-      );
+      const stats =
+        await this.propertyService.getOwnerPropertiesStatistics(ownerId);
 
       return responseWrapper.success(
         res,
         stats,
-        "Properties statistics fetched successfully"
+        "Properties statistics fetched successfully",
       );
     } catch (error) {
       return responseWrapper.error(res, error.message);
@@ -359,13 +361,126 @@ class PropertyController {
       const result = await this.propertyService.featureProperty(
         req.params.id,
         req.user.id,
-        duration
+        duration,
       );
 
       return responseWrapper.success(
         res,
         result,
-        "Property featured successfully"
+        "Property featured successfully",
+      );
+    } catch (error) {
+      return responseWrapper.error(res, error.message);
+    }
+  };
+
+  // ==================== GEOCODING & MAP ENDPOINTS ====================
+
+  // Yakındaki property'leri getir - Google Maps proximity
+  getNearbyProperties = async (req, res) => {
+    try {
+      const { lat, lng, radius = 50 } = req.query;
+
+      if (!lat || !lng) {
+        return responseWrapper.badRequest(
+          res,
+          "Latitude and longitude are required",
+        );
+      }
+
+      const latitude = parseFloat(lat);
+      const longitude = parseFloat(lng);
+      const radiusKm = parseFloat(radius);
+
+      // Diğer filtreleri de ekle
+      const filters = {};
+      if (req.query.propertyType) filters.propertyType = req.query.propertyType;
+      if (req.query.minYield) filters.minYield = parseFloat(req.query.minYield);
+      if (req.query.maxYield) filters.maxYield = parseFloat(req.query.maxYield);
+
+      const properties = await this.propertyService.getNearbyProperties(
+        latitude,
+        longitude,
+        radiusKm,
+        filters,
+      );
+
+      return responseWrapper.success(
+        res,
+        properties,
+        "Nearby properties fetched successfully",
+      );
+    } catch (error) {
+      return responseWrapper.error(res, error.message);
+    }
+  };
+
+  // Harita bounds içindeki property'leri getir
+  getPropertiesInBounds = async (req, res) => {
+    try {
+      const { north, south, east, west } = req.query;
+
+      if (!north || !south || !east || !west) {
+        return responseWrapper.badRequest(
+          res,
+          "Map bounds (north, south, east, west) are required",
+        );
+      }
+
+      const bounds = {
+        north: parseFloat(north),
+        south: parseFloat(south),
+        east: parseFloat(east),
+        west: parseFloat(west),
+      };
+
+      const filters = {};
+      if (req.query.propertyType) filters.propertyType = req.query.propertyType;
+
+      const properties = await this.propertyService.getPropertiesInBounds(
+        bounds,
+        filters,
+      );
+
+      return responseWrapper.success(
+        res,
+        properties,
+        "Properties in bounds fetched successfully",
+      );
+    } catch (error) {
+      return responseWrapper.error(res, error.message);
+    }
+  };
+
+  // Reverse geocoding - Koordinatlardan adres doldur (Admin/Owner)
+  fillAddressFromCoordinates = async (req, res) => {
+    try {
+      const property = await this.propertyService.fillAddressFromCoordinates(
+        req.params.id,
+      );
+
+      return responseWrapper.success(
+        res,
+        property,
+        "Address filled from coordinates successfully",
+      );
+    } catch (error) {
+      if (error.message === "Property not found") {
+        return responseWrapper.notFound(res, "Property not found");
+      }
+      return responseWrapper.error(res, error.message);
+    }
+  };
+
+  // Admin: Koordinatı eksik property'leri geocode et
+  geocodeMissingProperties = async (req, res) => {
+    try {
+      const results = await this.propertyService.geocodeMissingProperties();
+
+      return responseWrapper.success(
+        res,
+        results,
+        "Geocoding completed for missing properties",
       );
     } catch (error) {
       return responseWrapper.error(res, error.message);

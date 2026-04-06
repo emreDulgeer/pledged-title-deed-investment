@@ -2,7 +2,7 @@
 import axios from "axios";
 
 // Base configuration
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001/api/v1";
 const TIMEOUT = 30000; // 30 seconds
 
 // Create axios instance with default config
@@ -37,7 +37,7 @@ apiClient.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Response interceptor
@@ -92,7 +92,7 @@ apiClient.interceptors.response.use(
     };
 
     return Promise.reject(normalizedError);
-  }
+  },
 );
 
 export default apiClient;

@@ -11,8 +11,7 @@ const { body, param } = require("express-validator");
 // Import required models and utilities for inline routes
 const User = require("../models/User");
 const responseWrapper = require("../utils/responseWrapper");
-const NotificationService = require("../services/notificationService");
-const notificationService = new NotificationService();
+const notificationService = require("../services/notificationService");
 
 // ==================== PUBLIC ROUTES ====================
 
@@ -585,7 +584,7 @@ router.post(
         {
           // notificationData
           type: "kyc_approved",
-          title: "KYC Onaylandı",
+          title: "KYC approved",
           message:
             "Kimlik doğrulamanız onaylandı. Artık tüm işlemleri yapabilirsiniz.",
           priority: "high",

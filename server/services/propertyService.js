@@ -1,6 +1,7 @@
 // server/services/propertyService.js
 
 const PropertyRepository = require("../repositories/propertyRepository");
+const geocodingService = require("./geocoding");
 const {
   propertyFilters,
   propertySortFields,
@@ -20,9 +21,9 @@ class PropertyService {
     this.propertyRepository = new PropertyRepository();
   }
 
-  // Public listings için - TÜM FİLTRELER EKLENDI
+  // Public listings iÃ§in - TÃœM FÄ°LTRELER EKLENDI
   async getPublicProperties(queryParams, userId = null) {
-    // PDF'e göre: country, city, propertyType, yield range, investment range, contract period filtrelemeleri
+    // PDF'e gÃ¶re: country, city, propertyType, yield range, investment range, contract period filtrelemeleri
     const options = {
       populate: "owner",
       allowedFilters: propertyFilters,
@@ -32,7 +33,7 @@ class PropertyService {
 
     const result = await this.propertyRepository.paginate(queryParams, options);
 
-    // Eğer userId varsa investor view, yoksa normal list view
+    // EÄŸer userId varsa investor view, yoksa normal list view
     const dtoArray = userId
       ? toPropertyInvestorViewDtoArray(result.data, userId)
       : toPropertyListDtoArray(result.data);
@@ -43,36 +44,36 @@ class PropertyService {
     };
   }
 
-  // Property detayını getir
-  // Property detayını getir
+  // Property detayÄ±nÄ± getir
+  // Property detayÄ±nÄ± getir
   async getPropertyById(propertyId, userId = null, isAdmin = false) {
     const property = await this.propertyRepository.findById(
       propertyId,
-      "owner"
+      "owner",
     );
 
     if (!property) {
       throw new Error("Property not found");
     }
 
-    // PUBLIC endpoint güvenliği:
-    // published değilse ve admin/owner değilse 404 ver
+    // PUBLIC endpoint gÃ¼venliÄŸi:
+    // published deÄŸilse ve admin/owner deÄŸilse 404 ver
     const isOwner =
       userId &&
       property.owner &&
       property.owner.toString() === userId.toString();
 
     if (property.status !== "published" && !isAdmin && !isOwner) {
-      // Varlığı gizlemek için 404
+      // VarlÄ±ÄŸÄ± gizlemek iÃ§in 404
       throw new Error("Property not found");
     }
 
-    // View count sadece published için artsın
+    // View count sadece published iÃ§in artsÄ±n
     if (property.status === "published") {
       await this.propertyRepository.incrementViewCount(propertyId);
     }
 
-    // Role/kimlik durumuna göre DTO seçimi
+    // Role/kimlik durumuna gÃ¶re DTO seÃ§imi
     if (isAdmin) {
       return toPropertyAdminViewDto(property);
     } else if (userId) {
@@ -82,15 +83,15 @@ class PropertyService {
     }
   }
 
-  // Yeni property oluştur
+  // Yeni property oluÅŸtur
   async createProperty(propertyData, ownerId) {
     // Business logic validations
     if (propertyData.requestedInvestment < 10000) {
-      throw new Error("Minimum yatırım tutarı 10,000 EUR olmalıdır");
+      throw new Error("Minimum yatÄ±rÄ±m tutarÄ± 10,000 EUR olmalÄ±dÄ±r");
     }
 
     if (propertyData.contractPeriodMonths < 12) {
-      throw new Error("Minimum kontrat süresi 12 ay olmalıdır");
+      throw new Error("Minimum kontrat sÃ¼resi 12 ay olmalÄ±dÄ±r");
     }
 
     const newProperty = await this.propertyRepository.create({
@@ -102,7 +103,7 @@ class PropertyService {
     return toPropertyDetailDto(newProperty);
   }
 
-  // Property güncelle
+  // Property gÃ¼ncelle
   async updateProperty(propertyId, updateData, ownerId, isAdmin = false) {
     const property = await this.propertyRepository.findById(propertyId);
 
@@ -110,19 +111,19 @@ class PropertyService {
       throw new Error("Property not found");
     }
 
-    // Ownership kontrolü (admin değilse)
+    // Ownership kontrolÃ¼ (admin deÄŸilse)
     if (!isAdmin && property.owner.toString() !== ownerId.toString()) {
       throw new Error("Unauthorized to update this property");
     }
 
-    // Status değişimi business logic
+    // Status deÄŸiÅŸimi business logic
     if (updateData.status && !isAdmin) {
-      delete updateData.status; // Sadece admin status değiştirebilir
+      delete updateData.status; // Sadece admin status deÄŸiÅŸtirebilir
     }
 
     const updatedProperty = await this.propertyRepository.update(
       propertyId,
-      updateData
+      updateData,
     );
     return toPropertyDetailDto(updatedProperty);
   }
@@ -135,7 +136,7 @@ class PropertyService {
       throw new Error("Property not found");
     }
 
-    // Ownership kontrolü
+    // Ownership kontrolÃ¼
     if (!isAdmin && property.owner.toString() !== ownerId.toString()) {
       throw new Error("Unauthorized to delete this property");
     }
@@ -149,7 +150,7 @@ class PropertyService {
     return { message: "Property deleted successfully" };
   }
 
-  // Property'yi favorilere ekle/çıkar
+  // Property'yi favorilere ekle/Ã§Ä±kar
   async toggleFavorite(propertyId, userId) {
     const property = await this.propertyRepository.findById(propertyId);
 
@@ -162,11 +163,10 @@ class PropertyService {
       throw new Error("Only published properties can be added to favorites");
     }
 
-    // Investor'ın mevcut favorilerini kontrol et
+    // Investor'Ä±n mevcut favorilerini kontrol et
     const Investor = require("../models/Investor");
-    const investor = await Investor.findById(userId).select(
-      "favoriteProperties"
-    );
+    const investor =
+      await Investor.findById(userId).select("favoriteProperties");
 
     const isFavorited =
       investor.favoriteProperties &&
@@ -181,8 +181,8 @@ class PropertyService {
     }
   }
 
-  // Owner'ın property'lerini getir - PAGINATION VE FİLTRELEME EKLENDİ
-  // Owner'ın property'lerini getir - Owner View DTO ile
+  // Owner'Ä±n property'lerini getir - PAGINATION VE FÄ°LTRELEME EKLENDÄ°
+  // Owner'Ä±n property'lerini getir - Owner View DTO ile
   async getPropertiesByOwner(ownerId, queryParams) {
     const options = {
       populate: "owner",
@@ -202,10 +202,10 @@ class PropertyService {
     let property;
 
     if (isAdmin) {
-      // Admin: sahibine bakmadan kaydı getir
+      // Admin: sahibine bakmadan kaydÄ± getir
       property = await this.propertyRepository.findById(propertyId, "owner");
     } else {
-      // Owner: sadece kendine ait property'yi görebilir
+      // Owner: sadece kendine ait property'yi gÃ¶rebilir
       property = await this.propertyRepository.findOne({
         _id: propertyId,
         owner: ownerId,
@@ -222,7 +222,7 @@ class PropertyService {
       : toPropertyOwnerViewDto(property);
   }
 
-  // Admin için tüm property'ler - PAGINATION VE FİLTRELEME EKLENDİ
+  // Admin iÃ§in tÃ¼m property'ler - PAGINATION VE FÄ°LTRELEME EKLENDÄ°
   async getAllPropertiesForAdmin(queryParams) {
     const options = {
       populate: "owner",
@@ -237,7 +237,7 @@ class PropertyService {
     };
   }
 
-  // Property durumunu değiştir (Admin only)
+  // Property durumunu deÄŸiÅŸtir (Admin only)
   async updatePropertyStatus(propertyId, newStatus, reviewNotes = "") {
     const validStatuses = [
       "draft",
@@ -256,7 +256,7 @@ class PropertyService {
 
     const property = await this.propertyRepository.updateStatus(
       propertyId,
-      newStatus
+      newStatus,
     );
 
     if (reviewNotes) {
@@ -266,7 +266,7 @@ class PropertyService {
     return toPropertyAdminViewDto(property);
   }
 
-  // Property'yi işaretle - Admin için
+  // Property'yi iÅŸaretle - Admin iÃ§in
   async flagProperty(propertyId, issues, action = "add") {
     const property = await this.propertyRepository.findById(propertyId);
 
@@ -277,16 +277,16 @@ class PropertyService {
     let updatedFlaggedIssues = property.flaggedIssues || [];
 
     if (action === "add") {
-      // Yeni issue'ları ekle (duplicate olmayanları)
+      // Yeni issue'larÄ± ekle (duplicate olmayanlarÄ±)
       issues.forEach((issue) => {
         if (!updatedFlaggedIssues.includes(issue)) {
           updatedFlaggedIssues.push(issue);
         }
       });
     } else if (action === "remove") {
-      // Issue'ları kaldır
+      // Issue'larÄ± kaldÄ±r
       updatedFlaggedIssues = updatedFlaggedIssues.filter(
-        (issue) => !issues.includes(issue)
+        (issue) => !issues.includes(issue),
       );
     }
 
@@ -297,12 +297,12 @@ class PropertyService {
     return toPropertyAdminViewDto(updatedProperty);
   }
 
-  // İstatistikleri getir
+  // Ä°statistikleri getir
   async getPropertyStatistics(propertyId) {
     return await this.propertyRepository.getPropertyStatistics(propertyId);
   }
 
-  // Owner'ın tüm property'lerinin istatistiklerini getir
+  // Owner'Ä±n tÃ¼m property'lerinin istatistiklerini getir
   async getOwnerPropertiesStatistics(ownerId) {
     const properties = await this.propertyRepository.findByOwner(ownerId);
 
@@ -316,12 +316,12 @@ class PropertyService {
       favoriteCount: property.favoriteCount || 0,
       investmentOfferCount: property.investmentOfferCount || 0,
       createdAt: property.createdAt,
-      // Performans göstergeleri
+      // Performans gÃ¶stergeleri
       viewsPerDay:
         property.viewCount /
         Math.max(
           1,
-          Math.floor((Date.now() - property.createdAt) / (1000 * 60 * 60 * 24))
+          Math.floor((Date.now() - property.createdAt) / (1000 * 60 * 60 * 24)),
         ),
       conversionRate:
         property.investmentOfferCount > 0
@@ -336,17 +336,17 @@ class PropertyService {
           : 0,
     }));
 
-    // Özet istatistikler
+    // Ã–zet istatistikler
     const summary = {
       totalProperties: properties.length,
       totalViews: statistics.reduce((sum, stat) => sum + stat.viewCount, 0),
       totalFavorites: statistics.reduce(
         (sum, stat) => sum + stat.favoriteCount,
-        0
+        0,
       ),
       totalOffers: statistics.reduce(
         (sum, stat) => sum + stat.investmentOfferCount,
-        0
+        0,
       ),
       averageViewsPerProperty: (
         statistics.reduce((sum, stat) => sum + stat.viewCount, 0) /
@@ -364,7 +364,7 @@ class PropertyService {
     };
   }
 
-  // Harita için property'leri getir - sadece lokasyon ve temel bilgiler
+  // Harita iÃ§in property'leri getir - sadece lokasyon ve temel bilgiler
   async getPropertiesForMap(queryParams, userId = null) {
     const options = {
       select:
@@ -381,7 +381,7 @@ class PropertyService {
 
     const result = await this.propertyRepository.paginate(queryParams, options);
 
-    // Harita için basitleştirilmiş data
+    // Harita iÃ§in basitleÅŸtirilmiÅŸ data
     const mapData = result.data.map((p) => ({
       id: p._id,
       location: {
@@ -399,7 +399,7 @@ class PropertyService {
     return mapData;
   }
 
-  // Öne çıkan property'leri getir
+  // Ã–ne Ã§Ä±kan property'leri getir
   async getFeaturedProperties(queryParams = {}, userId = null) {
     const options = {
       populate: "owner",
@@ -407,12 +407,12 @@ class PropertyService {
       customFilters: {
         status: "published",
         isFeatured: true,
-        featuredUntil: { $gte: new Date() }, // Öne çıkarma süresi dolmamış olanlar
+        featuredUntil: { $gte: new Date() }, // Ã–ne Ã§Ä±karma sÃ¼resi dolmamÄ±ÅŸ olanlar
       },
       allowedSortFields: ["featuredAt", "createdAt"],
     };
 
-    // Varsayılan olarak öne çıkarıldığı tarihe göre sırala
+    // VarsayÄ±lan olarak Ã¶ne Ã§Ä±karÄ±ldÄ±ÄŸÄ± tarihe gÃ¶re sÄ±rala
     if (!queryParams.sortBy) {
       queryParams.sortBy = "featuredAt";
       queryParams.sortOrder = "desc";
@@ -430,7 +430,7 @@ class PropertyService {
     };
   }
 
-  // Property'yi öne çıkar (ücretli özellik)
+  // Property'yi Ã¶ne Ã§Ä±kar (Ã¼cretli Ã¶zellik)
   async featureProperty(propertyId, ownerId, durationWeeks = 1) {
     const property = await this.propertyRepository.findById(propertyId);
 
@@ -438,17 +438,17 @@ class PropertyService {
       throw new Error("Property not found");
     }
 
-    // Ownership kontrolü
+    // Ownership kontrolÃ¼
     if (property.owner.toString() !== ownerId.toString()) {
       throw new Error("Unauthorized to feature this property");
     }
 
-    // Sadece published property'ler öne çıkarılabilir
+    // Sadece published property'ler Ã¶ne Ã§Ä±karÄ±labilir
     if (property.status !== "published") {
       throw new Error("Only published properties can be featured");
     }
 
-    // Öne çıkarma süresi hesaplama
+    // Ã–ne Ã§Ä±karma sÃ¼resi hesaplama
     const featuredUntil = new Date();
     featuredUntil.setDate(featuredUntil.getDate() + durationWeeks * 7);
 
@@ -462,17 +462,16 @@ class PropertyService {
     return {
       property: toPropertyDetailDto(updatedProperty),
       featuredUntil: featuredUntil,
-      price: durationWeeks * 49, // PDF'e göre haftalık 49 EUR
+      price: durationWeeks * 49, // PDF'e gÃ¶re haftalÄ±k 49 EUR
     };
   }
 
-  // Investor'ın favori property'lerini getir
+  // Investor'Ä±n favori property'lerini getir
   async getFavoriteProperties(investorId, queryParams) {
-    // Önce investor'ın favori property id'lerini bul
+    // Ã–nce investor'Ä±n favori property id'lerini bul
     const Investor = require("../models/Investor");
-    const investor = await Investor.findById(investorId).select(
-      "favoriteProperties"
-    );
+    const investor =
+      await Investor.findById(investorId).select("favoriteProperties");
 
     if (
       !investor ||
@@ -499,20 +498,250 @@ class PropertyService {
       allowedSortFields: propertySortFields,
       customFilters: {
         _id: { $in: investor.favoriteProperties },
-        // Favori listesinde olsa bile sadece published olanları göster
+        // Favori listesinde olsa bile sadece published olanlarÄ± gÃ¶ster
         status: "published",
       },
     };
 
     const result = await this.propertyRepository.paginate(queryParams, options);
 
-    // Investor view DTO'su ile dön
+    // Investor view DTO'su ile dÃ¶n
     const dtoArray = toPropertyInvestorViewDtoArray(result.data, investorId);
 
     return {
       data: dtoArray,
       pagination: result.pagination,
     };
+  }
+
+  // ==================== GEOCODING & MAP FEATURES ====================
+
+  /**
+   * Property oluştururken veya güncellerken koordinat validasyonu ve fallback
+   * Frontend'den koordinat gelmezse, adres üzerinden geocoding yap
+   */
+  async validateAndGeocode(propertyData) {
+    const { locationPin, fullAddress, city, country } = propertyData;
+
+    // Eğer koordinat varsa, validate et
+    if (locationPin && locationPin.lat && locationPin.lng) {
+      const isValid = geocodingService.validateCoordinates(
+        locationPin.lat,
+        locationPin.lng,
+      );
+
+      if (!isValid) {
+        throw new Error(
+          "Invalid coordinates provided. Latitude must be between -90 and 90, longitude between -180 and 180",
+        );
+      }
+
+      // Türkiye sınırları kontrolü (isteğe bağlı - sadece uyarı)
+      if (country === "TR" || country === "Turkey") {
+        const inTurkey = geocodingService.isInTurkey(
+          locationPin.lat,
+          locationPin.lng,
+        );
+        if (!inTurkey) {
+          console.warn(
+            `⚠️ WARNING: Coordinates for Turkish property seem to be outside Turkey borders`,
+          );
+        }
+      }
+
+      return locationPin;
+    }
+
+    // Koordinat yoksa, adresten geocode et (FALLBACK)
+    if (fullAddress) {
+      try {
+        const geocoded = await geocodingService.geocode(fullAddress);
+        if (geocoded) {
+          return {
+            lat: geocoded.lat,
+            lng: geocoded.lng,
+          };
+        }
+      } catch (error) {
+        console.warn("Geocoding fallback failed:", error.message);
+      }
+    }
+
+    // Son çare: city + country ile geocode dene
+    if (city && country) {
+      try {
+        const geocoded = await geocodingService.geocode(`${city}, ${country}`);
+        if (geocoded) {
+          return {
+            lat: geocoded.lat,
+            lng: geocoded.lng,
+          };
+        }
+      } catch (error) {
+        console.warn("City geocoding fallback failed:", error.message);
+      }
+    }
+
+    // Hiçbir şekilde koordinat bulunamadı - null döndür
+    return null;
+  }
+
+  /**
+   * Reverse geocoding - Koordinatlardan adres bilgisi al
+   * Admin veya owner için eksik adres bilgilerini doldurma
+   */
+  async fillAddressFromCoordinates(propertyId) {
+    const property = await this.propertyRepository.findById(propertyId);
+
+    if (!property) {
+      throw new Error("Property not found");
+    }
+
+    if (!property.locationPin || !property.locationPin.lat) {
+      throw new Error("Property does not have coordinates");
+    }
+
+    const addressData = await geocodingService.reverseGeocode(
+      property.locationPin.lat,
+      property.locationPin.lng,
+    );
+
+    if (!addressData) {
+      throw new Error("Could not reverse geocode coordinates");
+    }
+
+    // Eksik bilgileri doldur
+    const updates = {};
+    if (!property.fullAddress && addressData.address) {
+      updates.fullAddress = addressData.address;
+    }
+    if (!property.city && addressData.city) {
+      updates.city = addressData.city;
+    }
+    if (!property.country && addressData.country) {
+      updates.country = addressData.country;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      const updated = await this.propertyRepository.update(propertyId, updates);
+      return toPropertyDetailDto(updated);
+    }
+
+    return toPropertyDetailDto(property);
+  }
+
+  /**
+   * Yakındaki property'leri getir - Google Maps "Yakınımdakiler" özelliği
+   */
+  async getNearbyProperties(lat, lng, radiusKm = 50, filters = {}) {
+    // Koordinat validasyonu
+    if (!geocodingService.validateCoordinates(lat, lng)) {
+      throw new Error("Invalid coordinates");
+    }
+
+    const additionalFilters = {
+      status: "published",
+      ...filters,
+    };
+
+    const nearbyProperties = await this.propertyRepository.findNearby(
+      lat,
+      lng,
+      radiusKm,
+      additionalFilters,
+    );
+
+    return nearbyProperties.map((property) => ({
+      ...toPropertyListDto(property),
+      distance: property.distanceKm,
+      distanceUnit: "km",
+    }));
+  }
+
+  /**
+   * Harita bounds içindeki property'leri getir
+   */
+  async getPropertiesInBounds(bounds, filters = {}) {
+    const { north, south, east, west } = bounds;
+
+    // Bounds validasyonu
+    if (
+      !geocodingService.validateCoordinates(north, east) ||
+      !geocodingService.validateCoordinates(south, west)
+    ) {
+      throw new Error("Invalid map bounds");
+    }
+
+    const additionalFilters = {
+      status: "published",
+      ...filters,
+    };
+
+    const properties = await this.propertyRepository.findWithinBounds(
+      bounds,
+      additionalFilters,
+    );
+
+    return toPropertyListDtoArray(properties);
+  }
+
+  /**
+   * Koordinatı eksik olan property'leri geocode et (Admin task)
+   */
+  async geocodeMissingProperties() {
+    const propertiesWithoutCoords =
+      await this.propertyRepository.findMissingCoordinates();
+
+    const results = {
+      total: propertiesWithoutCoords.length,
+      success: 0,
+      failed: 0,
+      details: [],
+    };
+
+    for (const property of propertiesWithoutCoords) {
+      try {
+        const address = property.fullAddress || `${city}, ${property.country}`;
+        const geocoded = await geocodingService.geocode(address);
+
+        if (geocoded) {
+          await this.propertyRepository.update(property._id, {
+            locationPin: {
+              lat: geocoded.lat,
+              lng: geocoded.lng,
+            },
+          });
+
+          results.success++;
+          results.details.push({
+            propertyId: property._id,
+            address: address,
+            success: true,
+            coordinates: { lat: geocoded.lat, lng: geocoded.lng },
+          });
+        } else {
+          results.failed++;
+          results.details.push({
+            propertyId: property._id,
+            address: address,
+            success: false,
+            error: "No results from geocoding",
+          });
+        }
+
+        // Rate limiting
+        await geocodingService.delay(200);
+      } catch (error) {
+        results.failed++;
+        results.details.push({
+          propertyId: property._id,
+          success: false,
+          error: error.message,
+        });
+      }
+    }
+
+    return results;
   }
 }
 

@@ -5,12 +5,13 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const morgan = require("morgan");
+const http = require("http");
 const path = require("path");
 const helmet = require("helmet"); // npm install helmet
 const compression = require("compression"); // npm install compression
 const connectDB = require("./config/db");
 const errorHandler = require("./middlewares/errorHandler");
-
+const { initializeSocket } = require("./utils/socket");
 // Security middleware imports
 const securityHeaders = require("./middlewares/securityHeaders");
 const deviceDetection = require("./middlewares/deviceDetection");
@@ -54,7 +55,7 @@ app.use(
       },
     },
     crossOriginEmbedderPolicy: false, // Dosya önizleme için
-  })
+  }),
 );
 
 // security middlewares
@@ -93,7 +94,7 @@ app.use(
       "X-RateLimit-Limit",
       "X-RateLimit-Remaining",
     ],
-  })
+  }),
 );
 
 // Rate limiting (global)
@@ -126,7 +127,7 @@ app.use(
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader("X-Frame-Options", "DENY");
     },
-  })
+  }),
 );
 
 // Dev logging middleware
@@ -137,7 +138,7 @@ if (process.env.NODE_ENV === "development") {
   app.use(
     morgan("combined", {
       skip: (req, res) => res.statusCode < 400, // just logging errors
-    })
+    }),
   );
 }
 
@@ -175,7 +176,9 @@ app.get("/api/v1", (req, res) => {
 });
 
 // Routes
+
 app.use("/api/v1/auth", require("./routes/authRoutes"));
+app.use("/api/v1/geocoding", require("./routes/geocodingRoutes"));
 app.use("/api/v1/properties", require("./routes/propertyRoutes"));
 app.use("/api/v1/investments", require("./routes/investmentRoutes"));
 app.use("/api/v1/notifications", require("./routes/notificationRoutes"));
@@ -201,9 +204,10 @@ app.use(errorHandler);
 
 // ===== SERVER CONFIGURATION =====
 
-const PORT = process.env.PORT || 5000;
-
-const server = app.listen(PORT, () => {
+const PORT = process.env.PORT || 5001;
+const server = http.createServer(app);
+initializeSocket(server);
+server.listen(PORT, () => {
   console.log(`
 ╔════════════════════════════════════════════════════╗
 ║                                                    ║

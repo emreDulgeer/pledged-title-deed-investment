@@ -1,4 +1,4 @@
-// src/pages/AdminPropertyDetail.jsx
+// client/src/views/admin/AdminPendingKycDetail.jsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -88,7 +88,7 @@ const AdminPropertyDetail = () => {
       const res = await bridge.properties.flagProperty(
         property.id,
         flags,
-        "add"
+        "add",
       );
       if (res?.success) {
         alert(t("admin.property.flag_success"));
@@ -160,7 +160,7 @@ const AdminPropertyDetail = () => {
     setCurrentImageIndex((p) => (images.length ? (p + 1) % images.length : 0));
   const prevImage = () =>
     setCurrentImageIndex((p) =>
-      images.length ? (p - 1 + images.length) % images.length : 0
+      images.length ? (p - 1 + images.length) % images.length : 0,
     );
 
   const canDecide = property?.status === "draft";
@@ -176,7 +176,7 @@ const AdminPropertyDetail = () => {
       const res = await bridge.properties.updateStatus(
         property.id,
         "published",
-        approveNote?.trim() || null
+        approveNote?.trim() || null,
       );
       if (res?.success) {
         alert(t("admin.property.approve_success"));
@@ -203,7 +203,7 @@ const AdminPropertyDetail = () => {
       const res = await bridge.properties.updateStatus(
         property.id,
         "rejected",
-        rejectReason
+        rejectReason,
       );
       if (res?.success) {
         alert(t("admin.property.reject_success"));
@@ -264,7 +264,7 @@ const AdminPropertyDetail = () => {
           <div className="flex items-center gap-2">
             <span
               className={`px-4 py-2 rounded-full text-sm font-medium ${statusPill(
-                property.status
+                property.status,
               )}`}
             >
               <Clock className="inline h-4 w-4 mr-1" />
@@ -406,14 +406,14 @@ const AdminPropertyDetail = () => {
                 label={t("properties.estimated_value")}
                 value={formatCurrency(
                   property.estimatedValue,
-                  property.currency
+                  property.currency,
                 )}
               />
               <Field
                 label={t("properties.requested_investment")}
                 value={formatCurrency(
                   property.requestedInvestment,
-                  property.currency
+                  property.currency,
                 )}
               />
               <Field

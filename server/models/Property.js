@@ -16,7 +16,7 @@ const PropertySchema = new mongoose.Schema(
       type: String,
       enum: ["apartment", "house", "commercial", "other"],
     },
-    size: Number, // m²
+    size: Number, // mÂ²
     rooms: Number,
     estimatedValue: Number,
     requestedInvestment: { type: Number, required: true },
@@ -27,7 +27,7 @@ const PropertySchema = new mongoose.Schema(
 
     contractPeriodMonths: Number,
 
-    // Görsel dosyalar - FileMetadata ile ilişkili
+    // GÃ¶rsel dosyalar - FileMetadata ile iliÅŸkili
     images: [
       {
         fileId: {
@@ -44,7 +44,7 @@ const PropertySchema = new mongoose.Schema(
       },
     ],
 
-    // Dökümanlar - FileMetadata ile ilişkili
+    // DÃ¶kÃ¼manlar - FileMetadata ile iliÅŸkili
     documents: [
       {
         type: {
@@ -80,7 +80,7 @@ const PropertySchema = new mongoose.Schema(
       },
     ],
 
-    // Ana dökümanlar için hızlı erişim
+    // Ana dÃ¶kÃ¼manlar iÃ§in hÄ±zlÄ± eriÅŸim
     titleDeedDocument: {
       fileId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -126,24 +126,24 @@ const PropertySchema = new mongoose.Schema(
       required: true,
     },
 
-    // PDF'e göre eklenen alanlar
+    // PDF'e gÃ¶re eklenen alanlar
     viewCount: { type: Number, default: 0 },
     favoriteCount: { type: Number, default: 0 },
     investmentOfferCount: { type: Number, default: 0 },
     favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: "Investor" }],
 
-    // Admin için review notları
+    // Admin iÃ§in review notlarÄ±
     reviewNotes: String,
     lastStatusChange: Date,
     flaggedIssues: [String],
 
-    // Öne Çıkarma özellikleri - PDF'e göre
+    // Ã–ne Ã‡Ä±karma Ã¶zellikleri - PDF'e gÃ¶re
     isFeatured: { type: Boolean, default: false },
     featuredAt: Date,
     featuredUntil: Date,
     featuredWeeks: Number,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Pre-save hook to calculate rentOffered or annualYieldPercent if one is missing
@@ -154,7 +154,7 @@ PropertySchema.pre("save", function (next) {
   if (hasRent && !hasYield && this.requestedInvestment) {
     const yearly = this.rentOffered * 12;
     this.annualYieldPercent = parseFloat(
-      ((yearly / this.requestedInvestment) * 100).toFixed(2)
+      ((yearly / this.requestedInvestment) * 100).toFixed(2),
     );
   } else if (!hasRent && hasYield && this.requestedInvestment) {
     const monthly =
@@ -164,8 +164,8 @@ PropertySchema.pre("save", function (next) {
     const expected = ((this.rentOffered * 12) / this.requestedInvestment) * 100;
     if (Math.abs(expected - this.annualYieldPercent) > 1) {
       console.warn(
-        `⚠️ UYARI: Girilen kira ve getiri tutarsız olabilir. 
-Rent = ${this.rentOffered}, Yield = ${this.annualYieldPercent}`
+        `âš ï¸ UYARI: Girilen kira ve getiri tutarsÄ±z olabilir. 
+Rent = ${this.rentOffered}, Yield = ${this.annualYieldPercent}`,
       );
     }
   }
@@ -181,7 +181,7 @@ Rent = ${this.rentOffered}, Yield = ${this.annualYieldPercent}`
   next();
 });
 
-// Status değişikliği takibi için middleware
+// Status deÄŸiÅŸikliÄŸi takibi iÃ§in middleware
 PropertySchema.pre("findOneAndUpdate", function (next) {
   const update = this.getUpdate();
   if (update.status) {
@@ -190,12 +190,16 @@ PropertySchema.pre("findOneAndUpdate", function (next) {
   next();
 });
 
-// İndeksler - performans için
+// Ä°ndeksler - performans iÃ§in
 PropertySchema.index({ country: 1, city: 1, status: 1 });
 PropertySchema.index({ owner: 1, status: 1 });
 PropertySchema.index({ annualYieldPercent: -1, status: 1 });
 PropertySchema.index({ requestedInvestment: 1, status: 1 });
 PropertySchema.index({ createdAt: -1 });
 PropertySchema.index({ isFeatured: 1, featuredUntil: 1 });
+
+// Geospatial index - Google Maps proximity queries için
+// $near, $geoWithin, $geoIntersects gibi sorguları destekler
+PropertySchema.index({ locationPin: "2dsphere" });
 
 module.exports = mongoose.model("Property", PropertySchema);

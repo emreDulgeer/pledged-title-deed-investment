@@ -14,6 +14,7 @@ import "./controllers/bridge";
 import { setUser } from "./store/slices/authSlice";
 import { ThemeProvider } from "./context/ThemeContext";
 import { LanguageProvider } from "./context/LanguageContext";
+import NotificationProvider from "./context/NotificationProvider";
 import GlobalAlerts from "./components/common/GlobalAlerts";
 import "./i18n/config";
 
@@ -29,6 +30,19 @@ import PropertyDetail from "./views/property/PropertyDetail";
 import AdminProperties from "./views/admin/AdminProperties";
 import PrivateRoute from "./routes/PrivateRoute";
 import RoleBasedRoute from "./routes/RoleBasedRoute";
+
+// Investor imports
+import InvestorLayout from "./views/layouts/InvestorLayout";
+import InvestorDashboard from "./components/Dashboards/InvestorDashboard";
+import InvestorInvestmentsList from "./views/investor/InvestorInvestmentsList";
+import InvestorInvestmentDetail from "./views/investor/InvestorInvestmentDetail";
+import InvestorRentalPayments from "./views/investor/InvestorRentalPayments";
+
+// Owner imports
+import OwnerLayout from "./views/layouts/OwnerLayout";
+import OwnerDashboard from "./components/Dashboards/OwnerDashboard";
+import OwnerProperties from "./views/owner/OwnerProperties";
+import OwnerRentalPayments from "./views/owner/OwnerRentalPayments";
 
 import authController from "./controllers/authController";
 import { defaultPathByRole } from "./utils/roleRedirect";
@@ -162,6 +176,50 @@ const AppContent = () => {
           <Route path="investments" element={<AdminInvestments />} />
           <Route path="investments/:id" element={<AdminInvestmentDetail />} />
         </Route>
+
+        {/* Investor (nested) */}
+        <Route
+          path="/investor"
+          element={
+            <PrivateRoute>
+              <RoleBasedRoute allowedRoles={["investor"]}>
+                <InvestorLayout />
+              </RoleBasedRoute>
+            </PrivateRoute>
+          }
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<InvestorDashboard />} />
+          <Route path="investments" element={<InvestorInvestmentsList />} />
+          <Route
+            path="investments/:id"
+            element={<InvestorInvestmentDetail />}
+          />
+          <Route path="rental-payments" element={<InvestorRentalPayments />} />
+        </Route>
+
+        {/* Owner (nested) */}
+        <Route
+          path="/owner"
+          element={
+            <PrivateRoute>
+              <RoleBasedRoute allowedRoles={["property_owner"]}>
+                <OwnerLayout />
+              </RoleBasedRoute>
+            </PrivateRoute>
+          }
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<OwnerDashboard />} />
+          <Route path="properties" element={<OwnerProperties />} />
+          <Route path="rental-payments" element={<OwnerRentalPayments />} />
+          {/* Placeholder routes - ileride doldurulacak */}
+          {/* <Route path="properties/new" element={<OwnerPropertyForm />} /> */}
+          {/* <Route path="investments/:id" element={<OwnerInvestmentDetail />} /> */}
+          {/* <Route path="notifications" element={<OwnerNotifications />} /> */}
+          {/* <Route path="settings" element={<OwnerSettings />} /> */}
+        </Route>
+
         <Route
           path="/auth/admin/pending-kyc/:userId"
           element={<AdminPendingKycDetail />}
@@ -184,7 +242,9 @@ const App = () => (
   <Provider store={store}>
     <ThemeProvider>
       <LanguageProvider>
-        <AppContent />
+        <NotificationProvider>
+          <AppContent />
+        </NotificationProvider>
       </LanguageProvider>
     </ThemeProvider>
   </Provider>

@@ -6,25 +6,31 @@ services:
     container_name: pledged-mongo
     restart: always
     ports:
-      - "27017:27017"
+      - "27021:27017"
     volumes:
       - mongo_data:/data/db
     environment:
       MONGO_INITDB_DATABASE: pledged_platform
 
-  backend:
-    build: ./server
-    container_name: pledged-backend
-    restart: always
-    ports:
-      - "5000:5000"
-    depends_on:
-      - mongo
-    environment:
-      - NODE_ENV=development
-      - MONGO_URI=mongodb://mongo:27017/pledged_platform
-    volumes:
-      - ./server:/app
+  # backend:
+  #   build: ./server
+  #   container_name: pledged-backend
+  #   restart: always
+  #   ports:
+  #     - "5000:5000"
+  #   depends_on:
+  #     - mongo
+  #   environment:
+  #     - NODE_ENV=development
+  #     - MONGO_URI=mongodb://mongo:27017/pledged_platform
+  #     - PORT=5000
+  #   working_dir: /app
+  #   command: npm run dev
+  #   volumes:
+  #     - ./server:/app
+  #     - /app/node_modules
+  #   tty: true
+  #   stdin_open: true
 
 volumes:
   mongo_data:

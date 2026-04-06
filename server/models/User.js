@@ -1,3 +1,5 @@
+// server/models/User.js - GÜNCELLENMIŞ VERSİYON
+
 const mongoose = require("mongoose");
 
 const UserSchema = new mongoose.Schema(
@@ -24,6 +26,7 @@ const UserSchema = new mongoose.Schema(
         "pending_activation",
         "active",
         "suspended",
+        "banned", // YENİ - ban durumu için
         "pending_deletion",
         "deleted",
       ],
@@ -162,18 +165,110 @@ const UserSchema = new mongoose.Schema(
         userAgent: String,
         location: String,
         success: Boolean,
-        reason: String, // Başarısızsa neden
+        reason: String,
         timestamp: {
           type: Date,
           default: Date.now,
         },
       },
     ],
+
+    // ============ YENİ ALANLAR - BAN & REPORT İSTATİSTİKLERİ ============
+
+    // Ban bilgileri (sadece istatistik)
+    isBanned: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    currentBan: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Ban",
+    },
+    totalBanCount: {
+      type: Number,
+      default: 0,
+    },
+
+    // Report bilgileri (sadece sayaçlar)
+    reportedCount: {
+      type: Number,
+      default: 0,
+    },
+    reportsMadeCount: {
+      type: Number,
+      default: 0,
+    },
+
+    // Trust Score (ban ve report'lara göre değişir)
+    trustScore: {
+      type: Number,
+      default: 100,
+      min: 0,
+      max: 100,
+    },
+
+    // Uyarı sistemi
+    warnings: [
+      {
+        reason: String,
+        givenBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        givenAt: {
+          type: Date,
+          default: Date.now,
+        },
+        severity: {
+          type: String,
+          enum: ["low", "medium", "high"],
+        },
+      },
+    ],
+    warningCount: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );
+
+// Indexes
 UserSchema.index({ role: 1 });
 UserSchema.index({ accountStatus: 1 });
 UserSchema.index({ membershipStatus: 1 });
 UserSchema.index({ kycStatus: 1 });
+UserSchema.index({ isBanned: 1 });
+UserSchema.index({ trustScore: 1 });
+
+// Method: Trust score güncelle
+UserSchema.methods.updateTrustScore = async function () {
+  let score = 100;
+
+  // Her ban için -20 puan
+  score -= this.totalBanCount * 20;
+
+  // Her rapor için -5 puan
+  score -= this.reportedCount * 5;
+
+  // Her uyarı için -10 puan
+  score -= this.warningCount * 10;
+
+  // KYC onaylanmışsa +10 puan
+  if (this.kycStatus === "Approved") {
+    score += 10;
+  }
+
+  // Email verify +5 puan
+  if (this.emailVerified) {
+    score += 5;
+  }
+
+  // Minimum 0, maksimum 100
+  this.trustScore = Math.max(0, Math.min(100, score));
+
+  return await this.save();
+};
+
 module.exports = mongoose.model("User", UserSchema);

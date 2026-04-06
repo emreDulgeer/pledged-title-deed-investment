@@ -15,11 +15,11 @@ const smsService = require("../services/smsService");
 const validator = require("validator");
 const speakeasy = require("speakeasy");
 const QRCode = require("qrcode");
-const NotificationService = require("../services/notificationService");
+const notificationService = require("../services/notificationService");
 class AuthController {
   constructor() {
     this.authService = require("../services/authService");
-    this.notificationService = new NotificationService();
+    this.notificationService = notificationService;
   }
   generateBackupCodesInternal = () => {
     const crypto = require("crypto");
@@ -160,9 +160,6 @@ class AuthController {
         },
         ip: req.ip,
       });
-
-      // Send notification to admin
-      await this.notificationService.notifyAdminsNewUserRegistration(user);
 
       return responseWrapper.created(res, {
         user: {
@@ -1069,10 +1066,6 @@ class AuthController {
    */
   // authController.js güncellemeleri
 
-  /**
-   * VERIFY EMAIL - Email doğrulama
-   * Email doğrulandıktan sonra hesap otomatik aktif olur (investor ve property_owner için)
-   */
   verifyEmail = async (req, res) => {
     try {
       const { token } = req.params;
@@ -1105,6 +1098,9 @@ class AuthController {
 
       // Update user
       const user = storedToken.user;
+      if (user.kycStatus === "pending") {
+        await notificationService.notifyAdminsAboutPendingKYC(user._id);
+      }
       user.emailVerified = true;
       user.emailVerifiedAt = new Date();
 
@@ -1188,6 +1184,91 @@ class AuthController {
     }
   };
 
+  // KYC ONAY - Admin tarafından KYC onayı
+  approveKYC = async (req, res) => {
+    const { userId } = req.params;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        kycStatus: "approved",
+        kycApprovedAt: new Date(),
+        kycApprovedBy: req.user._id,
+      },
+      { new: true }
+    );
+
+    // Kullanıcıya bildirim gönder
+    await notificationService.createNotification({
+      recipientId: userId,
+      recipientRole: user.role,
+      type: "kyc_approved",
+      title: "KYC Doğrulaması Onaylandı",
+      message:
+        "KYC doğrulama süreciniz başarıyla tamamlandı. Artık tüm platform özelliklerini kullanabilirsiniz.",
+      priority: "high",
+      channels: {
+        inApp: true,
+        email: true,
+      },
+      actions: [
+        {
+          label: "Yatırım Fırsatlarını Keşfet",
+          url: "/properties",
+          type: "primary",
+        },
+      ],
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "KYC onaylandı",
+      data: user,
+    });
+  };
+  // KYC RED - Admin tarafından KYC reddi
+  rejectKYC = async (req, res) => {
+    const { userId } = req.params;
+    const { reason } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        kycStatus: "rejected",
+        kycRejectedAt: new Date(),
+        kycRejectedBy: req.user._id,
+        kycRejectionReason: reason,
+      },
+      { new: true }
+    );
+
+    // Kullanıcıya bildirim gönder
+    await notificationService.createNotification({
+      recipientId: userId,
+      recipientRole: user.role,
+      type: "kyc_rejected",
+      title: "KYC Doğrulaması Reddedildi",
+      message: `KYC doğrulama başvurunuz reddedildi. Sebep: ${reason}. Lütfen gerekli düzenlemeleri yaparak tekrar başvurun.`,
+      priority: "high",
+      channels: {
+        inApp: true,
+        email: true,
+      },
+      actions: [
+        {
+          label: "KYC Bilgilerini Düzenle",
+          url: "/profile/kyc",
+          type: "primary",
+        },
+      ],
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "KYC reddedildi",
+      data: user,
+    });
+  };
   /**
    * ACTIVATE MEMBERSHIP - Üyelik planı aktifleştirme
    * Frontend'den ödeme doğrulaması sonrası çağrılır

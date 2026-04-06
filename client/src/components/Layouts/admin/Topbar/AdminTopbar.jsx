@@ -2,7 +2,7 @@
 import React from "react";
 import ThemeToggle from "../../common/ThemeToggle";
 import LanguageDropdown from "../../common/LanguageDropdown";
-import NotificationsButton from "../../common/NotificationsButton";
+import NotificationBell from "../../../Notifications/NotificationBell";
 import ProfileButton from "../../common/ProfileButton";
 
 const iconBtn =
@@ -43,7 +43,7 @@ const AdminTopbar = ({
         currentLanguage={currentLanguage}
         changeLanguage={changeLanguage}
       />
-      <NotificationsButton />
+      <NotificationBell />
       <ProfileButton theme={theme} user={user} />
     </div>
   </>

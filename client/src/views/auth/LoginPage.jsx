@@ -41,7 +41,7 @@ const LoginPage = () => {
           type: "error",
           title: t("auth.login_failed", "Login Failed"),
           message: loginError,
-        })
+        }),
       );
     }
   }, [loginError, dispatch, t]);
@@ -89,24 +89,21 @@ const LoginPage = () => {
           email: formData.email,
           password: formData.password,
           rememberMe: formData.rememberMe,
-        })
+        }),
       ).unwrap();
 
-      // Success
       dispatch(
         showAlert({
           type: "success",
           message: t("auth.login_successful"),
-        })
+        }),
       );
 
-      // Redirect to the originally requested page or dashboard
       const target = defaultPathByRole(result?.user?.role) || from;
       setTimeout(() => {
         navigate(target, { replace: true });
       }, 300);
     } catch (error) {
-      // Error is handled by the loginError effect above
       console.error("Login failed:", error);
     }
   };
@@ -128,6 +125,7 @@ const LoginPage = () => {
           <h2 className="text-center text-3xl font-extrabold text-day-text dark:text-night-text">
             {t("auth.sign_in_to_account")}
           </h2>
+
           <p className="mt-2 text-center text-sm text-day-text dark:text-night-text opacity-75">
             {t("auth.dont_have_account")}{" "}
             <Link
@@ -179,6 +177,7 @@ const LoginPage = () => {
               >
                 {t("auth.password")}
               </label>
+
               <div className="relative">
                 <input
                   id="password"
@@ -195,10 +194,11 @@ const LoginPage = () => {
                   } placeholder-gray-500 dark:placeholder-gray-400 text-day-text dark:text-night-text bg-day-surface dark:bg-night-surface rounded-lg focus:outline-none focus:ring-2 focus:ring-day-primary dark:focus:ring-night-primary focus:z-10 sm:text-sm`}
                   placeholder={t("auth.password")}
                 />
+
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => setShowPassword((p) => !p)}
                 >
                   <svg
                     className="h-5 w-5 text-gray-400"
@@ -224,6 +224,7 @@ const LoginPage = () => {
                   </svg>
                 </button>
               </div>
+
               {errors.password && (
                 <p className="mt-1 text-xs text-red-600 dark:text-red-400">
                   {errors.password}
@@ -299,29 +300,62 @@ const LoginPage = () => {
               )}
             </button>
           </div>
+        </form>
 
-          {/* Demo credentials info */}
-          <div
-            className={`mt-6 p-4 rounded-lg ${
-              theme === "dark"
-                ? "bg-night-primary/10 border border-night-primary"
-                : "bg-day-primary/10 border border-day-primary"
+        {/* Demo credentials info */}
+        <div
+          className={`mt-6 p-4 rounded-lg ${
+            theme === "dark"
+              ? "bg-night-primary/10 border border-night-primary"
+              : "bg-day-primary/10 border border-day-primary"
+          }`}
+        >
+          <p
+            className={`text-sm font-medium mb-3 ${
+              theme === "dark" ? "text-night-primary" : "text-day-primary"
             }`}
           >
-            <p
-              className={`text-sm font-medium ${
-                theme === "dark" ? "text-night-primary" : "text-day-primary"
-              }`}
-            >
-              Demo Credentials
-            </p>
-            <p className="text-sm text-day-text dark:text-night-text mt-1">
-              Email: admin@admin.com
-              <br />
-              Password: Admin123!@#
-            </p>
+            🔐 Demo Credentials
+          </p>
+
+          <div className="space-y-3 text-sm text-day-text dark:text-night-text">
+            <div className="p-2 bg-white/50 dark:bg-gray-800/50 rounded">
+              <p className="font-semibold text-purple-600 dark:text-purple-400">
+                👨‍💼 Admin
+              </p>
+              <p className="font-mono text-xs">admin@admin.com</p>
+              <p className="font-mono text-xs">Admin123!@#</p>
+            </div>
+
+            <div className="p-2 bg-white/50 dark:bg-gray-800/50 rounded">
+              <p className="font-semibold text-blue-600 dark:text-blue-400">
+                💼 Investor
+              </p>
+              <p className="font-mono text-xs">emre@investor.com</p>
+              <p className="font-mono text-xs">Test123!@#</p>
+            </div>
+
+            <div className="p-2 bg-white/50 dark:bg-gray-800/50 rounded">
+              <p className="font-semibold text-green-600 dark:text-green-400">
+                🏠 Property Owner
+              </p>
+              <p className="font-mono text-xs">ayse@owner.com</p>
+              <p className="font-mono text-xs">Owner123!@#</p>
+            </div>
+
+            <div className="p-2 bg-white/50 dark:bg-gray-800/50 rounded">
+              <p className="font-semibold text-orange-600 dark:text-orange-400">
+                🌍 Local Representative
+              </p>
+              <p className="font-mono text-xs">john@rep.com</p>
+              <p className="font-mono text-xs">Rep123!@#</p>
+            </div>
           </div>
-        </form>
+
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 italic">
+            Her rolün farklı izinleri var
+          </p>
+        </div>
       </div>
     </div>
   );

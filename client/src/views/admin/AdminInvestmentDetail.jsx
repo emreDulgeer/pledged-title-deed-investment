@@ -1,3 +1,4 @@
+// client/src/views/admin/AdminInvestmentDetail.jsx
 import React, { useEffect, useState } from "react";
 import { useParams, Link as RouterLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -108,7 +109,7 @@ export default function AdminInvestmentDetail() {
 
   const statusLabel = t(
     `investments.status.${investment.status}`,
-    investment.status
+    investment.status,
   );
 
   const docTypeLabel = (type) => t(`documents.types.${type}`, type);

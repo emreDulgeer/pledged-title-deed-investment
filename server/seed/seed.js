@@ -22,7 +22,9 @@ const ActivityLog = require("../models/ActivityLog");
 // MongoDB Connection
 mongoose
   .connect(
-    process.env.MONGODB_URI || "mongodb://localhost:27017/pledged_platform"
+    process.env.MONGODB_URI ||
+      process.env.MONGO_URI ||
+      "mongodb://localhost:27021/pledged_platform"
   )
   .then(async () => {
     console.log("🟢 MongoDB connected. Checking existing data...");

@@ -1,3 +1,4 @@
+// client/src/views/admin/AdminInvestments.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -62,7 +63,7 @@ export default function AdminInvestments() {
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(total / PAGE_SIZE)),
-    [total]
+    [total],
   );
 
   const fetchData = () => {
