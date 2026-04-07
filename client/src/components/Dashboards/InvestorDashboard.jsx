@@ -100,7 +100,7 @@ const InvestorDashboard = () => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">{t("loading")}...</p>
+          <p className="text-gray-600">{t("investor.loading")}...</p>
         </div>
       </div>
     );
@@ -112,17 +112,17 @@ const InvestorDashboard = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {t("investorDashboard")}
+            {t("investor.investorDashboard")}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            {t("welcomeBack")}, {t("manageYourInvestments")}
+            {t("investor.welcomeBack")}, {t("investor.manageYourInvestments")}
           </p>
         </div>
         <button
           onClick={() => navigate("/properties")}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          {t("browseProperties")}
+          {t("investor.browseProperties")}
         </button>
       </div>
 
@@ -130,35 +130,35 @@ const InvestorDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatsCard
           t={t}
-          title={t("totalInvestments")}
+          title={t("investor.totalInvestments")}
           value={stats.totalInvestments}
           icon="📊"
           color="blue"
         />
         <StatsCard
           t={t}
-          title={t("activeInvestments")}
+          title={t("investor.activeInvestments")}
           value={stats.activeInvestments}
           icon="✅"
           color="green"
         />
         <StatsCard
           t={t}
-          title={t("totalInvested")}
+          title={t("investor.totalInvested")}
           value={`${stats.totalInvested.toLocaleString()} ₺`}
           icon="💰"
           color="purple"
         />
         <StatsCard
           t={t}
-          title={t("monthlyIncome")}
+          title={t("investor.monthlyIncome")}
           value={`${stats.monthlyIncome.toLocaleString()} ₺`}
           icon="📈"
           color="emerald"
         />
         <StatsCard
           t={t}
-          title={t("totalEarnings")}
+          title={t("investor.totalEarnings")}
           value={`${stats.totalEarnings.toLocaleString()} ₺`}
           icon="💎"
           color="amber"
@@ -169,26 +169,26 @@ const InvestorDashboard = () => {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            {t("recentInvestments")}
+            {t("investor.recentInvestments")}
           </h2>
           <button
             onClick={() => navigate("/investor/investments")}
             className="text-blue-600 hover:text-blue-700 text-sm font-medium"
           >
-            {t("viewAll")} →
+            {t("investor.viewAll")} →
           </button>
         </div>
 
         {recentInvestments.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-500 dark:text-gray-400 mb-4">
-              {t("noInvestmentsYet")}
+              {t("investor.noInvestmentsYet")}
             </p>
             <button
               onClick={() => navigate("/properties")}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
-              {t("startInvesting")}
+              {t("investor.startInvesting")}
             </button>
           </div>
         ) : (
@@ -197,19 +197,19 @@ const InvestorDashboard = () => {
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    {t("property")}
+                    {t("investor.property")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    {t("amount")}
+                    {t("investor.amount")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    {t("status")}
+                    {t("investor.status")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    {t("monthlyRent")}
+                    {t("investor.monthlyRent")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                    {t("actions")}
+                    {t("common.actions")}
                   </th>
                 </tr>
               </thead>
@@ -249,7 +249,7 @@ const InvestorDashboard = () => {
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(investment.status)}`}
                       >
-                        {t(investment.status)}
+                        {t(`investor.${investment.status}`)}
                       </span>
                     </td>
                     <td className="px-4 py-4">
@@ -266,7 +266,7 @@ const InvestorDashboard = () => {
                         }
                         className="text-blue-600 hover:text-blue-700 text-sm font-medium"
                       >
-                        {t("viewDetails")}
+                        {t("investor.viewDetails")}
                       </button>
                     </td>
                   </tr>
@@ -281,19 +281,19 @@ const InvestorDashboard = () => {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            {t("upcomingPayments")}
+            {t("investor.upcomingPayments")}
           </h2>
           <button
             onClick={() => navigate("/investor/rental-payments")}
             className="text-blue-600 hover:text-blue-700 text-sm font-medium"
           >
-            {t("viewAll")} →
+            {t("investor.viewAll")} →
           </button>
         </div>
 
         {upcomingPayments.length === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-            {t("noUpcomingPayments")}
+            {t("investor.noUpcomingPayments")}
           </p>
         ) : (
           <div className="space-y-3">
@@ -318,7 +318,7 @@ const InvestorDashboard = () => {
                     {payment.amount?.toLocaleString()} ₺
                   </p>
                   <span className="text-xs text-yellow-600">
-                    {t("pending")}
+                    {t("investor.pending")}
                   </span>
                 </div>
               </div>

@@ -125,7 +125,9 @@ const InvestorRentalPayments = () => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">{t("loading")}...</p>
+          <p className="text-gray-600 dark:text-gray-400">
+            {t("investor.loading")}...
+          </p>
         </div>
       </div>
     );
@@ -138,10 +140,10 @@ const InvestorRentalPayments = () => {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {t("rentalPayments")}
+          {t("investor.rentalPayments")}
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          {t("trackYourRentalIncome")}
+          {t("investor.trackYourRentalIncome")}
         </p>
       </div>
 
@@ -151,7 +153,7 @@ const InvestorRentalPayments = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t("totalPaid")}
+                {t("investor.totalPaid")}
               </p>
               <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                 {stats.totalPaid.toLocaleString()} ₺
@@ -167,7 +169,7 @@ const InvestorRentalPayments = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t("pending")}
+                {t("investor.pending")}
               </p>
               <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
                 {stats.totalPending.toLocaleString()} ₺
@@ -183,7 +185,7 @@ const InvestorRentalPayments = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t("delayed")}
+                {t("investor.delayed")}
               </p>
               <p className="text-2xl font-bold text-red-600 dark:text-red-400">
                 {stats.totalDelayed.toLocaleString()} ₺
@@ -199,7 +201,7 @@ const InvestorRentalPayments = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t("thisMonth")}
+                {t("investor.thisMonth")}
               </p>
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                 {stats.thisMonth.toLocaleString()} ₺
@@ -217,39 +219,39 @@ const InvestorRentalPayments = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t("status")}
+              {t("investor.status")}
             </label>
             <select
               value={filters.status}
               onChange={(e) => handleFilterChange("status", e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
-              <option value="">{t("allStatuses")}</option>
-              <option value="pending">{t("pending")}</option>
-              <option value="paid">{t("paid")}</option>
-              <option value="delayed">{t("delayed")}</option>
+              <option value="">{t("investor.allStatuses")}</option>
+              <option value="pending">{t("investor.pending")}</option>
+              <option value="paid">{t("investor.paid")}</option>
+              <option value="delayed">{t("investor.delayed")}</option>
             </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t("sortBy")}
+              {t("investor.sortBy")}
             </label>
             <select
               value={filters.sortBy}
               onChange={(e) => handleFilterChange("sortBy", e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
-              <option value="-month">{t("newestMonth")}</option>
-              <option value="month">{t("oldestMonth")}</option>
-              <option value="-amount">{t("highestAmount")}</option>
-              <option value="amount">{t("lowestAmount")}</option>
+              <option value="-month">{t("investor.newestMonth")}</option>
+              <option value="month">{t("investor.oldestMonth")}</option>
+              <option value="-amount">{t("investor.highestAmount")}</option>
+              <option value="amount">{t("investor.lowestAmount")}</option>
             </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t("itemsPerPage")}
+              {t("investor.itemsPerPage")}
             </label>
             <select
               value={filters.limit}
@@ -272,16 +274,16 @@ const InvestorRentalPayments = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
             <div className="text-6xl mb-4">💰</div>
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              {t("noPaymentsFound")}
+              {t("investor.noPaymentsFound")}
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {t("paymentsWillAppearHere")}
+              {t("investor.paymentsWillAppearHere")}
             </p>
             <button
               onClick={() => navigate("/investor/investments")}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
-              {t("viewInvestments")}
+              {t("investor.viewInvestments")}
             </button>
           </div>
         ) : (
@@ -317,7 +319,7 @@ const InvestorRentalPayments = () => {
                     }
                     className="text-blue-600 hover:text-blue-700 dark:text-blue-400 text-sm font-medium"
                   >
-                    {t("viewInvestment")} →
+                    {t("investor.viewInvestment")} →
                   </button>
                 </div>
               </div>
@@ -328,19 +330,19 @@ const InvestorRentalPayments = () => {
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t("month")}
+                        {t("investor.month")}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t("amount")}
+                        {t("investor.amount")}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t("status")}
+                        {t("investor.status")}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t("paidDate")}
+                        {t("investor.paidDate")}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t("receipt")}
+                        {t("investor.receipt")}
                       </th>
                     </tr>
                   </thead>
@@ -362,7 +364,7 @@ const InvestorRentalPayments = () => {
                           <span
                             className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(payment.status)}`}
                           >
-                            {t(payment.status)}
+                            {t(`investor.${payment.status}`)}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-gray-900 dark:text-white">
@@ -378,7 +380,7 @@ const InvestorRentalPayments = () => {
                               }
                               className="text-blue-600 hover:text-blue-700 dark:text-blue-400 text-sm"
                             >
-                              {t("view")}
+                              {t("common.view")}
                             </button>
                           ) : (
                             <span className="text-gray-400 text-sm">-</span>
@@ -399,7 +401,7 @@ const InvestorRentalPayments = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              {t("showing")}{" "}
+              {t("investor.showing")}{" "}
               <span className="font-medium">
                 {(pagination.currentPage - 1) * pagination.itemsPerPage + 1}
               </span>{" "}
@@ -411,9 +413,9 @@ const InvestorRentalPayments = () => {
                   pagination.totalItems,
                 )}
               </span>{" "}
-              {t("of")}
+              {t("investor.of")}
               <span className="font-medium"> {pagination.totalItems}</span>{" "}
-              {t("results")}
+              {t("investor.results")}
             </p>
             <div className="flex space-x-2">
               <button
@@ -425,7 +427,7 @@ const InvestorRentalPayments = () => {
                     : "bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-700"
                 }`}
               >
-                {t("previous")}
+                {t("investor.previous")}
               </button>
               <span className="px-3 py-1 text-gray-700 dark:text-gray-300">
                 {pagination.currentPage} / {pagination.totalPages}
@@ -439,7 +441,7 @@ const InvestorRentalPayments = () => {
                     : "bg-gray-200 text-gray-400 cursor-not-allowed dark:bg-gray-700"
                 }`}
               >
-                {t("next")}
+                {t("investor.next")}
               </button>
             </div>
           </div>

@@ -390,7 +390,7 @@ const OwnerDashboard = () => {
               onClick={() => navigate("/owner/properties")}
               className="text-sm font-medium text-day-primary dark:text-night-primary hover:opacity-75 transition-opacity"
             >
-              {t("investor.viewAll") || "View All"} →
+              {t("common.view_all") || "View All"} →
             </button>
           </div>
 
@@ -513,7 +513,7 @@ const OwnerDashboard = () => {
               onClick={() => navigate("/owner/rental-payments")}
               className="text-sm font-medium text-day-primary dark:text-night-primary hover:opacity-75 transition-opacity"
             >
-              {t("investor.viewAll") || "View All"} →
+              {t("common.view_all") || "View All"} →
             </button>
           </div>
 

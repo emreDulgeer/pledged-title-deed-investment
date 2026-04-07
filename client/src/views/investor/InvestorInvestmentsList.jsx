@@ -89,7 +89,9 @@ const InvestorInvestmentsList = () => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">{t("loading")}...</p>
+          <p className="text-gray-600 dark:text-gray-400">
+            {t("investor.loading")}...
+          </p>
         </div>
       </div>
     );
@@ -101,17 +103,17 @@ const InvestorInvestmentsList = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {t("myInvestments")}
+            {t("investor.myInvestments")}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            {t("totalInvestments")}: {pagination.totalItems}
+            {t("investor.totalInvestments")}: {pagination.totalItems}
           </p>
         </div>
         <button
           onClick={() => navigate("/properties")}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          + {t("newInvestment")}
+          + {t("investor.newInvestment")}
         </button>
       </div>
 
@@ -121,46 +123,48 @@ const InvestorInvestmentsList = () => {
           {/* Status Filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t("status")}
+              {t("investor.status")}
             </label>
             <select
               value={filters.status}
               onChange={(e) => handleFilterChange("status", e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
-              <option value="">{t("allStatuses")}</option>
-              <option value="offer_sent">{t("offer_sent")}</option>
-              <option value="contract_signed">{t("contract_signed")}</option>
-              <option value="title_deed_pending">
-                {t("title_deed_pending")}
+              <option value="">{t("investor.allStatuses")}</option>
+              <option value="offer_sent">{t("investor.offer_sent")}</option>
+              <option value="contract_signed">
+                {t("investor.contract_signed")}
               </option>
-              <option value="active">{t("active")}</option>
-              <option value="completed">{t("completed")}</option>
-              <option value="defaulted">{t("defaulted")}</option>
+              <option value="title_deed_pending">
+                {t("investor.title_deed_pending")}
+              </option>
+              <option value="active">{t("investor.active")}</option>
+              <option value="completed">{t("investor.completed")}</option>
+              <option value="defaulted">{t("investor.defaulted")}</option>
             </select>
           </div>
 
           {/* Sort Filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t("sortBy")}
+              {t("investor.sortBy")}
             </label>
             <select
               value={filters.sortBy}
               onChange={(e) => handleFilterChange("sortBy", e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
-              <option value="-createdAt">{t("newestFirst")}</option>
-              <option value="createdAt">{t("oldestFirst")}</option>
-              <option value="-amountInvested">{t("highestAmount")}</option>
-              <option value="amountInvested">{t("lowestAmount")}</option>
+              <option value="-createdAt">{t("investor.newestFirst")}</option>
+              <option value="createdAt">{t("investor.oldestFirst")}</option>
+              <option value="-amountInvested">{t("investor.highestAmount")}</option>
+              <option value="amountInvested">{t("investor.lowestAmount")}</option>
             </select>
           </div>
 
           {/* Items Per Page */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t("itemsPerPage")}
+              {t("investor.itemsPerPage")}
             </label>
             <select
               value={filters.limit}
@@ -183,16 +187,16 @@ const InvestorInvestmentsList = () => {
           <div className="text-center py-12">
             <div className="text-6xl mb-4">📊</div>
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              {t("noInvestmentsFound")}
+              {t("investor.noInvestmentsFound")}
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {t("startInvestingToSeeResults")}
+              {t("investor.startInvestingToSeeResults")}
             </p>
             <button
               onClick={() => navigate("/properties")}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
-              {t("browseProperties")}
+              {t("investor.browseProperties")}
             </button>
           </div>
         ) : (
@@ -203,22 +207,22 @@ const InvestorInvestmentsList = () => {
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      {t("property")}
+                      {t("investor.property")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      {t("investmentAmount")}
+                      {t("investor.investmentAmount")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      {t("status")}
+                      {t("investor.status")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      {t("rentalProgress")}
+                      {t("investor.rentalProgress")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      {t("totalEarned")}
+                      {t("investor.totalEarned")}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      {t("actions")}
+                      {t("common.actions")}
                     </th>
                   </tr>
                 </thead>
@@ -261,7 +265,7 @@ const InvestorInvestmentsList = () => {
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(investment.status)}`}
                         >
-                          {t(investment.status)}
+                          {t(`investor.${investment.status}`)}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -307,7 +311,7 @@ const InvestorInvestmentsList = () => {
                           }
                           className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium"
                         >
-                          {t("viewDetails")} →
+                          {t("investor.viewDetails")} →
                         </button>
                       </td>
                     </tr>
@@ -345,14 +349,14 @@ const InvestorInvestmentsList = () => {
                       <span
                         className={`inline-block mt-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(investment.status)}`}
                       >
-                        {t(investment.status)}
+                        {t(`investor.${investment.status}`)}
                       </span>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-gray-500 dark:text-gray-400">
-                        {t("invested")}
+                        {t("investor.invested")}
                       </p>
                       <p className="font-semibold text-gray-900 dark:text-white">
                         {investment.amountInvested.toLocaleString()}{" "}
@@ -361,7 +365,7 @@ const InvestorInvestmentsList = () => {
                     </div>
                     <div>
                       <p className="text-gray-500 dark:text-gray-400">
-                        {t("earned")}
+                        {t("investor.earned")}
                       </p>
                       <p className="font-semibold text-green-600 dark:text-green-400">
                         {investment.rentalPaymentsSummary?.totalPaidAmount?.toLocaleString() ||
@@ -374,7 +378,7 @@ const InvestorInvestmentsList = () => {
                     <div className="mt-3">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs text-gray-600 dark:text-gray-400">
-                          {t("progress")}
+                          {t("investor.progress")}
                         </span>
                         <span className="text-xs font-medium text-gray-900 dark:text-white">
                           {investment.rentalPaymentsSummary.paidPayments}/
@@ -400,7 +404,7 @@ const InvestorInvestmentsList = () => {
               <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-gray-700 dark:text-gray-300">
-                    {t("showing")}{" "}
+                    {t("investor.showing")}{" "}
                     <span className="font-medium">
                       {(pagination.currentPage - 1) * pagination.itemsPerPage +
                         1}
@@ -413,12 +417,12 @@ const InvestorInvestmentsList = () => {
                         pagination.totalItems,
                       )}
                     </span>{" "}
-                    {t("of")}
+                    {t("investor.of")}
                     <span className="font-medium">
                       {" "}
                       {pagination.totalItems}
                     </span>{" "}
-                    {t("results")}
+                    {t("investor.results")}
                   </p>
                   <div className="flex space-x-2">
                     <button
@@ -432,7 +436,7 @@ const InvestorInvestmentsList = () => {
                           : "bg-gray-200 text-gray-400 cursor-not-allowed"
                       }`}
                     >
-                      {t("previous")}
+                      {t("investor.previous")}
                     </button>
                     <span className="px-3 py-1 text-gray-700 dark:text-gray-300">
                       {pagination.currentPage} / {pagination.totalPages}
@@ -448,7 +452,7 @@ const InvestorInvestmentsList = () => {
                           : "bg-gray-200 text-gray-400 cursor-not-allowed"
                       }`}
                     >
-                      {t("next")}
+                      {t("investor.next")}
                     </button>
                   </div>
                 </div>

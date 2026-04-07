@@ -28,6 +28,7 @@
     "status": "Status",
     "actions": "Actions",
     "view": "View",
+    "view_all": "View All",
     "download": "Download",
     "upload": "Upload",
     "select": "Select",
@@ -62,7 +63,12 @@
     "created_date": "Created Date",
     "updated_date": "Updated Date",
     "city": "City",
-    "type": "Type"
+    "type": "Type",
+    "all_statuses": "All Statuses",
+    "newest": "Newest First",
+    "oldest": "Oldest First",
+    "verified": "Verified",
+    "unverified": "Unverified"
   },
 
   "documents": {
@@ -95,7 +101,8 @@
     "create_new_account": "Create a new account",
     "login_successful": "Login successful!",
     "logout_successful": "Logout successful!",
-    "invalid_credentials": "Invalid email or password"
+    "invalid_credentials": "Invalid email or password",
+    "login_failed": "Login Failed"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -109,6 +116,10 @@
     "settings": "Settings",
     "profile": "Profile",
     "notifications": "Notifications",
+    "portfolio": "Portfolio",
+    "rental_payments": "Rental Payments",
+    "investor_panel": "Investor Panel",
+    "owner_panel": "Owner Panel",
     "help": "Help",
     "admin_panel": "Admin Panel"
   },
@@ -215,6 +226,40 @@
     "loading": "Loading",
     "investor": "Investor",
     "settings": "Settings"
+  },
+  "owner": {
+    "dashboard": "Property Owner Dashboard",
+    "welcome": "Welcome back",
+    "add_property": "Add Property",
+    "list_property_cta": "List a new property",
+    "list_property_sub": "Reach thousands of international investors on EstateLink",
+    "total_properties": "Total Properties",
+    "all_time": "All time",
+    "published_properties": "Published",
+    "active_listings": "Active listings",
+    "in_contract": "In Contract",
+    "active_contracts": "Active contracts",
+    "total_value": "Portfolio Value",
+    "estimated_value": "Estimated total",
+    "my_properties": "My Properties",
+    "property": "Property",
+    "value": "Value",
+    "no_properties": "No properties yet.",
+    "rental_payments": "Rental Payments",
+    "rental_payments_subtitle": "Track incoming rental payments from investors",
+    "no_payments": "No rental payments yet.",
+    "payment": "Payment",
+    "quick_actions": "Quick Actions",
+    "view_offers": "View Offers",
+    "all_types": "All Types",
+    "create_first": "Create your first property",
+    "properties_subtitle": "Manage and track your property portfolio",
+    "tabs": {
+      "all_properties": "All Properties",
+      "my_properties": "My Properties",
+      "offers": "Offers",
+      "invested": "Invested"
+    }
   },
   "dashboard": {
     "title": "Dashboard",
@@ -359,7 +404,13 @@
     "title": "Notifications",
     "noNotifications": "No notifications",
     "markAllRead": "Mark all as read",
-    "viewAll": "View all notifications"
+    "viewAll": "View all notifications",
+    "time": {
+      "justNow": "Just now",
+      "minutesAgo": "minutes ago",
+      "hoursAgo": "hours ago",
+      "daysAgo": "days ago"
+    }
   },
   "admin": {
     "kyc": {
@@ -402,11 +453,13 @@
       "tab_overview": "Overview",
       "tab_payments": "Payments",
       "paid_at": "Paid At",
+      "uploaded": "Uploaded",
       "payment_statistics": "Payment Statistics",
       "total_payments": "Total Payments",
       "paid_payments": "Paid",
       "pending_payments": "Pending",
       "delayed_payments": "Delayed",
+      "no_payments": "No payments found",
       "payment_rate": "Payment Rate",
       "on_time_rate": "On-Time Rate",
       "min_amount": "Min Amount",
@@ -527,6 +580,9 @@
       "flag_success": "Flags saved.",
       "flag_error": "Failed to save flags.",
       "flag_validation_required": "Please enter at least one flag/issue.",
+      "fetch_error": "Failed to load property details.",
+      "delete_success": "Property deleted successfully.",
+      "delete_error": "Failed to delete the property.",
       "approve_with_note_title": "Approve Property",
       "approve_with_note_hint": "Optionally add a note for the property owner (will be saved as review notes).",
       "approve_note_placeholder": "Type an optional approval note...",

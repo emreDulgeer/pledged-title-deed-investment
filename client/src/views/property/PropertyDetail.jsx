@@ -68,11 +68,11 @@ const PropertyDetail = () => {
         setProperty(res.data);
         setFlags(res.data.metadata?.flaggedIssues || []);
       } else {
-        throw new Error(t("property.detail.fetch_error"));
+        throw new Error(t("admin.property.fetch_error"));
       }
     } catch (err) {
       console.error(err);
-      setError(err.message || t("property.detail.fetch_error"));
+      setError(err.message || t("admin.property.fetch_error"));
       if (err.statusCode === 401 || err.statusCode === 403) {
         navigate(isAdmin ? "/admin/dashboard" : "/owner/dashboard");
       }
@@ -95,13 +95,13 @@ const PropertyDetail = () => {
         approveNote || null
       );
       if (res?.success) {
-        alert(t("property.detail.approve_success"));
+        alert(t("admin.property.approve_success"));
         await fetchPropertyDetails();
         setShowApproveModal(false);
         setApproveNote("");
       }
     } catch {
-      alert(t("property.detail.approve_error"));
+      alert(t("admin.property.approve_error"));
     } finally {
       setProcessing(false);
     }
@@ -109,7 +109,7 @@ const PropertyDetail = () => {
 
   const handleReject = async () => {
     if (!rejectReason.trim()) {
-      alert(t("property.detail.reject_reason_required"));
+      alert(t("admin.property.reject_reason_required"));
       return;
     }
     setProcessing(true);
@@ -120,13 +120,13 @@ const PropertyDetail = () => {
         rejectReason
       );
       if (res?.success) {
-        alert(t("property.detail.reject_success"));
+        alert(t("admin.property.reject_success"));
         await fetchPropertyDetails();
         setShowRejectModal(false);
         setRejectReason("");
       }
     } catch {
-      alert(t("property.detail.reject_error"));
+      alert(t("admin.property.reject_error"));
     } finally {
       setProcessing(false);
     }
@@ -137,11 +137,11 @@ const PropertyDetail = () => {
     try {
       const res = await bridge.properties.delete(property.id);
       if (res?.success) {
-        alert(t("property.detail.delete_success"));
+        alert(t("admin.property.delete_success"));
         navigate(isAdmin ? "/admin/dashboard" : "/owner/dashboard");
       }
     } catch {
-      alert(t("property.detail.delete_error"));
+      alert(t("admin.property.delete_error"));
     } finally {
       setProcessing(false);
     }
@@ -149,7 +149,7 @@ const PropertyDetail = () => {
 
   const saveFlagsToBackend = async () => {
     if (flags.length === 0) {
-      alert(t("property.detail.flag_validation_required"));
+      alert(t("admin.property.flag_validation_required"));
       return;
     }
     setProcessing(true);
@@ -160,12 +160,12 @@ const PropertyDetail = () => {
         "add"
       );
       if (res?.success) {
-        alert(t("property.detail.flag_success"));
+        alert(t("admin.property.flag_success"));
         await fetchPropertyDetails();
         setShowFlagModal(false);
       }
     } catch {
-      alert(t("property.detail.flag_error"));
+      alert(t("admin.property.flag_error"));
     } finally {
       setProcessing(false);
     }
@@ -200,7 +200,7 @@ const PropertyDetail = () => {
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 max-w-md w-full">
           <h2 className="text-xl font-semibold">
-            {t("property.detail.not_found")}
+            {t("admin.property.not_found")}
           </h2>
           <button
             onClick={() => navigate(-1)}

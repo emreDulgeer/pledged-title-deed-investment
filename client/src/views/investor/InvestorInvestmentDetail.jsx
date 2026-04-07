@@ -78,11 +78,11 @@ const InvestorInvestmentDetail = () => {
       if (response.success) {
         await loadInvestmentDetails();
         await loadDocuments();
-        alert(t("documentUploadedSuccessfully"));
+        alert(t("investor.documentUploadedSuccessfully"));
       }
     } catch (error) {
       console.error("Döküman yükleme hatası:", error);
-      alert(error.message || t("documentUploadFailed"));
+      alert(error.message || t("investor.documentUploadFailed"));
     } finally {
       setUploadingDoc(false);
     }
@@ -103,12 +103,12 @@ const InvestorInvestmentDetail = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Döküman indirme hatası:", error);
-      alert(t("documentDownloadFailed"));
+      alert(t("investor.documentDownloadFailed"));
     }
   };
 
   const handleRequestRepresentative = async () => {
-    if (!confirm(t("confirmRequestRepresentative"))) return;
+    if (!confirm(t("investor.confirmRequestRepresentative"))) return;
 
     try {
       const response =
@@ -116,11 +116,11 @@ const InvestorInvestmentDetail = () => {
 
       if (response.success) {
         await loadInvestmentDetails();
-        alert(t("representativeRequestedSuccessfully"));
+        alert(t("investor.representativeRequestedSuccessfully"));
       }
     } catch (error) {
       console.error("Temsilci talep hatası:", error);
-      alert(error.message || t("representativeRequestFailed"));
+      alert(error.message || t("investor.representativeRequestFailed"));
     }
   };
 
@@ -156,7 +156,9 @@ const InvestorInvestmentDetail = () => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">{t("loading")}...</p>
+          <p className="text-gray-600 dark:text-gray-400">
+            {t("investor.loading")}...
+          </p>
         </div>
       </div>
     );
@@ -167,13 +169,13 @@ const InvestorInvestmentDetail = () => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <p className="text-gray-600 dark:text-gray-400 text-xl">
-            {t("investmentNotFound")}
+            {t("investor.investmentNotFound")}
           </p>
           <button
             onClick={() => navigate("/investor/investments")}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
-            {t("backToList")}
+            {t("investor.backToList")}
           </button>
         </div>
       </div>
@@ -189,11 +191,11 @@ const InvestorInvestmentDetail = () => {
             onClick={() => navigate("/investor/investments")}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
           >
-            ← {t("back")}
+            ← {t("investor.back")}
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {t("investmentDetails")}
+              {t("investor.investmentDetails")}
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
               {investment.property?.city}, {investment.property?.country}
@@ -203,7 +205,7 @@ const InvestorInvestmentDetail = () => {
         <span
           className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(investment.status)}`}
         >
-          {t(investment.status)}
+          {t(`investor.${investment.status}`)}
         </span>
       </div>
 
@@ -220,7 +222,7 @@ const InvestorInvestmentDetail = () => {
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
               }`}
             >
-              {t(tab)}
+              {t(`investor.${tab}`)}
             </button>
           ))}
         </nav>
@@ -234,12 +236,12 @@ const InvestorInvestmentDetail = () => {
             {/* Investment Summary */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t("investmentSummary")}
+                {t("investor.investmentSummary")}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    {t("investmentAmount")}
+                    {t("investor.investmentAmount")}
                   </p>
                   <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                     {investment.amountInvested?.toLocaleString()}{" "}
@@ -248,7 +250,7 @@ const InvestorInvestmentDetail = () => {
                 </div>
                 <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    {t("monthlyRent")}
+                    {t("investor.monthlyRent")}
                   </p>
                   <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                     {investment.property?.rentOffered?.toLocaleString()} ₺
@@ -256,7 +258,7 @@ const InvestorInvestmentDetail = () => {
                 </div>
                 <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    {t("totalExpectedReturn")}
+                    {t("investor.totalExpectedReturn")}
                   </p>
                   <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                     {investment.calculations?.totalExpectedIncome?.toLocaleString()}{" "}
@@ -270,7 +272,7 @@ const InvestorInvestmentDetail = () => {
             {investment.processTracking && (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  {t("processTracking")}
+                  {t("investor.processTracking")}
                 </h2>
                 <div className="space-y-4">
                   {Object.entries(investment.processTracking).map(
@@ -287,7 +289,7 @@ const InvestorInvestmentDetail = () => {
                         </div>
                         <div className="ml-4 flex-1">
                           <p className="font-medium text-gray-900 dark:text-white">
-                            {t(key)}
+                            {t(`investor.${key}`)}
                           </p>
                           {value.date && (
                             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -306,12 +308,12 @@ const InvestorInvestmentDetail = () => {
             {investment.calculations && (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  {t("calculations")}
+                  {t("investor.calculations")}
                 </h2>
                 <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="border-b dark:border-gray-700 pb-4">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">
-                      {t("totalPaid")}
+                      {t("investor.totalPaid")}
                     </dt>
                     <dd className="text-lg font-semibold text-gray-900 dark:text-white">
                       {investment.calculations.totalPaidAmount?.toLocaleString()}{" "}
@@ -320,7 +322,7 @@ const InvestorInvestmentDetail = () => {
                   </div>
                   <div className="border-b dark:border-gray-700 pb-4">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">
-                      {t("remainingPayments")}
+                      {t("investor.remainingPayments")}
                     </dt>
                     <dd className="text-lg font-semibold text-gray-900 dark:text-white">
                       {investment.calculations.remainingPayments}
@@ -328,7 +330,7 @@ const InvestorInvestmentDetail = () => {
                   </div>
                   <div className="border-b dark:border-gray-700 pb-4">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">
-                      {t("paymentProgress")}
+                      {t("investor.paymentProgress")}
                     </dt>
                     <dd className="text-lg font-semibold text-gray-900 dark:text-white">
                       {investment.calculations.paymentProgress}%
@@ -336,7 +338,7 @@ const InvestorInvestmentDetail = () => {
                   </div>
                   <div className="border-b dark:border-gray-700 pb-4">
                     <dt className="text-sm text-gray-600 dark:text-gray-400">
-                      {t("contractEndDate")}
+                      {t("investor.contractEndDate")}
                     </dt>
                     <dd className="text-lg font-semibold text-gray-900 dark:text-white">
                       {investment.calculations.contractEndDate
@@ -353,14 +355,14 @@ const InvestorInvestmentDetail = () => {
             {/* Actions */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t("actions")}
+                {t("common.actions")}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {!investment.contractFile &&
                   investment.status === "offer_sent" && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        {t("uploadContract")}
+                        {t("investor.uploadContract")}
                       </label>
                       <input
                         type="file"
@@ -378,7 +380,7 @@ const InvestorInvestmentDetail = () => {
                   ) && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        {t("uploadPaymentReceipt")}
+                        {t("investor.uploadPaymentReceipt")}
                       </label>
                       <input
                         type="file"
@@ -398,7 +400,7 @@ const InvestorInvestmentDetail = () => {
                       onClick={handleRequestRepresentative}
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
-                      {t("requestLocalRepresentative")}
+                      {t("investor.requestLocalRepresentative")}
                     </button>
                   )}
               </div>
@@ -416,7 +418,7 @@ const InvestorInvestmentDetail = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
             <div className="p-6">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t("rentalPayments")}
+                {t("investor.rentalPayments")}
               </h2>
             </div>
             {investment.rentalPayments &&
@@ -426,16 +428,16 @@ const InvestorInvestmentDetail = () => {
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t("month")}
+                        {t("investor.month")}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t("amount")}
+                        {t("investor.amount")}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t("status")}
+                        {t("investor.status")}
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t("paidDate")}
+                        {t("investor.paidDate")}
                       </th>
                     </tr>
                   </thead>
@@ -452,7 +454,7 @@ const InvestorInvestmentDetail = () => {
                           <span
                             className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(payment.status)}`}
                           >
-                            {t(payment.status)}
+                            {t(`investor.${payment.status}`)}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-gray-900 dark:text-white">
@@ -467,7 +469,7 @@ const InvestorInvestmentDetail = () => {
               </div>
             ) : (
               <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-                {t("noPaymentsYet")}
+                {t("investor.noPaymentsYet")}
               </div>
             )}
           </div>
@@ -483,7 +485,7 @@ const InvestorInvestmentDetail = () => {
 
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t("uploadAdditionalDocument")}
+                {t("investor.uploadAdditionalDocument")}
               </h3>
               <input
                 type="file"
@@ -494,7 +496,7 @@ const InvestorInvestmentDetail = () => {
               />
               {uploadingDoc && (
                 <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                  {t("uploading")}...
+                  {t("investor.uploading")}...
                 </p>
               )}
             </div>

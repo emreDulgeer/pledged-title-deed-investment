@@ -135,18 +135,12 @@ const NotificationBell = () => {
     const now = new Date();
     const d = new Date(date);
     const diff = Math.floor((now - d) / 1000);
-    if (diff < 60) return t("notifications.time.justNow") || "Az önce";
+    if (diff < 60) return t("notifications.time.justNow");
     if (diff < 3600)
-      return `${Math.floor(diff / 60)} ${
-        t("notifications.time.minutesAgo") || "dakika önce"
-      }`;
+      return `${Math.floor(diff / 60)} ${t("notifications.time.minutesAgo")}`;
     if (diff < 86400)
-      return `${Math.floor(diff / 3600)} ${
-        t("notifications.time.hoursAgo") || "saat önce"
-      }`;
-    return `${Math.floor(diff / 86400)} ${
-      t("notifications.time.daysAgo") || "gün önce"
-    }`;
+      return `${Math.floor(diff / 3600)} ${t("notifications.time.hoursAgo")}`;
+    return `${Math.floor(diff / 86400)} ${t("notifications.time.daysAgo")}`;
   };
 
   // Öncelik rengi
