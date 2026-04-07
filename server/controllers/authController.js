@@ -529,13 +529,43 @@ class AuthController {
         ip: req.ip,
       });
 
-      // Remove refresh token if provided
+      // Revoke refresh token if provided
       if (refreshToken) {
-        await Token.findOneAndDelete({
-          user: req.user.id,
-          token: refreshToken,
-          type: "refresh",
-        });
+        await Token.findOneAndUpdate(
+          {
+            user: req.user.id,
+            token: refreshToken,
+            type: "refresh",
+            isRevoked: false,
+          },
+          {
+            isRevoked: true,
+            revokedAt: new Date(),
+            revokedReason: "user_logout",
+            lastUsedAt: new Date(),
+          }
+        );
+      }
+
+      // If no explicit refresh token was sent, revoke the latest active session token
+      if (!refreshToken) {
+        await Token.findOneAndUpdate(
+          {
+            user: req.user.id,
+            type: "refresh",
+            isRevoked: false,
+            expiresAt: { $gt: new Date() },
+          },
+          {
+            isRevoked: true,
+            revokedAt: new Date(),
+            revokedReason: "user_logout",
+            lastUsedAt: new Date(),
+          },
+          {
+            sort: { createdAt: -1 },
+          }
+        );
       }
 
       // Log logout
@@ -545,6 +575,7 @@ class AuthController {
         details: {
           ip: req.ip,
           userAgent: req.get("user-agent"),
+          refreshTokenRevoked: !!refreshToken,
         },
         ip: req.ip,
       });
@@ -589,6 +620,13 @@ class AuthController {
         return responseWrapper.unauthorized(res, "Refresh token bulunamadı");
       }
 
+      if (storedToken.isRevoked) {
+        return responseWrapper.unauthorized(
+          res,
+          "Refresh token geçersiz. Lütfen tekrar giriş yapın."
+        );
+      }
+
       // Check if token is expired
       if (storedToken.expiresAt < new Date()) {
         await storedToken.deleteOne();
@@ -618,8 +656,12 @@ class AuthController {
       let newRefreshToken = refreshToken;
 
       if (shouldRotate) {
-        // Delete old refresh token
-        await storedToken.deleteOne();
+        await storedToken.updateOne({
+          isRevoked: true,
+          revokedAt: new Date(),
+          revokedReason: "refresh_token_rotation",
+          lastUsedAt: new Date(),
+        });
 
         // Generate new refresh token
         newRefreshToken = jwt.sign(
@@ -637,6 +679,9 @@ class AuthController {
           ip: req.ip,
           expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         });
+      } else {
+        storedToken.lastUsedAt = new Date();
+        await storedToken.save();
       }
 
       return responseWrapper.success(

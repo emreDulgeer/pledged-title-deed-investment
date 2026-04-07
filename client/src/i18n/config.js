@@ -22,7 +22,7 @@ i18n
   .init({
     resources,
     fallbackLng: "en",
-    debug: import.meta.env.REACT_APP_ENV === "development",
+    debug: import.meta.env.DEV || import.meta.env.VITE_APP_ENV === "development",
 
     interpolation: {
       escapeValue: false, // React already escapes values

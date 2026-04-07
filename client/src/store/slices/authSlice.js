@@ -63,6 +63,15 @@ const authSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
+    const resetAuthState = (state) => {
+      state.user = null;
+      state.isAuthenticated = false;
+      state.loading = false;
+      state.loginLoading = false;
+      state.error = null;
+      state.loginError = null;
+    };
+
     builder
       // Login
       .addCase(login.pending, (state) => {
@@ -81,10 +90,14 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
       })
       // Logout
+      .addCase(logout.pending, (state) => {
+        resetAuthState(state);
+      })
       .addCase(logout.fulfilled, (state) => {
-        state.user = null;
-        state.isAuthenticated = false;
-        state.error = null;
+        resetAuthState(state);
+      })
+      .addCase(logout.rejected, (state) => {
+        resetAuthState(state);
       })
       // Fetch current user
       .addCase(fetchCurrentUser.pending, (state) => {

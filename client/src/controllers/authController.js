@@ -31,8 +31,12 @@ const authController = {
   },
 
   logout: async () => {
+    const refreshToken = tokenManager.getRefreshToken();
+
     try {
-      await apiClient.post("/auth/logout");
+      await apiClient.post("/auth/logout", {
+        refreshToken,
+      });
     } finally {
       tokenManager.clearTokens();
     }

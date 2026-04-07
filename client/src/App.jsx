@@ -60,6 +60,8 @@ const AppContent = () => {
   const [booting, setBooting] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       try {
         const access = tokenManager.getAccessToken?.();
@@ -73,7 +75,7 @@ const AppContent = () => {
             console.error("Refresh token yenileme başarısız:", err);
             await authController.logout?.();
             dispatch(logoutAction());
-            setBooting(false);
+            if (!cancelled) setBooting(false);
             return;
           }
         }
@@ -95,7 +97,7 @@ const AppContent = () => {
               if (e?.statusCode === 401) {
                 await authController.logout?.();
                 dispatch(logoutAction());
-                setBooting(false);
+                if (!cancelled) setBooting(false);
                 return;
               }
               // 429 / 5xx → soft fail: oturumu düşürme, mevcut state ile devam
@@ -107,14 +109,14 @@ const AppContent = () => {
           if (verifyRes && verifyRes?.data?.valid === false) {
             await authController.logout?.();
             dispatch(logoutAction());
-            setBooting(false);
+            if (!cancelled) setBooting(false);
             return;
           }
 
           // 3) Kullanıcıyı hydrate et (verify user varsa öncelik bu)
           if (verifyRes?.data?.user) {
             dispatch(setUser(verifyRes.data.user));
-          } else if (!user) {
+          } else {
             await dispatch(fetchCurrentUser());
           }
         }
@@ -127,10 +129,14 @@ const AppContent = () => {
         }
         dispatch(logoutAction());
       } finally {
-        setBooting(false);
+        if (!cancelled) setBooting(false);
       }
     })();
-  }, [dispatch, user]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch]);
 
   if (booting) {
     return (
