@@ -2,6 +2,7 @@ export { default as HeaderBar } from "./HeaderBar";
 export { default as ActionButtons } from "./ActionButtons";
 export { default as ImageGallery } from "./ImageGallery";
 export { default as PropertySummary } from "./PropertySummary";
+export { default as LocationMap } from "./LocationMap";
 export { default as FinancialInfo } from "./FinancialInfo";
 export { default as AdminNotes } from "./AdminNotes";
 export { default as FlaggedIssues } from "./FlaggedIssues";

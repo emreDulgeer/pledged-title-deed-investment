@@ -43,6 +43,7 @@ import OwnerLayout from "./views/layouts/OwnerLayout";
 import OwnerDashboard from "./components/Dashboards/OwnerDashboard";
 import OwnerProperties from "./views/owner/OwnerProperties";
 import OwnerRentalPayments from "./views/owner/OwnerRentalPayments";
+import OwnerPropertyCreate from "./views/owner/OwnerPropertyCreate";
 
 import authController from "./controllers/authController";
 import { defaultPathByRole } from "./utils/roleRedirect";
@@ -218,9 +219,9 @@ const AppContent = () => {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<OwnerDashboard />} />
           <Route path="properties" element={<OwnerProperties />} />
+          <Route path="properties/new" element={<OwnerPropertyCreate />} />
           <Route path="rental-payments" element={<OwnerRentalPayments />} />
           {/* Placeholder routes - ileride doldurulacak */}
-          {/* <Route path="properties/new" element={<OwnerPropertyForm />} /> */}
           {/* <Route path="investments/:id" element={<OwnerInvestmentDetail />} /> */}
           {/* <Route path="notifications" element={<OwnerNotifications />} /> */}
           {/* <Route path="settings" element={<OwnerSettings />} /> */}

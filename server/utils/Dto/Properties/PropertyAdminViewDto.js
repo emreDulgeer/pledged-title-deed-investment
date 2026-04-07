@@ -4,6 +4,7 @@ class PropertyAdminViewDto {
     this.country = property.country;
     this.city = property.city;
     this.fullAddress = property.fullAddress;
+    this.mapSearchAddress = property.mapSearchAddress;
     this.locationPin = property.locationPin;
     this.description = property.description;
     this.propertyType = property.propertyType;

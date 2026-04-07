@@ -113,6 +113,32 @@ class GeocodingAdapter {
     }
   }
 
+  async search(address, options = {}) {
+    try {
+      if (typeof this.provider.search !== "function") {
+        return [];
+      }
+      return await this.provider.search(address, options);
+    } catch (error) {
+      logger.warn(`Primary provider failed for search: ${error.message}`);
+
+      if (
+        this.fallbackProvider &&
+        typeof this.fallbackProvider.search === "function"
+      ) {
+        logger.info("Trying fallback provider for search...");
+        try {
+          return await this.fallbackProvider.search(address, options);
+        } catch (fallbackError) {
+          logger.error(`Fallback search failed: ${fallbackError.message}`);
+          throw new Error("All geocoding providers failed for search");
+        }
+      }
+
+      throw error;
+    }
+  }
+
   /**
    * Validate address
    */

@@ -28,9 +28,14 @@ class GoogleMapsProvider {
         throw new Error("Google Maps API key is not configured");
       }
 
+      const query =
+        address && typeof address === "object" && !Array.isArray(address)
+          ? this._buildFreeformQuery(address)
+          : address;
+
       const response = await axios.get(`${this.baseUrl}/geocode/json`, {
         params: {
-          address: address,
+          address: query,
           key: this.apiKey,
         },
       });
@@ -115,6 +120,57 @@ class GoogleMapsProvider {
     }
   }
 
+  async search(address, options = {}) {
+    try {
+      if (!this.apiKey) {
+        throw new Error("Google Maps API key is not configured");
+      }
+
+      const query =
+        address && typeof address === "object" && !Array.isArray(address)
+          ? this._buildFreeformQuery(address)
+          : address;
+
+      if (!query) {
+        return [];
+      }
+
+      const response = await axios.get(`${this.baseUrl}/geocode/json`, {
+        params: {
+          address: query,
+          key: this.apiKey,
+          ...(options.countrycodes
+            ? { components: `country:${options.countrycodes}` }
+            : {}),
+        },
+      });
+
+      if (response.data.status !== "OK" || !response.data.results?.length) {
+        if (response.data.status === "ZERO_RESULTS") {
+          return [];
+        }
+        throw new Error(`Search failed: ${response.data.status}`);
+      }
+
+      return response.data.results
+        .slice(0, Math.min(options.limit || 5, 10))
+        .map((result) => ({
+          lat: result.geometry.location.lat,
+          lng: result.geometry.location.lng,
+          formattedAddress: result.formatted_address,
+          placeId: result.place_id,
+          name:
+            result.address_components?.[0]?.long_name ||
+            result.formatted_address?.split(",")?.[0] ||
+            "",
+          addressComponents: result.address_components,
+        }));
+    } catch (error) {
+      logger.error("Google Maps search error:", error.message);
+      throw new Error("Failed to search address with Google Maps");
+    }
+  }
+
   /**
    * Adres validasyonu
    */
@@ -125,6 +181,20 @@ class GoogleMapsProvider {
     } catch (error) {
       return false;
     }
+  }
+
+  _buildFreeformQuery(address) {
+    return [
+      [address.houseNumber, address.street].filter(Boolean).join(" ").trim(),
+      address.amenity,
+      address.city,
+      address.county,
+      address.state,
+      address.postalcode,
+      address.country,
+    ]
+      .filter(Boolean)
+      .join(", ");
   }
 
   /**

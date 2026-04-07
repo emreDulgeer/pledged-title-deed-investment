@@ -4,6 +4,7 @@ class PropertyDto {
     this.country = property.country;
     this.city = property.city;
     this.fullAddress = property.fullAddress;
+    this.mapSearchAddress = property.mapSearchAddress;
     this.locationPin = property.locationPin;
     this.description = property.description;
     this.propertyType = property.propertyType;
@@ -16,7 +17,6 @@ class PropertyDto {
     this.currency = property.currency;
     this.contractPeriodMonths = property.contractPeriodMonths;
     this.images = property.images;
-    this.documents = property.documents;
     this.status = property.status;
     this.trustScore = property.trustScore;
     this.createdAt = property.createdAt;

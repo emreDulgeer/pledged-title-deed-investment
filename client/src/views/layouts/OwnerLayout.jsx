@@ -35,6 +35,11 @@ const OwnerLayout = () => {
       icon: <IconBldg />,
     },
     {
+      title: t("owner.add_property") || "Create Property",
+      path: "/owner/properties/new",
+      icon: <IconPlusSquare />,
+    },
+    {
       title: t("owner.rental_payments") || "Rental Payments",
       path: "/owner/rental-payments",
       icon: <IconReceipt />,
@@ -123,6 +128,22 @@ const IconReceipt = () => (
       strokeLinejoin="round"
       strokeWidth={2}
       d="M9 14h6m-6-4h6M7 21l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1-2-1-2 1v18z"
+    />
+  </svg>
+);
+
+const IconPlusSquare = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 9v6m3-3H9m-3 9h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
     />
   </svg>
 );

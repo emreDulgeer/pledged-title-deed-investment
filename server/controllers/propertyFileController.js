@@ -10,6 +10,41 @@ class PropertyFileController {
     this.fileUploadManager = new FileUploadManager();
   }
 
+  buildPendingPreviewUrl() {
+    return `/api/v1/files/preview/pending`;
+  }
+
+  buildPreviewUrl(fileId) {
+    return `/api/v1/files/preview/${fileId}`;
+  }
+
+  createPropertyUploadManager({
+    maxFileSize,
+    allowedExtensions,
+    generateThumbnails = false,
+  }) {
+    return new FileUploadManager({
+      maxFileSize,
+      allowedExtensions,
+      enableSecurityValidation: false,
+      enableMagicNumberCheck: false,
+      enableContentValidation: false,
+      generateThumbnails: false,
+      extractMetadata: false,
+      uploadStrategy: "multer",
+      storageType: process.env.STORAGE_TYPE || "local",
+      cloudConfig: {
+        endPoint: process.env.MINIO_ENDPOINT,
+        port: process.env.MINIO_PORT,
+        useSSL: process.env.MINIO_USE_SSL,
+        accessKey: process.env.MINIO_ACCESS_KEY,
+        secretKey: process.env.MINIO_SECRET_KEY,
+        bucket: process.env.MINIO_BUCKET,
+        publicBaseUrl: process.env.MINIO_PUBLIC_URL,
+      },
+    });
+  }
+
   // Property görseli yükle
   uploadPropertyImage = async (req, res) => {
     try {
@@ -43,12 +78,18 @@ class PropertyFileController {
         },
         limits: {
           fileSize: 10 * 1024 * 1024, // 10MB
-          allowedTypes: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
+          allowedExtensions: ["jpg", "jpeg", "png", "webp"],
         },
       };
 
       // Multiple upload middleware
-      const uploadMiddleware = this.fileUploadManager.middleware({
+      const uploadManager = this.createPropertyUploadManager({
+        maxFileSize: 10 * 1024 * 1024,
+        allowedExtensions: ["jpg", "jpeg", "png", "webp"],
+        generateThumbnails: true,
+      });
+
+      const uploadMiddleware = uploadManager.middleware({
         fieldConfig: { mode: "array", fieldName: "images", maxCount: 10 },
         ...uploadConfig,
       });
@@ -84,13 +125,17 @@ class PropertyFileController {
         const fileMetadata = new FileMetadata({
           filename: uploadData.filename,
           originalName:
-            uploadData.metadata?.originalName ?? uploadData.filename, // <<<
-          mimeType: uploadData.mimeType, // <<<
+            uploadData.originalName ||
+            uploadData.originalname ||
+            uploadData.metadata?.originalName ||
+            uploadData.filename,
+          mimeType: uploadData.mimeType,
           size: uploadData.size,
           directory: uploadConfig.directory,
-          url: uploadData.url,
-          // path: uploadData.path, // çoğu storage’da yok, gerekirse bırakılabilir
-          storageType: "local",
+          url: this.buildPendingPreviewUrl(),
+          path: uploadData.path,
+          storageType: process.env.STORAGE_TYPE || "local",
+          bucket: uploadData.bucket,
           hash: uploadData.hash,
           uploadedBy: userId,
           relatedModel: "Property",
@@ -100,11 +145,13 @@ class PropertyFileController {
         });
 
         await fileMetadata.save();
+        fileMetadata.url = this.buildPreviewUrl(fileMetadata._id);
+        await fileMetadata.save();
 
         // Property'ye ekle
         const imageData = {
           fileId: fileMetadata._id,
-          url: fileMetadata.url,
+          url: this.buildPreviewUrl(fileMetadata._id),
           isPrimary: currentImageCount === 0 && i === 0, // İlk resim primary
           order: currentImageCount + i,
           uploadedAt: new Date(),
@@ -113,7 +160,7 @@ class PropertyFileController {
         property.images.push(imageData);
         uploadedImages.push({
           id: fileMetadata._id,
-          url: fileMetadata.url,
+          url: this.buildPreviewUrl(fileMetadata._id),
           filename: fileMetadata.filename,
           isPrimary: imageData.isPrimary,
         });
@@ -175,17 +222,17 @@ class PropertyFileController {
         },
         limits: {
           fileSize: 50 * 1024 * 1024, // 50MB for documents
-          allowedTypes: [
-            "application/pdf",
-            "image/jpeg",
-            "image/jpg",
-            "image/png",
-          ],
+          allowedExtensions: ["pdf", "jpg", "jpeg", "png"],
         },
       };
 
-      const uploadMiddleware = this.fileUploadManager.middleware({
-        fieldConfig: { mode: "single", fieldName: "document" },
+      const uploadManager = this.createPropertyUploadManager({
+        maxFileSize: 50 * 1024 * 1024,
+        allowedExtensions: ["pdf", "jpg", "jpeg", "png"],
+      });
+
+      const uploadMiddleware = uploadManager.middleware({
+        fieldConfig: { mode: "array", fieldName: "documents", maxCount: 20 },
         ...uploadConfig,
       });
 
@@ -197,6 +244,20 @@ class PropertyFileController {
         });
       });
       const { documentType, description } = req.body || {};
+      const documentTypes = Array.isArray(req.body?.documentTypes)
+        ? req.body.documentTypes
+        : req.body?.documentTypes
+          ? [req.body.documentTypes]
+          : documentType
+            ? [documentType]
+            : [];
+      const descriptions = Array.isArray(req.body?.documentDescriptions)
+        ? req.body.documentDescriptions
+        : req.body?.documentDescriptions
+          ? [req.body.documentDescriptions]
+          : description
+            ? [description]
+            : [];
       const validTypes = [
         "title_deed",
         "annotation",
@@ -205,72 +266,98 @@ class PropertyFileController {
         "floor_plan",
         "other",
       ];
-      if (!documentType || !validTypes.includes(documentType)) {
+      if (
+        documentTypes.length === 0 ||
+        documentTypes.some((type) => !validTypes.includes(type))
+      ) {
         return responseWrapper.badRequest(
           res,
           "Invalid or missing document type"
         );
       }
-      // Kaydedilecek metadata'ya documentType'ı da yaz
-      uploadConfig.metadata.documentType = documentType;
-      // Upload sonucu kontrolü
-      if (
-        !req.uploadResults ||
-        req.uploadResults.length === 0 ||
-        !req.uploadResults[0].success
-      ) {
+
+      if (!req.uploadResults || req.uploadResults.length === 0) {
         return responseWrapper.error(res, "File upload failed");
       }
 
-      const uploadResult = req.uploadResults[0].data;
+      const successfulResults = req.uploadResults.filter((item) => item.success);
+      if (successfulResults.length === 0) {
+        return responseWrapper.error(res, "File upload failed");
+      }
 
-      // FileMetadata oluştur
-      const fileMetadata = new FileMetadata({
-        filename: uploadResult.filename,
-        originalName:
-          uploadResult.metadata?.originalName ?? uploadResult.filename, // <<<
-        mimeType: uploadResult.mimeType, // <<<
-        size: uploadResult.size,
-        directory: uploadConfig.directory,
-        url: uploadResult.url,
-        mimeType: uploadResult.mimeType || uploadResult.mimetype,
-        storageType: "local",
-        hash: uploadResult.hash,
-        uploadedBy: userId,
-        relatedModel: "Property",
-        relatedId: propertyId,
-        documentType: documentType,
-        isPublic: false,
-      });
+      if (successfulResults.length !== documentTypes.length) {
+        return responseWrapper.badRequest(
+          res,
+          "Each uploaded file must have a matching document type"
+        );
+      }
 
-      await fileMetadata.save();
+      const uploadedDocuments = [];
 
-      // Property'ye dökümanı ekle
-      const documentData = {
-        type: documentType,
-        fileId: fileMetadata._id,
-        url: fileMetadata.url,
-        fileName: fileMetadata.originalName,
-        description: description || "",
-        uploadedAt: new Date(),
-        uploadedBy: userId,
-      };
+      for (let i = 0; i < successfulResults.length; i++) {
+        const uploadResult = successfulResults[i].data;
+        const currentType = documentTypes[i];
+        const currentDescription = descriptions[i] || "";
 
-      property.documents.push(documentData);
+        const fileMetadata = new FileMetadata({
+          filename: uploadResult.filename,
+          originalName:
+            uploadResult.originalName ||
+            uploadResult.originalname ||
+            uploadResult.metadata?.originalName ||
+            uploadResult.filename,
+          mimeType: uploadResult.mimeType || uploadResult.mimetype,
+          size: uploadResult.size,
+          directory: uploadConfig.directory,
+          url: this.buildPendingPreviewUrl(),
+          path: uploadResult.path,
+          storageType: process.env.STORAGE_TYPE || "local",
+          bucket: uploadResult.bucket,
+          hash: uploadResult.hash,
+          uploadedBy: userId,
+          relatedModel: "Property",
+          relatedId: propertyId,
+          documentType: currentType,
+          isPublic: false,
+        });
 
-      // Eğer title deed veya annotation ise hızlı erişim alanlarını güncelle
-      if (documentType === "title_deed") {
-        property.titleDeedDocument = {
+        await fileMetadata.save();
+        fileMetadata.url = this.buildPreviewUrl(fileMetadata._id);
+        await fileMetadata.save();
+
+        const documentData = {
+          type: currentType,
           fileId: fileMetadata._id,
-          url: fileMetadata.url,
-          verified: false,
+          url: this.buildPreviewUrl(fileMetadata._id),
+          fileName: fileMetadata.originalName,
+          description: currentDescription,
+          uploadedAt: new Date(),
+          uploadedBy: userId,
         };
-      } else if (documentType === "annotation") {
-        property.annotationDocument = {
-          fileId: fileMetadata._id,
-          url: fileMetadata.url,
-          hasAnnotation: true,
-        };
+
+        property.documents.push(documentData);
+
+        if (currentType === "title_deed") {
+          property.titleDeedDocument = {
+            fileId: fileMetadata._id,
+            url: this.buildPreviewUrl(fileMetadata._id),
+            verified: false,
+          };
+        } else if (currentType === "annotation") {
+          property.annotationDocument = {
+            fileId: fileMetadata._id,
+            url: this.buildPreviewUrl(fileMetadata._id),
+            hasAnnotation: true,
+          };
+        }
+
+        uploadedDocuments.push({
+          id: fileMetadata._id,
+          type: currentType,
+          url: this.buildPreviewUrl(fileMetadata._id),
+          filename: fileMetadata.filename,
+          description: currentDescription,
+        });
       }
 
       await property.save();
@@ -279,15 +366,9 @@ class PropertyFileController {
         res,
         {
           propertyId: property._id,
-          document: {
-            id: fileMetadata._id,
-            type: documentType,
-            url: fileMetadata.url,
-            filename: fileMetadata.filename,
-            description: description,
-          },
+          documents: uploadedDocuments,
         },
-        "Document uploaded successfully"
+        `${uploadedDocuments.length} documents uploaded successfully`
       );
     } catch (error) {
       console.error("Property document upload error:", error);

@@ -41,8 +41,21 @@ class MulterStrategy {
         );
       }
 
+      if (
+        this.config.allowedExtensions &&
+        this.config.allowedExtensions.length > 0 &&
+        !this.config.allowedExtensions.includes(ext)
+      ) {
+        return cb(
+          new Error(`.${ext} uzantılı dosyalar kabul edilmemektedir`),
+          false
+        );
+      }
+
       // MIME type kontrolü
       if (
+        (!this.config.allowedExtensions ||
+          this.config.allowedExtensions.length === 0) &&
         this.config.allowedMimeTypes &&
         this.config.allowedMimeTypes.length > 0
       ) {

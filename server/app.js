@@ -55,6 +55,9 @@ app.use(
       },
     },
     crossOriginEmbedderPolicy: false, // Dosya önizleme için
+    crossOriginResourcePolicy: {
+      policy: "cross-origin",
+    },
   }),
 );
 

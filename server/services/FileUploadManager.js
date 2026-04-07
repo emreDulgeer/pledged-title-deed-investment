@@ -17,11 +17,13 @@ class FileUploadManager {
       // Genel ayarlar
       maxFileSize: config.maxFileSize || 100 * 1024 * 1024, // 100MB
       allowedMimeTypes: config.allowedMimeTypes || [],
+      allowedExtensions: config.allowedExtensions || [],
       blockedExtensions:
         config.blockedExtensions || this.getDefaultBlockedExtensions(),
 
       // Güvenlik ayarları
       enableVirusScan: config.enableVirusScan || false,
+      enableSecurityValidation: config.enableSecurityValidation ?? true,
       enableMagicNumberCheck: config.enableMagicNumberCheck || true,
       enableContentValidation: config.enableContentValidation || true,
       quarantineDir: config.quarantineDir || "./uploads/quarantine",
@@ -243,7 +245,14 @@ class FileUploadManager {
         data: {
           id: uploadResult.id,
           filename: uploadResult.filename,
+          originalName:
+            uploadResult.originalName ||
+            uploadResult.originalname ||
+            metadata.originalName,
           url: uploadResult.url,
+          path: uploadResult.path,
+          bucket: uploadResult.bucket,
+          storageType: this.config.storageType,
           size: metadata.size,
           directory: uploadResult.directory,
           mimeType: metadata.mimeType,
@@ -285,12 +294,23 @@ class FileUploadManager {
     if (this.config.blockedExtensions.includes(ext)) {
       throw new Error(`${ext} uzantılı dosyalar engellenmiştir`);
     }
+
+    if (
+      this.config.allowedExtensions.length > 0 &&
+      !this.config.allowedExtensions.includes(ext)
+    ) {
+      throw new Error(`${ext} uzantılı dosyalar kabul edilmemektedir`);
+    }
   }
 
   /**
    * Güvenlik kontrolleri
    */
   async performSecurityChecks(file) {
+    if (this.config.enableSecurityValidation === false) {
+      return { safe: true };
+    }
+
     // Güvenlik modülü yoksa (dev) güvenli kabul et
     if (!this.securityValidator) return { safe: true };
 
@@ -408,7 +428,11 @@ class FileUploadManager {
     }
 
     // Thumbnail oluştur
-    if (this.config.generateThumbnails && this.isImageFile(file)) {
+    if (
+      this.config.extractMetadata !== false &&
+      this.config.generateThumbnails &&
+      this.isImageFile(file)
+    ) {
       processedFile.thumbnail = await this.generateThumbnail(file);
     }
 
@@ -428,6 +452,10 @@ class FileUploadManager {
       uploadDate: new Date(),
       hash: await this.calculateHash(buffer),
     };
+
+    if (this.config.extractMetadata === false) {
+      return metadata;
+    }
 
     // Dosya tipine göre ek metadata
     if (this.isImageFile(file)) {

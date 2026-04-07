@@ -3,6 +3,7 @@ const PropertyDto = require("./PropertyDto");
 class PropertyOwnerViewDto extends PropertyDto {
   constructor(property) {
     super(property);
+    this.documents = property.documents;
 
     // Owner için detaylı istatistikler
     this.statistics = {

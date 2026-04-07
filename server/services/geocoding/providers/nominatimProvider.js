@@ -39,9 +39,45 @@ class NominatimProvider {
     try {
       await this.enforceRateLimit();
 
+      const searchParams = this._buildSearchParams(address);
+
+      const response = await axios.get(`${this.baseUrl}/search`, {
+        params: searchParams,
+        headers: {
+          "User-Agent": this.userAgent,
+        },
+      });
+
+      if (response.data && response.data.length > 0) {
+        const result = response.data[0];
+
+        return {
+          lat: parseFloat(result.lat),
+          lng: parseFloat(result.lon),
+          formattedAddress: result.display_name,
+          placeId: result.place_id?.toString(),
+          addressComponents: this._parseAddressComponents(result.address),
+        };
+      }
+
+      return null;
+    } catch (error) {
+      if (this._isStructuredQuery(address)) {
+        return await this._geocodeStructuredWithFallback(address);
+      }
+
+      logger.error("Nominatim geocoding error:", error.message);
+      throw new Error("Failed to geocode address with Nominatim");
+    }
+  }
+
+  async _geocodeStructuredWithFallback(address) {
+    try {
+      await this.enforceRateLimit();
+
       const response = await axios.get(`${this.baseUrl}/search`, {
         params: {
-          q: address,
+          q: this._buildFreeformQuery(address),
           format: "json",
           addressdetails: 1,
           limit: 1,
@@ -116,6 +152,49 @@ class NominatimProvider {
     }
   }
 
+  async search(address, options = {}) {
+    try {
+      await this.enforceRateLimit();
+
+      const query = this._buildFreeformQuery(address);
+      if (!query) {
+        return [];
+      }
+
+      const response = await axios.get(`${this.baseUrl}/search`, {
+        params: {
+          q: query,
+          format: "json",
+          addressdetails: 1,
+          limit: Math.min(options.limit || 5, 10),
+          namedetails: 1,
+          ...(options.countrycodes
+            ? { countrycodes: options.countrycodes }
+            : {}),
+        },
+        headers: {
+          "User-Agent": this.userAgent,
+        },
+      });
+
+      return (response.data || []).map((result) => ({
+        lat: parseFloat(result.lat),
+        lng: parseFloat(result.lon),
+        formattedAddress: result.display_name,
+        placeId: result.place_id?.toString(),
+        name:
+          result.namedetails?.name ||
+          result.name ||
+          result.display_name?.split(",")?.[0] ||
+          "",
+        addressComponents: this._parseAddressComponents(result.address),
+      }));
+    } catch (error) {
+      logger.error("Nominatim search error:", error.message);
+      throw new Error("Failed to search address with Nominatim");
+    }
+  }
+
   /**
    * Adres bileşenlerini parse et
    */
@@ -168,6 +247,89 @@ class NominatimProvider {
     } catch (error) {
       return false;
     }
+  }
+
+  _isStructuredQuery(address) {
+    return !!address && typeof address === "object" && !Array.isArray(address);
+  }
+
+  _buildSearchParams(address) {
+    if (!this._isStructuredQuery(address)) {
+      return {
+        q: address,
+        format: "json",
+        addressdetails: 1,
+        limit: 1,
+      };
+    }
+
+    const params = {
+      format: "json",
+      addressdetails: 1,
+      limit: 1,
+    };
+
+    const street = [address.houseNumber, address.street]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    if (address.amenity) params.amenity = address.amenity;
+    if (street) params.street = street;
+    if (address.city) params.city = address.city;
+    if (address.county) params.county = address.county;
+    if (address.state) params.state = address.state;
+    if (address.postalcode) params.postalcode = address.postalcode;
+    if (address.country) params.country = address.country;
+
+    const countryCode = this._normalizeCountryCode(
+      address.countryCode || address.country,
+    );
+    if (countryCode) {
+      params.countrycodes = countryCode.toLowerCase();
+    }
+
+    return params;
+  }
+
+  _buildFreeformQuery(address) {
+    if (!this._isStructuredQuery(address)) {
+      return address;
+    }
+
+    return [
+      [address.houseNumber, address.street].filter(Boolean).join(" ").trim(),
+      address.amenity,
+      address.city,
+      address.county,
+      address.state,
+      address.postalcode,
+      address.country,
+    ]
+      .filter(Boolean)
+      .join(", ");
+  }
+
+  _normalizeCountryCode(value) {
+    if (!value || typeof value !== "string") return null;
+    const trimmed = value.trim();
+    if (trimmed.length === 2) return trimmed;
+
+    const countryMap = {
+      turkey: "TR",
+      turkiye: "TR",
+      "türkiye": "TR",
+      usa: "US",
+      "united states": "US",
+      "united kingdom": "GB",
+      england: "GB",
+      germany: "DE",
+      france: "FR",
+      spain: "ES",
+      italy: "IT",
+    };
+
+    return countryMap[trimmed.toLowerCase()] || null;
   }
 
   /**

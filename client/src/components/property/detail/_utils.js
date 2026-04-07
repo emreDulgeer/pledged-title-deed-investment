@@ -1,6 +1,10 @@
 // _utils.js
 import { Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5001/api/v1";
+const API_ORIGIN = API_BASE_URL.replace(/\/api\/v1\/?$/, "");
+
 export const getStatusConfig = (status, t) => {
   const map = {
     draft: {
@@ -35,3 +39,14 @@ export const currencySymbol = (c) =>
   ({ USD: "$", EUR: "€", GBP: "£", TRY: "₺" }[c] || c);
 export const propertyTypeLabel = (t, type) =>
   t(`properties.types.${type}`, type);
+
+export const resolveFileUrl = (url) => {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  if (url.startsWith("/")) {
+    return `${API_ORIGIN}${url}`;
+  }
+  return `${API_ORIGIN}/${url}`;
+};

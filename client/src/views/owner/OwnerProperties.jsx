@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import bridge from "../../controllers/bridge";
+import { resolveFileUrl } from "../../components/property/detail/_utils";
 
 // ── Sabitler ─────────────────────────────────────────────────────────────────
 
@@ -227,7 +228,7 @@ const FilterBar = ({
 
 const PropertyCard = ({ property, onNavigate, showMyBadge = false }) => {
   const thumbnail =
-    property.thumbnail?.url || property.images?.[0]?.url || null;
+    resolveFileUrl(property.thumbnail?.url || property.images?.[0]?.url || "");
 
   return (
     <div
@@ -701,7 +702,9 @@ const OffersTab = () => {
             const pid = p.id || p._id;
             const isExpanded = expandedId === pid;
             const offerState = offersMap[pid];
-            const thumbnail = p.thumbnail?.url || p.images?.[0]?.url || null;
+            const thumbnail = resolveFileUrl(
+              p.thumbnail?.url || p.images?.[0]?.url || "",
+            );
 
             return (
               <div

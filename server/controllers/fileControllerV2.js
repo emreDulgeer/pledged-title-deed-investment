@@ -21,41 +21,34 @@ class FileControllerV2 {
       // Görsel yükleme
       image: new FileUploadManager({
         maxFileSize: 10 * 1024 * 1024, // 10MB
-        allowedMimeTypes: [
-          "image/jpeg",
-          "image/png",
-          "image/gif",
-          "image/webp",
-        ],
-        enableMagicNumberCheck: true,
+        allowedExtensions: ["jpg", "jpeg", "png", "gif", "webp"],
+        enableSecurityValidation: false,
+        enableMagicNumberCheck: false,
+        enableContentValidation: false,
         generateThumbnails: true,
         uploadStrategy: "multer",
-        storageType: "local",
+        storageType: process.env.STORAGE_TYPE || "local",
       }),
 
       // Döküman yükleme
       document: new FileUploadManager({
         maxFileSize: 50 * 1024 * 1024, // 50MB
-        allowedMimeTypes: [
-          "application/pdf",
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          "application/vnd.ms-excel",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        ],
-        enableVirusScan: true,
-        enableContentValidation: true,
+        allowedExtensions: ["pdf", "doc", "docx", "xls", "xlsx"],
+        enableSecurityValidation: false,
+        enableVirusScan: false,
+        enableContentValidation: false,
         uploadStrategy: "express-fileupload", // Farklı strateji
-        storageType: "local",
+        storageType: process.env.STORAGE_TYPE || "local",
       }),
 
       // Property dökümanları (kritik)
       property: new FileUploadManager({
         maxFileSize: 50 * 1024 * 1024,
-        allowedMimeTypes: ["application/pdf", "image/jpeg", "image/png"],
-        enableVirusScan: true,
-        enableMagicNumberCheck: true,
-        enableContentValidation: true,
+        allowedExtensions: ["pdf", "jpg", "jpeg", "png", "webp"],
+        enableSecurityValidation: false,
+        enableVirusScan: false,
+        enableMagicNumberCheck: false,
+        enableContentValidation: false,
         uploadStrategy: "multer",
         storageType: process.env.STORAGE_TYPE || "local",
       }),
@@ -315,29 +308,16 @@ class FileControllerV2 {
       }
 
       // Yetki kontrolü
-      if (!this.canAccessFile(metadata, req.user)) {
+      if (!(await this.canAccessFileWithContext(metadata, req.user))) {
         return responseWrapper.forbidden(res, "Bu dosyaya erişim yetkiniz yok");
       }
 
       // Storage provider'dan dosyayı al
       const manager = this.getManagerForFile(metadata);
-      // 1) Directory fallback: önce metadata.directory, olmazsa URL'den çıkar
-      let directory = metadata.directory || "general";
-      try {
-        const exists = await manager.storageProvider.exists(
-          metadata.filename,
-          directory
-        );
-        if (!exists && metadata.url) {
-          const m = metadata.url.match(/\/uploads\/([^/]+)\//);
-          if (m) directory = m[1];
-        }
-      } catch (_) {
-        /* exists zaten true/false döner; hata durumunu yutuyoruz */
-      }
+      const location = await this.resolveStorageLocation(metadata, manager);
       const fileData = await manager.storageProvider.download(
-        metadata.filename,
-        directory
+        location.filename,
+        location.directory
       );
 
       // Download log
@@ -354,7 +334,7 @@ class FileControllerV2 {
 
       res.send(fileData.buffer);
     } catch (error) {
-      if (String(e.message).includes("Dosya bulunamadı")) {
+      if (String(error.message).includes("Dosya bulunamadı")) {
         return responseWrapper.notFound(res, "Dosya bulunamadı");
       }
       console.error("Download error:", error);
@@ -377,7 +357,10 @@ class FileControllerV2 {
       }
 
       // Public değilse yetki kontrolü
-      if (!metadata.isPublic && !this.canAccessFile(metadata, req.user)) {
+      if (
+        !metadata.isPublic &&
+        !(await this.canAccessFileWithContext(metadata, req.user))
+      ) {
         return responseWrapper.forbidden(res, "Bu dosyaya erişim yetkiniz yok");
       }
 
@@ -397,9 +380,10 @@ class FileControllerV2 {
 
       // Storage provider'dan dosyayı al
       const manager = this.getManagerForFile(metadata);
+      const location = await this.resolveStorageLocation(metadata, manager);
       const fileData = await manager.storageProvider.download(
-        metadata.filename,
-        metadata.directory
+        location.filename,
+        location.directory
       );
 
       // Preview log
@@ -447,29 +431,12 @@ class FileControllerV2 {
 
       // 3) Doğru klasörü baştan çöz
       const manager = this.getManagerForFile(metadata);
-      let directory = metadata.directory || "general";
-
-      try {
-        const existsInMetaDir = await manager.storageProvider.exists(
-          metadata.filename,
-          directory
-        );
-        if (!existsInMetaDir && metadata.url) {
-          const m = metadata.url.match(/\/uploads\/([^/]+)\//);
-          if (m) directory = m[1];
-        }
-      } catch (e) {
-        // exists() hata verirse klasörü URL'den çözmeyi dene
-        if (metadata.url) {
-          const m = metadata.url.match(/\/uploads\/([^/]+)\//);
-          if (m) directory = m[1];
-        }
-      }
+      const location = await this.resolveStorageLocation(metadata, manager);
 
       // 4) Fiziksel sil (hata ENOENT ise yola devam)
       let physicallyDeleted = false;
       try {
-        await manager.storageProvider.delete(metadata.filename, directory, {
+        await manager.storageProvider.delete(location.filename, location.directory, {
           hard: hardDelete,
         });
         physicallyDeleted = true;
@@ -478,7 +445,7 @@ class FileControllerV2 {
         if (msg.includes("Dosya bulunamadı")) {
           console.warn("[FILES] Physical file already missing:", {
             filename: metadata.filename,
-            directory,
+            directory: location.directory,
           });
           // Burada 404 DÖNME!
         } else {
@@ -678,6 +645,9 @@ class FileControllerV2 {
       size: fileData.size,
       directory: fileData.directory || "general",
       url: fileData.url,
+      path: fileData.path,
+      storageType: fileData.storageType || process.env.STORAGE_TYPE || "local",
+      bucket: fileData.bucket,
       hash: fileData.hash,
       uploadedBy: user._id,
       relatedModel: fileData.relatedModel,
@@ -704,6 +674,30 @@ class FileControllerV2 {
     return metadata.isPublic;
   }
 
+  async canAccessFileWithContext(metadata, user) {
+    if (this.canAccessFile(metadata, user)) {
+      return true;
+    }
+
+    if (!user || metadata.relatedModel !== "Property" || !metadata.relatedId) {
+      return false;
+    }
+
+    const Property = require("../models/Property");
+    const property = await Property.findById(metadata.relatedId).select(
+      "owner status"
+    );
+
+    if (!property) return false;
+    if (user.role === "local_representative") return true;
+    if (String(property.owner) === String(user._id)) return true;
+    if (metadata.documentType === "property_image" && property.status === "published") {
+      return true;
+    }
+
+    return false;
+  }
+
   /**
    * Dosya için uygun manager'ı seç
    */
@@ -727,6 +721,50 @@ class FileControllerV2 {
     }
 
     return this.defaultManager;
+  }
+
+  async resolveStorageLocation(metadata, manager) {
+    if (metadata.storageType === "minio" && metadata.path) {
+      const existsAtPath = await manager.storageProvider.exists(metadata.path, "");
+      if (existsAtPath) {
+        return {
+          filename: metadata.path,
+          directory: "",
+        };
+      }
+    }
+
+    let directory = metadata.directory || "general";
+    const existsInDirectory = await manager.storageProvider.exists(
+      metadata.filename,
+      directory
+    );
+
+    if (existsInDirectory) {
+      return {
+        filename: metadata.filename,
+        directory,
+      };
+    }
+
+    if (metadata.storageType === "minio" && metadata.path) {
+      return {
+        filename: metadata.path,
+        directory: "",
+      };
+    }
+
+    if (metadata.url) {
+      const match = metadata.url.match(/\/uploads\/([^/]+)\//);
+      if (match) {
+        directory = match[1];
+      }
+    }
+
+    return {
+      filename: metadata.filename,
+      directory,
+    };
   }
 
   /**

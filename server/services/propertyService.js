@@ -21,6 +21,34 @@ class PropertyService {
     this.propertyRepository = new PropertyRepository();
   }
 
+  buildGeocodeInput(fullAddress, city, country, mapSearchAddress = "") {
+    const normalizedFullAddress =
+      mapSearchAddress?.trim?.() || fullAddress?.trim?.() || "";
+    const normalizedCity = city?.trim?.() || "";
+    const normalizedCountry = country?.trim?.() || "";
+
+    const useFreeform = normalizedFullAddress.includes(",");
+
+    if (useFreeform) {
+      const seen = new Set();
+      return [normalizedFullAddress, normalizedCity, normalizedCountry]
+        .filter(Boolean)
+        .filter((part) => {
+          const key = part.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .join(", ");
+    }
+
+    return {
+      street: normalizedFullAddress || undefined,
+      city: normalizedCity || undefined,
+      country: normalizedCountry || undefined,
+    };
+  }
+
   // Public listings iÃ§in - TÃœM FÄ°LTRELER EKLENDI
   async getPublicProperties(queryParams, userId = null) {
     // PDF'e gÃ¶re: country, city, propertyType, yield range, investment range, contract period filtrelemeleri
@@ -94,8 +122,11 @@ class PropertyService {
       throw new Error("Minimum kontrat sÃ¼resi 12 ay olmalÄ±dÄ±r");
     }
 
+    const locationPin = await this.validateAndGeocode(propertyData);
+
     const newProperty = await this.propertyRepository.create({
       ...propertyData,
+      locationPin,
       owner: ownerId,
       status: "draft",
     });
@@ -119,6 +150,29 @@ class PropertyService {
     // Status deÄŸiÅŸimi business logic
     if (updateData.status && !isAdmin) {
       delete updateData.status; // Sadece admin status deÄŸiÅŸtirebilir
+    }
+
+    const hasLocationInputs =
+      Object.prototype.hasOwnProperty.call(updateData, "locationPin") ||
+      Object.prototype.hasOwnProperty.call(updateData, "fullAddress") ||
+      Object.prototype.hasOwnProperty.call(updateData, "mapSearchAddress") ||
+      Object.prototype.hasOwnProperty.call(updateData, "city") ||
+      Object.prototype.hasOwnProperty.call(updateData, "country");
+
+    if (hasLocationInputs) {
+      const mergedLocationData = {
+        fullAddress: updateData.fullAddress ?? property.fullAddress,
+        mapSearchAddress:
+          updateData.mapSearchAddress ?? property.mapSearchAddress,
+        city: updateData.city ?? property.city,
+        country: updateData.country ?? property.country,
+        locationPin:
+          updateData.locationPin === null
+            ? null
+            : updateData.locationPin ?? property.locationPin,
+      };
+
+      updateData.locationPin = await this.validateAndGeocode(mergedLocationData);
     }
 
     const updatedProperty = await this.propertyRepository.update(
@@ -521,7 +575,14 @@ class PropertyService {
    * Frontend'den koordinat gelmezse, adres üzerinden geocoding yap
    */
   async validateAndGeocode(propertyData) {
-    const { locationPin, fullAddress, city, country } = propertyData;
+    const { locationPin, fullAddress, city, country, mapSearchAddress } =
+      propertyData;
+    const geocodeAddress = this.buildGeocodeInput(
+      fullAddress,
+      city,
+      country,
+      mapSearchAddress,
+    );
 
     // Eğer koordinat varsa, validate et
     if (locationPin && locationPin.lat && locationPin.lng) {
@@ -555,7 +616,7 @@ class PropertyService {
     // Koordinat yoksa, adresten geocode et (FALLBACK)
     if (fullAddress) {
       try {
-        const geocoded = await geocodingService.geocode(fullAddress);
+        const geocoded = await geocodingService.geocode(geocodeAddress);
         if (geocoded) {
           return {
             lat: geocoded.lat,
@@ -570,7 +631,10 @@ class PropertyService {
     // Son çare: city + country ile geocode dene
     if (city && country) {
       try {
-        const geocoded = await geocodingService.geocode(`${city}, ${country}`);
+        const geocoded = await geocodingService.geocode({
+          city,
+          country,
+        });
         if (geocoded) {
           return {
             lat: geocoded.lat,

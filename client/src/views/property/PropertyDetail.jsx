@@ -11,6 +11,7 @@ import {
   ActionButtons,
   ImageGallery,
   PropertySummary,
+  LocationMap,
   FinancialInfo,
   AdminNotes,
   FlaggedIssues,
@@ -233,6 +234,7 @@ const PropertyDetail = () => {
           />
 
           <PropertySummary property={property} t={t} />
+          <LocationMap property={property} t={t} />
           <FinancialInfo property={property} t={t} />
 
           {canEdit && property.metadata?.reviewNotes && (

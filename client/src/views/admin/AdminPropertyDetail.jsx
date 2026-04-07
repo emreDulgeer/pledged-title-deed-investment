@@ -23,6 +23,8 @@ import {
   Info,
   User,
 } from "lucide-react";
+import { resolveFileUrl } from "../../components/property/detail/_utils";
+import { LocationMap } from "../../components/property/detail";
 import bridge from "../../controllers/bridge";
 
 const AdminPropertyDetail = () => {
@@ -137,14 +139,14 @@ const AdminPropertyDetail = () => {
 
   const normImage = (img) =>
     typeof img === "string"
-      ? { url: img }
-      : { url: img?.url || img?.path || "" };
+      ? { url: resolveFileUrl(img) }
+      : { url: resolveFileUrl(img?.url || img?.path || "") };
 
   const normDoc = (d) => {
     if (typeof d === "string")
       return { url: d, type: guessType(d), verified: d.verified ?? undefined };
     return {
-      url: d?.url || d?.path || "",
+      url: resolveFileUrl(d?.url || d?.path || ""),
       type: d?.type || guessType(d?.url || d?.path || ""),
       verified: d?.verified,
       name: d?.fileName || d?.name,
@@ -356,6 +358,8 @@ const AdminPropertyDetail = () => {
               </div>
             )}
           </div>
+
+          <LocationMap property={property} t={t} />
 
           {/* Basic Info */}
           <div className="bg-day-surface dark:bg-night-surface rounded-lg border border-day-border dark:border-night-border p-6">

@@ -1,6 +1,6 @@
 import React from "react";
 import { ChevronLeft, ChevronRight, Home } from "lucide-react";
-import { getStatusConfig } from "./_utils";
+import { getStatusConfig, resolveFileUrl } from "./_utils";
 
 const ImageGallery = ({
   images = [],
@@ -14,13 +14,18 @@ const ImageGallery = ({
   const prev = () =>
     setCurrentIndex((p) => (p - 1 + images.length) % images.length);
   const { color, icon: StatusIcon, label } = getStatusConfig(status, t);
+  const currentImage = images[currentIndex];
+  const currentImageUrl =
+    typeof currentImage === "string"
+      ? resolveFileUrl(currentImage)
+      : resolveFileUrl(currentImage?.url || currentImage?.path || "");
 
   return (
     <div className="bg-day-surface dark:bg-night-surface rounded-lg shadow-lg overflow-hidden">
       {images.length ? (
         <div className="relative group">
           <img
-            src={images[currentIndex]}
+            src={currentImageUrl}
             alt={`Property ${currentIndex + 1}`}
             className="w-full h-96 object-cover cursor-pointer"
             onClick={onOpenModal}
