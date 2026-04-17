@@ -5,6 +5,10 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import bridge from "../../controllers/bridge";
 
+const statIconBaseClass =
+  "grid h-12 w-12 place-items-center rounded-xl ring-1 ring-black/5 shadow-sm";
+const statIconStrokeClass = "text-slate-950";
+
 const AdminDashboard = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -37,8 +41,11 @@ const AdminDashboard = () => {
         sortBy: "createdAt",
         sortOrder: "desc",
       });
-      console.log("Fetched pending properties:", res);
-      if (res?.success) setPendingProperties(res.data ?? []);
+      if (res?.success) {
+        setPendingProperties(
+          (res.data ?? []).filter((property) => property.status === "draft"),
+        );
+      }
     } catch (e) {
       console.error("Error fetching pending properties:", e);
     } finally {
@@ -66,10 +73,12 @@ const AdminDashboard = () => {
         {/* KYC Pending */}
         <div className="rounded-lg shadow p-6 bg-day-surface dark:bg-night-surface border border-day-border dark:border-night-border">
           <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-day-secondary-light dark:bg-night-secondary-light opacity-100">
+            <div
+              className={`${statIconBaseClass} bg-cyan-300 dark:bg-cyan-300`}
+            >
               <User
-                className="h-6 w-6 text-day-secondary dark:text-night-secondary text-opacity-100"
-                strokeWidth={2.25}
+                className={`h-6 w-6 ${statIconStrokeClass}`}
+                strokeWidth={2.6}
               />
             </div>
             <div className="ml-4">
@@ -84,10 +93,12 @@ const AdminDashboard = () => {
         {/* Properties Pending */}
         <div className="rounded-lg shadow p-6 bg-day-surface dark:bg-night-surface border border-day-border dark:border-night-border">
           <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-day-accent-light dark:bg-night-accent-light opacity-100">
+            <div
+              className={`${statIconBaseClass} bg-violet-300 dark:bg-violet-300`}
+            >
               <Home
-                className="h-6 w-6 text-day-accent dark:text-night-accent text-opacity-100"
-                strokeWidth={2.25}
+                className={`h-6 w-6 ${statIconStrokeClass}`}
+                strokeWidth={2.6}
               />
             </div>
             <div className="ml-4">
@@ -104,10 +115,12 @@ const AdminDashboard = () => {
         {/* Total Pending */}
         <div className="rounded-lg shadow p-6 bg-day-surface dark:bg-night-surface border border-day-border dark:border-night-border">
           <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-day-primary-light dark:bg-night-primary-light opacity-100">
+            <div
+              className={`${statIconBaseClass} bg-emerald-300 dark:bg-emerald-300`}
+            >
               <AlertCircle
-                className="h-6 w-6 text-day-primary dark:text-night-primary text-opacity-100"
-                strokeWidth={2.25}
+                className={`h-6 w-6 ${statIconStrokeClass}`}
+                strokeWidth={2.6}
               />
             </div>
             <div className="ml-4">
@@ -124,10 +137,12 @@ const AdminDashboard = () => {
         {/* Refresh */}
         <div className="rounded-lg shadow p-6 bg-day-surface dark:bg-night-surface border border-day-border dark:border-night-border">
           <div className="flex items-center justify-between">
-            <div className="p-3 rounded-lg bg-day-secondary-light dark:bg-night-secondary-light opacity-100">
+            <div
+              className={`${statIconBaseClass} bg-cyan-300 dark:bg-cyan-300`}
+            >
               <RefreshCw
-                className="h-6 w-6 text-day-secondary dark:text-night-secondary text-opacity-100"
-                strokeWidth={2.25}
+                className={`h-6 w-6 ${statIconStrokeClass}`}
+                strokeWidth={2.6}
               />
             </div>
             <button
@@ -151,12 +166,12 @@ const AdminDashboard = () => {
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold flex items-center">
                 <User
-                  className="h-5 w-5 mr-2 text-day-primary dark:text-night-primary"
-                  strokeWidth={2.25}
+                  className="h-5 w-5 mr-2 text-cyan-300 dark:text-cyan-300"
+                  strokeWidth={2.5}
                 />
                 {t("dashboard.users_pending_kyc")}
               </h2>
-              <span className="bg-day-secondary-light text-day-secondary dark:bg-night-secondary-light dark:text-night-secondary px-3 py-1 rounded-full text-sm font-medium">
+              <span className="bg-cyan-300 text-slate-950 dark:bg-cyan-300 dark:text-slate-950 px-3 py-1 rounded-full text-sm font-semibold">
                 {pendingUsers.length} {t("dashboard.users_count_suffix")}
               </span>
             </div>
@@ -211,12 +226,12 @@ const AdminDashboard = () => {
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold flex items-center">
                 <Home
-                  className="h-5 w-5 mr-2 text-day-accent dark:text-night-accent"
-                  strokeWidth={2.25}
+                  className="h-5 w-5 mr-2 text-violet-300 dark:text-violet-300"
+                  strokeWidth={2.5}
                 />
                 {t("dashboard.properties_pending")}
               </h2>
-              <span className="bg-day-accent-light text-day-accent dark:bg-night-accent-light dark:text-night-accent px-3 py-1 rounded-full text-sm font-medium">
+              <span className="bg-violet-300 text-slate-950 dark:bg-violet-300 dark:text-slate-950 px-3 py-1 rounded-full text-sm font-semibold">
                 {pendingProperties.length}{" "}
                 {t("dashboard.properties_count_suffix")}
               </span>
@@ -236,7 +251,7 @@ const AdminDashboard = () => {
               <div className="space-y-4 max-h-[600px] overflow-y-auto">
                 {pendingProperties.map((property) => (
                   <div
-                    key={property._id}
+                    key={property.id || property._id}
                     className="border border-day-border dark:border-night-border rounded-lg p-4 hover:shadow-md transition-shadow"
                   >
                     <div className="flex items-start justify-between">
@@ -255,7 +270,7 @@ const AdminDashboard = () => {
                       </div>
                       <button
                         onClick={() =>
-                          navigate(`/properties/my/properties/${property.id}`)
+                          navigate(`/admin/properties/${property.id || property._id}`)
                         }
                         className="p-2 rounded-lg transition-colors hover:bg-day-border/40 dark:hover:bg-night-border/40"
                         title={t("common.view")}

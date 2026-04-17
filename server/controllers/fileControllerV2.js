@@ -3,6 +3,10 @@
 const FileUploadManager = require("../services/FileUploadManager");
 const responseWrapper = require("../utils/responseWrapper");
 const FileMetadata = require("../models/FileMetadata");
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+const BlacklistedToken = require("../models/BlacklistedToken");
+const { resolveStorageDirectory } = require("../utils/fileStoragePath");
 
 class FileControllerV2 {
   constructor() {
@@ -15,7 +19,7 @@ class FileControllerV2 {
         enableMagicNumberCheck: true,
         enableContentValidation: true,
         uploadStrategy: "multer", // Default
-        storageType: "local",
+        storageType: process.env.STORAGE_TYPE || "local",
       }),
 
       // Görsel yükleme
@@ -58,6 +62,37 @@ class FileControllerV2 {
     this.defaultManager = this.managers.general;
   }
 
+  getUploadContext(req, fallbackDirectory) {
+    const relatedModel =
+      req.query.relatedModel ||
+      req.headers["x-related-model"] ||
+      (req.body && req.body.relatedModel) ||
+      "User";
+    const relatedId =
+      req.query.relatedId ||
+      req.headers["x-related-id"] ||
+      (req.body && req.body.relatedId) ||
+      req.user?._id;
+    const documentType =
+      req.query.documentType ||
+      req.headers["x-document-type"] ||
+      (req.body && req.body.documentType);
+
+    return {
+      directory:
+        req.query.directory ||
+        req.headers["x-directory"] ||
+        (req.body && req.body.directory) ||
+        fallbackDirectory,
+      metadata: {
+        relatedModel,
+        relatedId,
+        documentType,
+        uploadedBy: req.user?._id,
+      },
+    };
+  }
+
   /**
    * Tek dosya yükleme
    */
@@ -69,15 +104,10 @@ class FileControllerV2 {
         (req.body && req.body.uploadType) ||
         "general";
       const manager = this.managers[uploadType] || this.defaultManager;
+      const uploadContext = this.getUploadContext(req, uploadType);
 
       // Manager'ın middleware'ini kullan
-      const middleware = manager.middleware({
-        directory:
-          req.query.directory ||
-          req.headers["x-directory"] ||
-          (req.body && req.body.directory) ||
-          uploadType,
-      });
+      const middleware = manager.middleware(uploadContext);
 
       // Middleware'i çalıştır
       await new Promise((resolve, reject) => {
@@ -104,7 +134,10 @@ class FileControllerV2 {
         );
       }
       // Veritabanına kaydet
-      const fileMetadata = await this.saveFileMetadata(result.data, req.user);
+      const fileMetadata = await this.saveFileMetadata(
+        { ...result.data, ...uploadContext.metadata },
+        req.user
+      );
 
       return responseWrapper.created(
         res,
@@ -131,15 +164,10 @@ class FileControllerV2 {
         (req.body && req.body.uploadType) ||
         "general";
       const manager = this.managers[uploadType] || this.defaultManager;
+      const uploadContext = this.getUploadContext(req, uploadType);
 
       // Manager'ın middleware'ini kullan
-      const middleware = manager.middleware({
-        directory:
-          req.query.directory ||
-          req.headers["x-directory"] ||
-          (req.body && req.body.directory) ||
-          uploadType,
-      });
+      const middleware = manager.middleware(uploadContext);
       // Middleware'i çalıştır
       await new Promise((resolve, reject) => {
         middleware(req, res, (err) => {
@@ -158,7 +186,10 @@ class FileControllerV2 {
 
       for (const result of req.uploadResults) {
         if (result.success) {
-          const metadata = await this.saveFileMetadata(result.data, req.user);
+          const metadata = await this.saveFileMetadata(
+            { ...result.data, ...uploadContext.metadata },
+            req.user
+          );
           successful.push(metadata);
         } else {
           failed.push({
@@ -221,7 +252,7 @@ class FileControllerV2 {
       const manager = this.managers.property;
 
       const middleware = manager.middleware({
-        directory: `properties/${propertyId}`,
+        directory: `properties/${propertyId}/Documents`,
         metadata: {
           relatedModel: "Property",
           relatedId: propertyId,
@@ -299,6 +330,7 @@ class FileControllerV2 {
   download = async (req, res) => {
     try {
       const { fileId } = req.params;
+      const requestUser = await this.resolveRequestUser(req);
 
       // Metadata'yı bul
       const metadata = await FileMetadata.findById(fileId);
@@ -308,7 +340,7 @@ class FileControllerV2 {
       }
 
       // Yetki kontrolü
-      if (!(await this.canAccessFileWithContext(metadata, req.user))) {
+      if (!(await this.canAccessFileWithContext(metadata, requestUser))) {
         return responseWrapper.forbidden(res, "Bu dosyaya erişim yetkiniz yok");
       }
 
@@ -321,7 +353,7 @@ class FileControllerV2 {
       );
 
       // Download log
-      await this.logFileAccess(metadata, req.user, "download");
+      await this.logFileAccess(metadata, requestUser, "download");
 
       // Dosyayı gönder
       res.setHeader("Content-Type", metadata.mimeType);
@@ -638,21 +670,37 @@ class FileControllerV2 {
    * Dosya metadata'sını kaydet
    */
   async saveFileMetadata(fileData, user) {
+    const relatedModel =
+      fileData.relatedModel || fileData.metadata?.relatedModel;
+    const relatedId = fileData.relatedId || fileData.metadata?.relatedId;
+    const documentType =
+      fileData.documentType || fileData.metadata?.documentType;
+    const mimeType = fileData.mimeType || fileData.mimetype;
+
     const metadata = new FileMetadata({
       filename: fileData.filename,
-      originalName: fileData.originalName || fileData.filename,
-      mimeType: fileData.mimeType,
+      originalName:
+        fileData.originalName ||
+        fileData.originalname ||
+        fileData.metadata?.originalName ||
+        fileData.filename,
+      mimeType,
       size: fileData.size,
-      directory: fileData.directory || "general",
+      directory: resolveStorageDirectory({
+        directory: fileData.directory || fileData.metadata?.directory,
+        relatedModel,
+        relatedId,
+        mimeType,
+      }),
       url: fileData.url,
       path: fileData.path,
       storageType: fileData.storageType || process.env.STORAGE_TYPE || "local",
       bucket: fileData.bucket,
       hash: fileData.hash,
       uploadedBy: user._id,
-      relatedModel: fileData.relatedModel,
-      relatedId: fileData.relatedId,
-      documentType: fileData.documentType,
+      relatedModel,
+      relatedId,
+      documentType,
       metadata: fileData.metadata,
       isPublic: false,
       isDeleted: false,
@@ -721,6 +769,50 @@ class FileControllerV2 {
     }
 
     return this.defaultManager;
+  }
+
+  async resolveRequestUser(req) {
+    if (req.user) {
+      return req.user;
+    }
+
+    const token = req.query?.token;
+    if (!token) {
+      return null;
+    }
+
+    if (await BlacklistedToken.isBlacklisted(token)) {
+      return null;
+    }
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const user = await User.findById(decoded.userId).select(
+        "_id email role fullName accountStatus"
+      );
+
+      if (!user) {
+        return null;
+      }
+
+      if (
+        user.accountStatus === "suspended" ||
+        user.accountStatus === "deleted" ||
+        user.accountStatus === "pending_deletion"
+      ) {
+        return null;
+      }
+
+      return {
+        _id: user._id,
+        id: user._id.toString(),
+        email: user.email,
+        role: user.role,
+        fullName: user.fullName,
+      };
+    } catch (error) {
+      return null;
+    }
   }
 
   async resolveStorageLocation(metadata, manager) {

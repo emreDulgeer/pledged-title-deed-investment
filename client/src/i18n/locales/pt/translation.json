@@ -74,6 +74,10 @@
     "types": {
       "contract": "Contrato",
       "title_deed": "Escritura",
+      "annotation": "Anotacao",
+      "valuation_report": "Relatorio de Avaliacao",
+      "tax_document": "Documento Fiscal",
+      "floor_plan": "Planta",
       "payment_receipt": "Recibo de Pagamento",
       "rental_receipt": "Recibo de Aluguel",
       "notary_document": "Documento de Cartório",
@@ -599,7 +603,11 @@
       "confirm_delete": "Tem certeza de que deseja excluir as propriedades selecionadas?",
       "confirm_bulk_action": "Aplicar esta ação a todos os itens selecionados?",
       "no_properties": "Nenhuma propriedade encontrada.",
-      "subtitle": "Revisar, aprovar, rejeitar e gerenciar todas as propriedades"
+      "subtitle": "Revisar, aprovar, rejeitar e gerenciar todas as propriedades",
+      "tabs": {
+        "draft": "Fila de Rascunhos",
+        "other": "Outras Propriedades"
+      }
     }
   },
   "errors": {

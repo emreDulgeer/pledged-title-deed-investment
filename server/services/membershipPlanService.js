@@ -365,7 +365,10 @@ class MembershipPlanService {
     try {
       const updates = orderUpdates.map((update) => ({
         id: update.planId,
-        data: { order: update.order },
+        data: {
+          order: update.order,
+          tier: update.order + 1,
+        },
       }));
 
       await membershipPlanRepository.bulkUpdate(updates);

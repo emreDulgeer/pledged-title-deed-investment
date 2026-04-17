@@ -1,7 +1,9 @@
 // src/controllers/fileController.js
+import axios from "axios";
 import apiClient from "../api/client";
+import { tokenManager } from "../api/client";
 
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5001/api/v1";
 
 const fileController = {
   upload: async (formData, type = "document") => {
@@ -22,9 +24,25 @@ const fileController = {
     return `${BASE_URL}${path}`;
   },
 
+  getDownloadUrl: (fileId) => {
+    if (!fileId) return "";
+
+    const token = tokenManager.getAccessToken();
+    const downloadUrl = new URL(`${BASE_URL}/files/download/${fileId}`);
+
+    if (token) {
+      downloadUrl.searchParams.set("token", token);
+    }
+
+    return downloadUrl.toString();
+  },
+
   download: async (fileId) => {
-    return await apiClient.get(`/files/download/${fileId}`, {
+    const token = tokenManager.getAccessToken();
+
+    return await axios.get(`${BASE_URL}/files/download/${fileId}`, {
       responseType: "blob",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
   },
 
@@ -46,6 +64,21 @@ const fileController = {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
+  },
+
+  triggerBrowserDownload: (url, filename) => {
+    if (!url) return;
+
+    const link = document.createElement("a");
+    link.href = url;
+
+    if (filename) {
+      link.download = filename;
+    }
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   },
 
   validateFile: (file, options = {}) => {

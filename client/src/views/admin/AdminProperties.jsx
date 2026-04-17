@@ -1,7 +1,7 @@
 // src/views/admin/AdminProperties.jsx
 import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   fetchProperties,
@@ -11,7 +11,6 @@ import {
   selectPropertyLoading,
   selectPropertyError,
   setFilters,
-  clearFilters,
   deleteProperty,
 } from "../../store/slices/propertySlice";
 import {
@@ -29,14 +28,39 @@ import {
   Hotel,
   RefreshCw,
   Download,
-  Plus,
 } from "lucide-react";
+import { resolveFileUrl } from "../../components/property/detail/_utils";
 
 const AdminProperties = () => {
   const { t } = useTranslation();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") === "draft" ? "draft" : "other";
   const getPropId = (p) => (p?._id ?? p?.id)?.toString() ?? "";
+  const getEntryFileId = (entry) => {
+    if (!entry || typeof entry === "string") return "";
+    const rawId =
+      entry.id ||
+      entry._id ||
+      entry.fileId?._id ||
+      entry.fileId?.id ||
+      entry.fileId;
+    return rawId ? String(rawId) : "";
+  };
+  const getImageUrl = (image) => {
+    if (!image) return "";
+    if (typeof image === "string") {
+      return resolveFileUrl(image);
+    }
+
+    return (
+      resolveFileUrl(image.url || image.path || "") ||
+      (getEntryFileId(image)
+        ? resolveFileUrl(`/api/v1/files/preview/${getEntryFileId(image)}`)
+        : "")
+    );
+  };
   // Redux state
   const properties = useSelector(selectProperties);
   const pagination = useSelector(selectPropertyPagination);
@@ -62,6 +86,46 @@ const AdminProperties = () => {
 
   const [selectedProperties, setSelectedProperties] = useState([]);
   const [bulkAction, setBulkAction] = useState("");
+  const tabItems = [
+    { key: "other", label: t("admin.properties.tabs.other") },
+    { key: "draft", label: t("admin.properties.tabs.draft") },
+  ];
+  const appliedFilterCount = Object.entries(localFilters).filter(
+    ([key, value]) => {
+      if (value === "" || value === null || value === undefined) {
+        return false;
+      }
+
+      if (key === "status" && activeTab === "draft") {
+        return false;
+      }
+
+      if (key === "sortBy" || key === "sortOrder") {
+        return false;
+      }
+
+      return true;
+    }
+  ).length;
+
+  const getTabScopedFilters = (tabKey, baseFilters = {}) => {
+    const nextFilters = { ...baseFilters };
+
+    if (tabKey === "draft") {
+      nextFilters.status = "draft";
+      delete nextFilters.statusMode;
+      return nextFilters;
+    }
+
+    if (!nextFilters.status || nextFilters.status === "draft") {
+      nextFilters.status = "";
+      nextFilters.statusMode = "nonDraft";
+    } else {
+      delete nextFilters.statusMode;
+    }
+
+    return nextFilters;
+  };
 
   // Property type icons
   const propertyTypeIcons = {
@@ -74,16 +138,46 @@ const AdminProperties = () => {
 
   // Fetch properties on mount and filter changes
   useEffect(() => {
-    fetchPropertiesData();
-  }, [filters]);
+    const cleaned = Object.fromEntries(
+      Object.entries({
+        ...getTabScopedFilters(activeTab, filters),
+        page: filters.page || 1,
+        limit: filters.limit || 10,
+      }).filter(([, value]) => value !== "" && value !== null && value !== undefined)
+    );
+
+    dispatch(fetchProperties(cleaned));
+  }, [activeTab, dispatch, filters]);
+
+  useEffect(() => {
+    setLocalFilters((prev) => ({
+      ...prev,
+      status:
+        activeTab === "draft"
+          ? "draft"
+          : prev.status === "draft"
+            ? ""
+            : prev.status,
+    }));
+
+    dispatch(
+      setFilters(
+        getTabScopedFilters(activeTab, {
+          ...filters,
+          page: 1,
+        })
+      )
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const fetchPropertiesData = () => {
     const cleaned = Object.fromEntries(
       Object.entries({
-        ...filters,
+        ...getTabScopedFilters(activeTab, filters),
         page: filters.page || 1,
         limit: filters.limit || 10,
-      }).filter(([v]) => v !== "" && v !== null && v !== undefined)
+      }).filter(([, value]) => value !== "" && value !== null && value !== undefined)
     );
     dispatch(fetchProperties(cleaned));
   };
@@ -98,15 +192,23 @@ const AdminProperties = () => {
 
   // Apply filters
   const applyFilters = () => {
-    dispatch(setFilters({ ...filters, ...localFilters, page: 1 }));
+    dispatch(
+      setFilters(
+        getTabScopedFilters(activeTab, {
+          ...filters,
+          ...localFilters,
+          page: 1,
+        })
+      )
+    );
     setShowFilters(false);
   };
 
   // Clear all filters
   const handleClearFilters = () => {
-    setLocalFilters({
+    const resetFilters = {
       search: "",
-      status: "",
+      status: activeTab === "draft" ? "draft" : "",
       propertyType: "",
       country: "",
       city: "",
@@ -116,8 +218,18 @@ const AdminProperties = () => {
       maxSize: "",
       sortBy: "createdAt",
       sortOrder: "desc",
-    });
-    dispatch(clearFilters());
+    };
+
+    setLocalFilters(resetFilters);
+    dispatch(
+      setFilters(
+        getTabScopedFilters(activeTab, {
+          ...resetFilters,
+          page: 1,
+          limit: filters.limit || 10,
+        })
+      )
+    );
   };
 
   // Pagination
@@ -206,9 +318,9 @@ const AdminProperties = () => {
           >
             <Filter className="h-4 w-4" />
             {t("common.filters")}
-            {Object.keys(filters).length > 2 && (
+            {appliedFilterCount > 0 && (
               <span className="ml-1 px-1.5 py-0.5 text-xs bg-day-accent dark:bg-night-accent text-white rounded-full">
-                {Object.keys(filters).length - 2}
+                {appliedFilterCount}
               </span>
             )}
           </button>
@@ -217,6 +329,31 @@ const AdminProperties = () => {
             {t("common.export")}
           </button>
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 overflow-x-auto border-b border-day-border dark:border-night-border">
+        {tabItems.map((tab) => {
+          const isActive = tab.key === activeTab;
+
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => {
+                const nextParams = new URLSearchParams(searchParams);
+                nextParams.set("tab", tab.key);
+                setSearchParams(nextParams);
+              }}
+              className={`border-b-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+                isActive
+                  ? "border-day-accent text-day-accent dark:border-night-accent dark:text-night-accent"
+                  : "border-transparent text-day-text/60 dark:text-night-text/60 hover:text-day-text dark:hover:text-night-text"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters Panel */}
@@ -257,20 +394,26 @@ const AdminProperties = () => {
               <select
                 value={localFilters.status}
                 onChange={(e) => handleFilterChange("status", e.target.value)}
+                disabled={activeTab === "draft"}
                 className="w-full px-3 py-2 border border-day-border dark:border-night-border rounded-lg bg-white dark:bg-night-surface-light focus:ring-2 focus:ring-day-accent dark:focus:ring-night-accent"
               >
                 <option value="">{t("common.all")}</option>
-                <option value="published">
-                  {t("properties.status.published")}
-                </option>
-                <option value="draft">{t("properties.status.draft")}</option>
-                <option value="pending_review">
-                  {t("properties.status.pending_review")}
-                </option>
-                <option value="rejected">
-                  {t("properties.status.rejected")}
-                </option>
-                <option value="sold">{t("properties.status.sold")}</option>
+                {activeTab === "draft" ? (
+                  <option value="draft">{t("properties.status.draft")}</option>
+                ) : (
+                  <>
+                    <option value="published">
+                      {t("properties.status.published")}
+                    </option>
+                    <option value="pending_review">
+                      {t("properties.status.pending_review")}
+                    </option>
+                    <option value="rejected">
+                      {t("properties.status.rejected")}
+                    </option>
+                    <option value="sold">{t("properties.status.sold")}</option>
+                  </>
+                )}
               </select>
             </div>
 
@@ -544,7 +687,7 @@ const AdminProperties = () => {
               ) : (
                 properties.map((property) => (
                   <tr
-                    key={property._id}
+                    key={getPropId(property)}
                     className="hover:bg-day-border/5 dark:hover:bg-night-border/5 transition-colors"
                   >
                     <td className="p-4">
@@ -568,9 +711,17 @@ const AdminProperties = () => {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        {property.images?.[0] && (
+                        {getImageUrl(
+                          property.images?.find((img) => img?.isPrimary) ||
+                            property.images?.[0] ||
+                            property.thumbnail,
+                        ) && (
                           <img
-                            src={property.images[0]}
+                            src={getImageUrl(
+                              property.images?.find((img) => img?.isPrimary) ||
+                                property.images?.[0] ||
+                                property.thumbnail,
+                            )}
                             alt={property.title}
                             className="h-10 w-10 rounded-lg object-cover"
                           />
@@ -645,7 +796,7 @@ const AdminProperties = () => {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() =>
-                            navigate(`/admin/properties/${property.id}`)
+                            navigate(`/admin/properties/${getPropId(property)}`)
                           }
                           className="p-1.5 rounded hover:bg-day-border/20 dark:hover:bg-night-border/20 transition-colors"
                           title={t("common.view")}

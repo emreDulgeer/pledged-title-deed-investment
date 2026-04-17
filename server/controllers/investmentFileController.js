@@ -8,8 +8,34 @@ const InvestmentService = require("../services/investmentService");
 
 class InvestmentFileController {
   constructor() {
-    this.fileUploadManager = new FileUploadManager();
     this.investmentService = new InvestmentService();
+  }
+
+  createInvestmentUploadManager({
+    maxFileSize,
+    allowedExtensions,
+    generateThumbnails = false,
+  }) {
+    return new FileUploadManager({
+      maxFileSize,
+      allowedExtensions,
+      enableSecurityValidation: false,
+      enableMagicNumberCheck: false,
+      enableContentValidation: false,
+      generateThumbnails,
+      extractMetadata: false,
+      uploadStrategy: "multer",
+      storageType: process.env.STORAGE_TYPE || "local",
+      cloudConfig: {
+        endPoint: process.env.MINIO_ENDPOINT,
+        port: process.env.MINIO_PORT,
+        useSSL: process.env.MINIO_USE_SSL,
+        accessKey: process.env.MINIO_ACCESS_KEY,
+        secretKey: process.env.MINIO_SECRET_KEY,
+        bucket: process.env.MINIO_BUCKET,
+        publicBaseUrl: process.env.MINIO_PUBLIC_URL,
+      },
+    });
   }
 
   /**
@@ -54,7 +80,7 @@ class InvestmentFileController {
 
       // FileUploadManager kullanarak dosyayı yükle
       const uploadConfig = {
-        directory: `investments/${investmentId}/contracts`,
+        directory: `investments/${investmentId}/Documents`,
         metadata: {
           relatedModel: "Investment",
           relatedId: investmentId,
@@ -68,7 +94,12 @@ class InvestmentFileController {
       };
 
       // Upload middleware'i oluştur
-      const uploadMiddleware = this.fileUploadManager.middleware({
+      const uploadManager = this.createInvestmentUploadManager({
+        maxFileSize: 10 * 1024 * 1024,
+        allowedExtensions: ["pdf"],
+      });
+
+      const uploadMiddleware = uploadManager.middleware({
         fieldConfig: { mode: "array", fieldName: "file", maxCount: 10 },
         ...uploadConfig,
       });
@@ -99,12 +130,17 @@ class InvestmentFileController {
       const fileMetadata = new FileMetadata({
         filename: uploadResult.filename,
         originalName:
-          uploadResult.metadata?.originalName ?? uploadResult.filename,
+          uploadResult.originalName ||
+          uploadResult.originalname ||
+          uploadResult.metadata?.originalName ||
+          uploadResult.filename,
         mimeType: uploadResult.mimeType || uploadResult.mimetype,
         size: uploadResult.size,
-        directory: uploadConfig.directory,
+        directory: uploadResult.directory || uploadConfig.directory,
         url: uploadResult.url,
-        storageType: "local",
+        path: uploadResult.path,
+        bucket: uploadResult.bucket,
+        storageType: process.env.STORAGE_TYPE || "local",
         hash: uploadResult.hash,
         uploadedBy: userId,
         relatedModel: "Investment",
@@ -187,7 +223,7 @@ class InvestmentFileController {
 
       // FileUploadManager kullanarak dosyayı yükle
       const uploadConfig = {
-        directory: `investments/${investmentId}/title-deeds`,
+        directory: `investments/${investmentId}/Documents`,
         metadata: {
           relatedModel: "Investment",
           relatedId: investmentId,
@@ -205,7 +241,12 @@ class InvestmentFileController {
         },
       };
 
-      const uploadMiddleware = this.fileUploadManager.middleware({
+      const uploadManager = this.createInvestmentUploadManager({
+        maxFileSize: 20 * 1024 * 1024,
+        allowedExtensions: ["pdf", "jpg", "jpeg", "png"],
+      });
+
+      const uploadMiddleware = uploadManager.middleware({
         fieldConfig: { mode: "array", fieldName: "file", maxCount: 10 },
         ...uploadConfig,
       });
@@ -234,13 +275,17 @@ class InvestmentFileController {
       const fileMetadata = new FileMetadata({
         filename: uploadResult.filename,
         originalName:
-          uploadResult.metadata?.originalName ?? uploadResult.filename,
+          uploadResult.originalName ||
+          uploadResult.originalname ||
+          uploadResult.metadata?.originalName ||
+          uploadResult.filename,
         mimeType: uploadResult.mimeType || uploadResult.mimetype,
         size: uploadResult.size,
-        directory: uploadConfig.directory,
+        directory: uploadResult.directory || uploadConfig.directory,
         url: uploadResult.url,
         path: uploadResult.path,
-        storageType: "local",
+        storageType: process.env.STORAGE_TYPE || "local",
+        bucket: uploadResult.bucket,
         hash: uploadResult.hash,
         uploadedBy: userId,
         relatedModel: "Investment",
@@ -313,7 +358,7 @@ class InvestmentFileController {
 
       // FileUploadManager kullanarak dosyayı yükle
       const uploadConfig = {
-        directory: `investments/${investmentId}/receipts`,
+        directory: `investments/${investmentId}/Documents`,
         metadata: {
           relatedModel: "Investment",
           relatedId: investmentId,
@@ -331,7 +376,12 @@ class InvestmentFileController {
         },
       };
 
-      const uploadMiddleware = this.fileUploadManager.middleware({
+      const uploadManager = this.createInvestmentUploadManager({
+        maxFileSize: 5 * 1024 * 1024,
+        allowedExtensions: ["pdf", "jpg", "jpeg", "png"],
+      });
+
+      const uploadMiddleware = uploadManager.middleware({
         fieldConfig: { mode: "array", fieldName: "file", maxCount: 10 },
         ...uploadConfig,
       });
@@ -357,13 +407,18 @@ class InvestmentFileController {
 
       const fileMetadata = new FileMetadata({
         filename: uploadResult.filename,
-        originalName: uploadResult.originalName,
-        mimeType: uploadResult.mimetype,
+        originalName:
+          uploadResult.originalName ||
+          uploadResult.originalname ||
+          uploadResult.metadata?.originalName ||
+          uploadResult.filename,
+        mimeType: uploadResult.mimeType || uploadResult.mimetype,
         size: uploadResult.size,
-        directory: uploadConfig.directory,
+        directory: uploadResult.directory || uploadConfig.directory,
         url: uploadResult.url,
         path: uploadResult.path,
-        storageType: "local",
+        storageType: process.env.STORAGE_TYPE || "local",
+        bucket: uploadResult.bucket,
         hash: uploadResult.hash,
         uploadedBy: userId,
         relatedModel: "Investment",
@@ -449,7 +504,7 @@ class InvestmentFileController {
 
       // FileUploadManager kullanarak dosyayı yükle
       const uploadConfig = {
-        directory: `investments/${investmentId}/rental-receipts/${month}`,
+        directory: `investments/${investmentId}/Documents`,
         metadata: {
           relatedModel: "Investment",
           relatedId: investmentId,
@@ -468,7 +523,12 @@ class InvestmentFileController {
         },
       };
 
-      const uploadMiddleware = this.fileUploadManager.middleware({
+      const uploadManager = this.createInvestmentUploadManager({
+        maxFileSize: 5 * 1024 * 1024,
+        allowedExtensions: ["pdf", "jpg", "jpeg", "png"],
+      });
+
+      const uploadMiddleware = uploadManager.middleware({
         fieldConfig: { mode: "array", fieldName: "file", maxCount: 10 },
         ...uploadConfig,
       });
@@ -495,13 +555,18 @@ class InvestmentFileController {
 
       const fileMetadata = new FileMetadata({
         filename: uploadResult.filename,
-        originalName: uploadResult.originalName,
-        mimeType: uploadResult.mimetype,
+        originalName:
+          uploadResult.originalName ||
+          uploadResult.originalname ||
+          uploadResult.metadata?.originalName ||
+          uploadResult.filename,
+        mimeType: uploadResult.mimeType || uploadResult.mimetype,
         size: uploadResult.size,
-        directory: uploadConfig.directory,
+        directory: uploadResult.directory || uploadConfig.directory,
         url: uploadResult.url,
         path: uploadResult.path,
-        storageType: "local",
+        storageType: process.env.STORAGE_TYPE || "local",
+        bucket: uploadResult.bucket,
         hash: uploadResult.hash,
         uploadedBy: userId,
         relatedModel: "Investment",
@@ -550,6 +615,7 @@ class InvestmentFileController {
       const userId = req.user._id;
       const userRole = req.user.role;
       const investmentId = req.params.id;
+      const { documentType, description } = req.body;
 
       // Document type kontrolü
       const validTypes = [
@@ -558,7 +624,7 @@ class InvestmentFileController {
         "tax_receipt",
         "other",
       ];
-      if (!validTypes.includes(documentType)) {
+      if (!documentType || !validTypes.includes(documentType)) {
         return responseWrapper.badRequest(res, "Invalid document type");
       }
 
@@ -591,7 +657,7 @@ class InvestmentFileController {
 
       // FileUploadManager kullanarak dosyayı yükle
       const uploadConfig = {
-        directory: `investments/${investmentId}/documents`,
+        directory: `investments/${investmentId}/Documents`,
         metadata: {
           relatedModel: "Investment",
           relatedId: investmentId,
@@ -609,7 +675,12 @@ class InvestmentFileController {
         },
       };
 
-      const uploadMiddleware = this.fileUploadManager.middleware({
+      const uploadManager = this.createInvestmentUploadManager({
+        maxFileSize: 10 * 1024 * 1024,
+        allowedExtensions: ["pdf", "jpg", "jpeg", "png"],
+      });
+
+      const uploadMiddleware = uploadManager.middleware({
         fieldConfig: { mode: "array", fieldName: "file", maxCount: 10 },
         ...uploadConfig,
       });
@@ -620,13 +691,6 @@ class InvestmentFileController {
           else resolve();
         });
       });
-      const { documentType, description } = req.body;
-      if (!documentType || !validTypes.includes(documentType)) {
-        return responseWrapper.badRequest(
-          res,
-          "Invalid or missing document type"
-        );
-      }
       if (
         !req.uploadResults ||
         req.uploadResults.length === 0 ||
@@ -642,13 +706,18 @@ class InvestmentFileController {
 
       const fileMetadata = new FileMetadata({
         filename: uploadResult.filename,
-        originalName: uploadResult.originalName,
-        mimeType: uploadResult.mimetype,
+        originalName:
+          uploadResult.originalName ||
+          uploadResult.originalname ||
+          uploadResult.metadata?.originalName ||
+          uploadResult.filename,
+        mimeType: uploadResult.mimeType || uploadResult.mimetype,
         size: uploadResult.size,
-        directory: uploadConfig.directory,
+        directory: uploadResult.directory || uploadConfig.directory,
         url: uploadResult.url,
         path: uploadResult.path,
-        storageType: "local",
+        storageType: process.env.STORAGE_TYPE || "local",
+        bucket: uploadResult.bucket,
         hash: uploadResult.hash,
         uploadedBy: userId,
         relatedModel: "Investment",

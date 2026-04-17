@@ -75,6 +75,10 @@
     "types": {
       "contract": "Contract",
       "title_deed": "Title Deed",
+      "annotation": "Annotation",
+      "valuation_report": "Valuation Report",
+      "tax_document": "Tax Document",
+      "floor_plan": "Floor Plan",
       "payment_receipt": "Payment Receipt",
       "rental_receipt": "Rental Receipt",
       "notary_document": "Notary Document",
@@ -601,7 +605,11 @@
       "confirm_delete": "Are you sure you want to delete the selected property(ies)?",
       "confirm_bulk_action": "Apply this action to all selected items?",
       "no_properties": "No properties found.",
-      "subtitle": "Review, approve, reject, and manage all properties"
+      "subtitle": "Review, approve, reject, and manage all properties",
+      "tabs": {
+        "draft": "Draft Queue",
+        "other": "Other Properties"
+      }
     }
   },
   "errors": {

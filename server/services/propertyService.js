@@ -278,13 +278,23 @@ class PropertyService {
 
   // Admin iÃ§in tÃ¼m property'ler - PAGINATION VE FÄ°LTRELEME EKLENDÄ°
   async getAllPropertiesForAdmin(queryParams) {
+    const { statusMode, ...sanitizedQueryParams } = queryParams;
     const options = {
       populate: "owner",
       allowedFilters: { ...propertyFilters, status: "exact" },
       allowedSortFields: [...propertySortFields, "status"],
     };
 
-    const result = await this.propertyRepository.paginate(queryParams, options);
+    if (statusMode === "nonDraft" && !sanitizedQueryParams.status) {
+      options.customFilters = {
+        status: { $ne: "draft" },
+      };
+    }
+
+    const result = await this.propertyRepository.paginate(
+      sanitizedQueryParams,
+      options,
+    );
     return {
       data: result.data.map((p) => toPropertyAdminViewDto(p)),
       pagination: result.pagination,

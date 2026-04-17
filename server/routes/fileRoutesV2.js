@@ -51,7 +51,12 @@ router.post(
 );
 
 // Dosya indirme
-router.get("/download/:fileId", auth, downloadLimiter, fileController.download);
+router.get(
+  "/download/:fileId",
+  auth.optional,
+  downloadLimiter,
+  fileController.download
+);
 
 // Dosya silme
 router.delete(

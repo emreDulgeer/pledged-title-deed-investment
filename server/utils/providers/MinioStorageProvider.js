@@ -1,6 +1,7 @@
 const { Client } = require("minio");
 const path = require("path");
 const crypto = require("crypto");
+const { resolveStorageDirectory } = require("../fileStoragePath");
 
 class MinioStorageProvider {
   constructor(config = {}) {
@@ -114,9 +115,12 @@ class MinioStorageProvider {
   }
 
   determineDirectory(file, metadata) {
-    if (metadata?.directory) return metadata.directory;
-    if ((file.mimetype || "").startsWith("image/")) return "images";
-    return "general";
+    return resolveStorageDirectory({
+      directory: metadata?.directory,
+      relatedModel: metadata?.relatedModel,
+      relatedId: metadata?.relatedId,
+      mimeType: metadata?.mimeType || file.mimetype || file.type,
+    });
   }
 
   generateUniqueFilename(originalName, hash = "") {

@@ -26,6 +26,7 @@ import AdminPropertyDetail from "./views/admin/AdminPropertyDetail";
 import AdminInvestments from "./views/admin/AdminInvestments";
 import AdminInvestmentDetail from "./views/admin/AdminInvestmentDetail";
 import AdminMembershipPlans from "./views/admin/AdminMembershipPlans";
+import AdminUserDirectory from "./views/admin/AdminUserDirectory";
 import PropertyDetail from "./views/property/PropertyDetail";
 import AdminProperties from "./views/admin/AdminProperties";
 import PrivateRoute from "./routes/PrivateRoute";
@@ -182,6 +183,18 @@ const AppContent = () => {
           <Route path="membership-plans" element={<AdminMembershipPlans />} />
           <Route path="investments" element={<AdminInvestments />} />
           <Route path="investments/:id" element={<AdminInvestmentDetail />} />
+          <Route
+            path="users"
+            element={<AdminUserDirectory mode="users" />}
+          />
+          <Route
+            path="investors"
+            element={<AdminUserDirectory mode="investors" />}
+          />
+          <Route
+            path="property-owners"
+            element={<AdminUserDirectory mode="propertyOwners" />}
+          />
         </Route>
 
         {/* Investor (nested) */}
@@ -231,7 +244,10 @@ const AppContent = () => {
           path="/auth/admin/pending-kyc/:userId"
           element={<AdminPendingKycDetail />}
         />
-        <Route path="/admin/properties/:id" element={<PropertyDetail />} />
+        <Route
+          path="/admin/properties/:propertyId"
+          element={<AdminPropertyDetail />}
+        />
         <Route path="/owner/properties/:id" element={<PropertyDetail />} />
 
         <Route

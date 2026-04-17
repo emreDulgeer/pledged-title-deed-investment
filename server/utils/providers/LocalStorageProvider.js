@@ -3,6 +3,7 @@
 const fs = require("fs").promises;
 const path = require("path");
 const crypto = require("crypto");
+const { resolveStorageDirectory } = require("../fileStoragePath");
 
 class LocalStorageProvider {
   constructor(config) {
@@ -27,7 +28,9 @@ class LocalStorageProvider {
       const subdirs = [
         "images",
         "documents",
+        "users",
         "properties",
+        "investments",
         "profiles",
         "general",
       ];
@@ -323,37 +326,12 @@ class LocalStorageProvider {
    * Dizin belirle
    */
   determineDirectory(file, metadata) {
-    // Metadata'dan dizin bilgisi
-    if (metadata.directory) {
-      return metadata.directory;
-    }
-
-    // MIME type'a göre
-    const mimeType = file.mimetype || file.type || "";
-
-    if (mimeType.startsWith("image/")) {
-      return "images";
-    }
-
-    if (
-      mimeType === "application/pdf" ||
-      mimeType.includes("document") ||
-      mimeType.includes("msword") ||
-      mimeType.includes("spreadsheet")
-    ) {
-      return "documents";
-    }
-
-    // Model tipine göre
-    if (metadata.relatedModel === "Property") {
-      return "properties";
-    }
-
-    if (metadata.relatedModel === "User") {
-      return "profiles";
-    }
-
-    return "general";
+    return resolveStorageDirectory({
+      directory: metadata?.directory,
+      relatedModel: metadata?.relatedModel,
+      relatedId: metadata?.relatedId,
+      mimeType: metadata?.mimeType || file.mimetype || file.type,
+    });
   }
 
   /**

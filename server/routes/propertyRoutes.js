@@ -43,7 +43,7 @@ router.get(
 router.get(
   "/my/properties/:id",
   auth,
-  authorize(["property_owner"]),
+  authorize(["property_owner", "admin"]),
   propertyController.getMyPropertyById,
 );
 

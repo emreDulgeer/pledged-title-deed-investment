@@ -27,10 +27,46 @@ import { resolveFileUrl } from "../../components/property/detail/_utils";
 import { LocationMap } from "../../components/property/detail";
 import bridge from "../../controllers/bridge";
 
+const getEntryFileId = (entry) => {
+  if (!entry) return "";
+
+  if (typeof entry === "string") {
+    return "";
+  }
+
+  const rawId =
+    entry.id ||
+    entry._id ||
+    entry.fileId?._id ||
+    entry.fileId?.id ||
+    entry.fileId;
+
+  return rawId ? String(rawId) : "";
+};
+
+const getPreviewUrl = (entry) => {
+  const fileId = getEntryFileId(entry);
+  return fileId ? resolveFileUrl(`/api/v1/files/preview/${fileId}`) : "";
+};
+
+const prettifyDocType = (type = "") =>
+  String(type)
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
+const getFileExtension = (value = "") => {
+  const cleanValue = String(value).split("?")[0];
+  const parts = cleanValue.split(".");
+  return parts.length > 1 ? parts.pop() : "";
+};
+
 const AdminPropertyDetail = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { propertyId } = useParams();
+  const { propertyId: propertyIdParam, id } = useParams();
+  const propertyId = propertyIdParam || id;
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [property, setProperty] = useState(null);
@@ -43,6 +79,8 @@ const AdminPropertyDetail = () => {
   const [showFlagModal, setShowFlagModal] = useState(false);
   const [flagInput, setFlagInput] = useState("");
   const [flags, setFlags] = useState([]);
+  const listTab = property?.status === "draft" ? "draft" : "other";
+  const propertiesListPath = `/admin/properties?tab=${listTab}`;
 
   useEffect(() => {
     fetchProperty();
@@ -52,16 +90,34 @@ const AdminPropertyDetail = () => {
   const fetchProperty = async () => {
     setLoading(true);
     try {
-      // Admin görünümü: sadece ID ile getir
-      const res = await bridge.properties.getMyPropertyById(propertyId);
-      if (res?.success && res.data) {
-        setProperty(res.data);
+      const [propertyResult, filesResult] = await Promise.allSettled([
+        bridge.properties.getMyPropertyById(propertyId),
+        bridge.properties.getFiles(propertyId),
+      ]);
+
+      const propertyRes =
+        propertyResult.status === "fulfilled" ? propertyResult.value : null;
+      const filesRes =
+        filesResult.status === "fulfilled" ? filesResult.value : null;
+
+      if (propertyRes?.success && propertyRes.data) {
+        setProperty({
+          ...propertyRes.data,
+          images:
+            filesRes?.success && Array.isArray(filesRes.data?.images)
+              ? filesRes.data.images
+              : propertyRes.data.images,
+          documents:
+            filesRes?.success && Array.isArray(filesRes.data?.documents)
+              ? filesRes.data.documents
+              : propertyRes.data.documents,
+        });
       } else {
-        navigate("/admin/dashboard");
+        navigate("/admin/properties");
       }
     } catch (e) {
       console.error("Error fetching property details:", e);
-      navigate("/admin/dashboard");
+      navigate("/admin/properties");
     } finally {
       setLoading(false);
     }
@@ -136,20 +192,37 @@ const AdminPropertyDetail = () => {
 
   const images = Array.isArray(property?.images) ? property.images : [];
   const docs = Array.isArray(property?.documents) ? property.documents : [];
+  const docTypeLabel = (type) =>
+    t(`documents.types.${type}`, prettifyDocType(type) || t("common.file"));
 
   const normImage = (img) =>
     typeof img === "string"
       ? { url: resolveFileUrl(img) }
-      : { url: resolveFileUrl(img?.url || img?.path || "") };
+      : {
+          id: getEntryFileId(img),
+          url: resolveFileUrl(img?.url || img?.path || "") || getPreviewUrl(img),
+        };
 
   const normDoc = (d) => {
     if (typeof d === "string")
-      return { url: d, type: guessType(d), verified: d.verified ?? undefined };
+      return {
+        id: "",
+        url: resolveFileUrl(d),
+        type: guessType(d),
+        verified: undefined,
+        name: "",
+      };
     return {
-      url: resolveFileUrl(d?.url || d?.path || ""),
+      id: getEntryFileId(d),
+      url: resolveFileUrl(d?.url || d?.path || "") || getPreviewUrl(d),
       type: d?.type || guessType(d?.url || d?.path || ""),
       verified: d?.verified,
-      name: d?.fileName || d?.name,
+      name:
+        d?.fileName ||
+        d?.name ||
+        d?.originalName ||
+        d?.fileId?.originalName ||
+        d?.fileId?.filename,
     };
   };
 
@@ -167,6 +240,27 @@ const AdminPropertyDetail = () => {
 
   const canDecide = property?.status === "draft";
 
+  const handleDownloadDocument = async (doc) => {
+    if (!doc?.id) {
+      return;
+    }
+
+    try {
+      const extension = getFileExtension(doc.name || doc.url);
+      const filename = doc.name || `${docTypeLabel(doc.type)}${extension ? `.${extension}` : ""}`;
+      const downloadUrl = bridge.files.getDownloadUrl(doc.id);
+
+      if (!downloadUrl) {
+        throw new Error("Download URL could not be created");
+      }
+
+      bridge.files.triggerBrowserDownload(downloadUrl, filename);
+    } catch (error) {
+      console.error("Property document download error:", error);
+      alert(t("common.error"));
+    }
+  };
+
   const handleApprove = async () => {
     // Not girmek istiyorsa modalı açalım (eski confirm yerine modal kullanacağız)
     setShowApproveModal(true);
@@ -182,7 +276,7 @@ const AdminPropertyDetail = () => {
       );
       if (res?.success) {
         alert(t("admin.property.approve_success"));
-        navigate("/admin/dashboard");
+        navigate("/admin/properties?tab=draft");
       } else {
         alert(t("admin.property.approve_error"));
       }
@@ -209,7 +303,7 @@ const AdminPropertyDetail = () => {
       );
       if (res?.success) {
         alert(t("admin.property.reject_success"));
-        navigate("/admin/dashboard");
+        navigate("/admin/properties?tab=draft");
       } else {
         alert(t("admin.property.reject_error"));
       }
@@ -248,7 +342,7 @@ const AdminPropertyDetail = () => {
       {/* Header */}
       <div className="mb-6">
         <button
-          onClick={() => navigate("/admin/dashboard")}
+          onClick={() => navigate(propertiesListPath)}
           className="flex items-center gap-2 text-day-text/70 dark:text-night-text/70 hover:text-day-text dark:hover:text-night-text transition-colors mb-4"
         >
           <ArrowLeft className="h-5 w-5" />
@@ -458,7 +552,7 @@ const AdminPropertyDetail = () => {
                         <FileText className="h-5 w-5 text-day-text/50 dark:text-night-text/50" />
                         <div>
                           <p className="font-medium text-sm">
-                            {doc.name || doc.type?.toUpperCase()}
+                            {doc.name || docTypeLabel(doc.type)}
                           </p>
                           {typeof doc.verified === "boolean" && (
                             <p className="text-xs text-day-text/60 dark:text-night-text/60">
@@ -469,15 +563,17 @@ const AdminPropertyDetail = () => {
                           )}
                         </div>
                       </div>
-                      {doc.url && (
-                        <a
-                          href={doc.url}
-                          download
+                      {doc.id && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadDocument(doc);
+                          }}
                           className="p-2 hover:bg-day-border/20 dark:hover:bg-night-border/20 rounded-lg transition-colors"
-                          onClick={(e) => e.stopPropagation()}
                         >
                           <Download className="h-4 w-4" />
-                        </a>
+                        </button>
                       )}
                     </div>
                   );

@@ -29,7 +29,7 @@ class PropertyFileController {
       enableSecurityValidation: false,
       enableMagicNumberCheck: false,
       enableContentValidation: false,
-      generateThumbnails: false,
+      generateThumbnails,
       extractMetadata: false,
       uploadStrategy: "multer",
       storageType: process.env.STORAGE_TYPE || "local",
@@ -69,7 +69,7 @@ class PropertyFileController {
 
       // FileUploadManager kullanarak dosyaları yükle
       const uploadConfig = {
-        directory: `properties/${propertyId}/images`,
+        directory: `properties/${propertyId}/Images`,
         metadata: {
           relatedModel: "Property",
           relatedId: propertyId,
@@ -131,7 +131,7 @@ class PropertyFileController {
             uploadData.filename,
           mimeType: uploadData.mimeType,
           size: uploadData.size,
-          directory: uploadConfig.directory,
+          directory: uploadData.directory || uploadConfig.directory,
           url: this.buildPendingPreviewUrl(),
           path: uploadData.path,
           storageType: process.env.STORAGE_TYPE || "local",
@@ -214,7 +214,7 @@ class PropertyFileController {
 
       // FileUploadManager kullanarak dosyayı yükle
       const uploadConfig = {
-        directory: `properties/${propertyId}/documents`,
+        directory: `properties/${propertyId}/Documents`,
         metadata: {
           relatedModel: "Property",
           relatedId: propertyId,
@@ -308,7 +308,7 @@ class PropertyFileController {
             uploadResult.filename,
           mimeType: uploadResult.mimeType || uploadResult.mimetype,
           size: uploadResult.size,
-          directory: uploadConfig.directory,
+          directory: uploadResult.directory || uploadConfig.directory,
           url: this.buildPendingPreviewUrl(),
           path: uploadResult.path,
           storageType: process.env.STORAGE_TYPE || "local",
@@ -529,8 +529,11 @@ class PropertyFileController {
       const propertyId = req.params.propertyId || req.params.id;
 
       const property = await Property.findById(propertyId)
-        .populate("images.fileId", "_id filename size createdAt")
-        .populate("documents.fileId", "_id filename size createdAt");
+        .populate("images.fileId", "_id filename originalName mimeType size createdAt")
+        .populate(
+          "documents.fileId",
+          "_id filename originalName mimeType size createdAt"
+        );
 
       if (!property) {
         return responseWrapper.notFound(res, "Property not found");

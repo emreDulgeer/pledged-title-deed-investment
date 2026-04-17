@@ -110,6 +110,19 @@ router.post(
 );
 
 /**
+ * @route   PUT /api/membership-plans/admin/order
+ * @desc    Plan sıralamasını güncelle
+ * @access  Admin
+ * @body    { orders: [{ planId, order }] }
+ */
+router.put(
+  "/admin/order",
+  auth,
+  authorize(["admin"]),
+  membershipPlanController.updatePlanOrder
+);
+
+/**
  * @route   PUT /api/membership-plans/admin/:id
  * @desc    Plan güncelle
  * @access  Admin
@@ -170,19 +183,6 @@ router.post(
   auth,
   authorize(["admin"]),
   membershipPlanController.updatePromotion
-);
-
-/**
- * @route   PUT /api/membership-plans/admin/order
- * @desc    Plan sıralamasını güncelle
- * @access  Admin
- * @body    { orders: [{ planId, order }] }
- */
-router.put(
-  "/admin/order",
-  auth,
-  authorize(["admin"]),
-  membershipPlanController.updatePlanOrder
 );
 
 /**

@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const { fileTypeFromBuffer } = require("file-type");
 const sharp = require("sharp");
 const pdfParse = require("pdf-parse");
+const { resolveStorageDirectory } = require("../utils/fileStoragePath");
 
 /**
  * Modüler File Upload Manager
@@ -229,7 +230,7 @@ class FileUploadManager {
       const processedFile = await this.processFile(file, options);
 
       // 6. Metadata oluştur
-      const metadata = await this.generateMetadata(processedFile);
+      const metadata = await this.generateMetadata(processedFile, options);
 
       // 7. Storage'a yükle
       const uploadResult = await this.storageProvider.upload(
@@ -442,15 +443,28 @@ class FileUploadManager {
   /**
    * Metadata oluştur
    */
-  async generateMetadata(file) {
+  async generateMetadata(file, options = {}) {
     const buffer = await this.getFileBuffer(file);
+    const optionMetadata = options.metadata || {};
+    const mimeType = file.mimetype || file.type;
 
     const metadata = {
+      ...optionMetadata,
       originalName: file.originalname || file.name,
       size: file.size || buffer.length,
-      mimeType: file.mimetype || file.type,
+      mimeType,
       uploadDate: new Date(),
       hash: await this.calculateHash(buffer),
+      relatedModel: optionMetadata.relatedModel,
+      relatedId: optionMetadata.relatedId,
+      documentType: optionMetadata.documentType,
+      uploadedBy: optionMetadata.uploadedBy,
+      directory: resolveStorageDirectory({
+        directory: options.directory || optionMetadata.directory,
+        relatedModel: optionMetadata.relatedModel,
+        relatedId: optionMetadata.relatedId,
+        mimeType,
+      }),
     };
 
     if (this.config.extractMetadata === false) {

@@ -67,6 +67,7 @@ const AdminMembershipPlans = () => {
 
   useEffect(() => {
     fetchPlans();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [includeInactive]);
 
   // Handle create/edit
@@ -200,7 +201,13 @@ const AdminMembershipPlans = () => {
   // Handle reorder
   const handleReorder = async (reorderedPlans) => {
     try {
-      const orders = reorderedPlans.map((plan, index) => ({
+      const plansWithUpdatedTier = reorderedPlans.map((plan, index) => ({
+        ...plan,
+        order: index,
+        tier: index + 1,
+      }));
+
+      const orders = plansWithUpdatedTier.map((plan, index) => ({
         planId: plan._id,
         order: index,
       }));
@@ -213,7 +220,7 @@ const AdminMembershipPlans = () => {
             "Plans reordered successfully",
         })
       );
-      setPlans(reorderedPlans);
+      setPlans(plansWithUpdatedTier);
     } catch (error) {
       console.error("Error reordering plans:", error);
       dispatch(

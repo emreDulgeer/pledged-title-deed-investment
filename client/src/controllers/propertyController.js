@@ -63,6 +63,10 @@ const propertyController = {
     return await apiClient.get(`/properties/my/properties/${id}`);
   },
 
+  getFiles: async (id) => {
+    return await apiClient.get(`/properties/${id}/files`);
+  },
+
   getMyPropertiesStatistics: async () => {
     return await apiClient.get("/properties/my/statistics");
   },

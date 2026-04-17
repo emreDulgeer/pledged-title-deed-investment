@@ -1,6 +1,13 @@
 import React from "react";
 import { FileText, Download, Shield } from "lucide-react";
 
+const prettifyDocType = (type = "") =>
+  String(type)
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
 const DocumentsList = ({ documents = [], t }) => {
   if (!documents.length) return null;
 
@@ -20,7 +27,11 @@ const DocumentsList = ({ documents = [], t }) => {
             <div className="flex items-center gap-3">
               <FileText className="w-5 h-5 text-day-text/70 dark:text-night-text/70" />
               <span className="text-day-text/90 dark:text-night-text/90">
-                {doc.name || `Document ${index + 1}`}
+                {doc.name ||
+                  t(
+                    `documents.types.${doc.type}`,
+                    prettifyDocType(doc.type) || `Document ${index + 1}`,
+                  )}
               </span>
               {doc.verified && (
                 <Shield className="w-4 h-4 text-day-primary dark:text-night-primary" />

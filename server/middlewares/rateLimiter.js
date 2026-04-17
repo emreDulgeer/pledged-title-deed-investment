@@ -6,7 +6,7 @@ const { ipKeyGenerator } = rateLimit;
 // Light limiter - Genel API istekleri için
 const light = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 dakika
-  max: 100, // 100 istek
+  max: 150, // 150 istek
   message: {
     success: false,
     message: "Çok fazla istek gönderdiniz, lütfen biraz bekleyin",
@@ -18,7 +18,7 @@ const light = rateLimit({
 // Moderate limiter - Orta seviye işlemler için
 const moderate = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 dakika
-  max: 50, // 50 istek
+  max: 75, // 75 istek
   message: {
     success: false,
     message: "İstek limiti aşıldı, lütfen 1 dakika bekleyin",
@@ -45,7 +45,7 @@ const strict = rateLimit({
 // Upload limiter - Dosya yükleme için
 const uploadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 dakika
-  max: 50, // Dakikada 10 yükleme
+  max: 75, // 15 dakikada 75 yükleme
   message: {
     success: false,
     message: "Çok fazla dosya yükleme isteği. Lütfen 1 dakika bekleyin",
@@ -69,7 +69,7 @@ const uploadLimiter = rateLimit({
 // Download limiter - Dosya indirme için
 const downloadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 dakika
-  max: 100, // Dakikada 30 indirme
+  max: 150, // 15 dakikada 150 indirme
   message: {
     success: false,
     message: "Çok fazla indirme isteği. Lütfen biraz bekleyin",
@@ -135,7 +135,7 @@ const dynamicRoleLimiter = (req, res, next) => {
       // Admin'ler için yüksek limit
       limiter = createCustomLimiter({
         windowMs: 1 * 60 * 1000,
-        max: 1000,
+        max: 1500,
       });
       break;
     case "property_owner":
@@ -143,14 +143,14 @@ const dynamicRoleLimiter = (req, res, next) => {
       // Normal kullanıcılar için orta limit
       limiter = createCustomLimiter({
         windowMs: 1 * 60 * 1000,
-        max: 200,
+        max: 300,
       });
       break;
     default:
       // Misafirler için düşük limit
       limiter = createCustomLimiter({
         windowMs: 1 * 60 * 1000,
-        max: 50,
+        max: 75,
       });
   }
 
