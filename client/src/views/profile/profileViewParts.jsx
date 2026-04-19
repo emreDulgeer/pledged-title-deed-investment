@@ -8,7 +8,10 @@ import {
   ShieldCheck,
   UserRound,
 } from "lucide-react";
-import { resolveFileUrl } from "../../components/property/detail/_utils";
+import {
+  getPropertyImageStyle,
+  getPropertyImageUrl,
+} from "../../utils/propertyImages";
 
 export const ROLE_LABELS = {
   admin: "Admin",
@@ -57,7 +60,7 @@ export const StatCard = ({ label, value }) => (
 
 export const PropertyCard = ({ property, detailPath }) => {
   const Wrapper = detailPath ? Link : "div";
-  const thumbnail = property.thumbnail ? resolveFileUrl(property.thumbnail) : "";
+  const thumbnailUrl = getPropertyImageUrl(property.thumbnail);
   const wrapperProps = detailPath ? { to: detailPath } : {};
 
   return (
@@ -68,11 +71,12 @@ export const PropertyCard = ({ property, detailPath }) => {
       }`}
     >
       <div className="h-40 bg-day-background dark:bg-night-background">
-        {thumbnail ? (
+        {thumbnailUrl ? (
           <img
-            src={thumbnail}
+            src={thumbnailUrl}
             alt={`${property.city || "Property"} cover`}
             className="h-full w-full object-cover"
+            style={getPropertyImageStyle(property.thumbnail)}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-day-text/40 dark:text-night-text/40">

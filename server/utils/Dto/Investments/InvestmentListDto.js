@@ -1,5 +1,7 @@
 // server/utils/dto/Investments/InvestmentListDto.js
 
+const { getPrimaryPropertyImage } = require("../../propertyImages");
+
 class InvestmentListDto {
   constructor(investment) {
     this.id = investment._id;
@@ -15,10 +17,7 @@ class InvestmentListDto {
         country: investment.property.country,
         city: investment.property.city,
         propertyType: investment.property.propertyType,
-        thumbnail:
-          investment.property.images && investment.property.images.length > 0
-            ? investment.property.images[0]
-            : null,
+        thumbnail: getPrimaryPropertyImage(investment.property),
       };
 
       // Beklenen toplam gelir

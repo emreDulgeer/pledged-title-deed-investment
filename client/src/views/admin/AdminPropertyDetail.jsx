@@ -28,6 +28,7 @@ import { LocationMap } from "../../components/property/detail";
 import bridge from "../../controllers/bridge";
 import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
 import OfficialDataCheckModal from "../../components/property/modals/OfficialDataCheckModal";
+import { getPropertyImageStyle } from "../../utils/propertyImages";
 
 const getEntryFileId = (entry) => {
   if (!entry) return "";
@@ -207,6 +208,7 @@ const AdminPropertyDetail = () => {
       : {
           id: getEntryFileId(img),
           url: resolveFileUrl(img?.url || img?.path || "") || getPreviewUrl(img),
+          presentation: img?.presentation || null,
         };
 
   const normDoc = (d) => {
@@ -423,6 +425,9 @@ const AdminPropertyDetail = () => {
                     src={normImage(images[currentImageIndex]).url}
                     alt={`Image ${currentImageIndex + 1}`}
                     className="w-full h-96 object-cover rounded-lg"
+                    style={getPropertyImageStyle(
+                      normImage(images[currentImageIndex]),
+                    )}
                   />
 
                   {images.length > 1 && (
@@ -467,6 +472,7 @@ const AdminPropertyDetail = () => {
                             ? "ring-2 ring-day-accent dark:ring-night-accent"
                             : "opacity-70 hover:opacity-100"
                         }`}
+                        style={getPropertyImageStyle(normImage(im))}
                       />
                     ))}
                   </div>

@@ -3,7 +3,11 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import bridge from "../../controllers/bridge";
-import { resolveFileUrl } from "../../components/property/detail/_utils";
+import {
+  getPrimaryPropertyImage,
+  getPropertyImageStyle,
+  getPropertyImageUrl,
+} from "../../utils/propertyImages";
 
 // ── Sabitler ─────────────────────────────────────────────────────────────────
 
@@ -227,8 +231,8 @@ const FilterBar = ({
 // ── Property kartı (All / My / Invested tabları için) ─────────────────────────
 
 const PropertyCard = ({ property, onNavigate, showMyBadge = false }) => {
-  const thumbnail =
-    resolveFileUrl(property.thumbnail?.url || property.images?.[0]?.url || "");
+  const thumbnail = getPrimaryPropertyImage(property);
+  const thumbnailUrl = getPropertyImageUrl(thumbnail);
 
   return (
     <div
@@ -237,11 +241,12 @@ const PropertyCard = ({ property, onNavigate, showMyBadge = false }) => {
     >
       {/* Resim */}
       <div className="relative h-44 bg-day-background dark:bg-night-background">
-        {thumbnail ? (
+        {thumbnailUrl ? (
           <img
-            src={thumbnail}
+            src={thumbnailUrl}
             alt={property.city}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            style={getPropertyImageStyle(thumbnail)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-4xl text-day-text/20 dark:text-night-text/20">
@@ -702,9 +707,8 @@ const OffersTab = () => {
             const pid = p.id || p._id;
             const isExpanded = expandedId === pid;
             const offerState = offersMap[pid];
-            const thumbnail = resolveFileUrl(
-              p.thumbnail?.url || p.images?.[0]?.url || "",
-            );
+            const thumbnail = getPrimaryPropertyImage(p);
+            const thumbnailUrl = getPropertyImageUrl(thumbnail);
 
             return (
               <div
@@ -715,11 +719,12 @@ const OffersTab = () => {
                 <div className="flex items-center gap-4 p-4">
                   {/* Küçük resim */}
                   <div className="w-16 h-16 rounded-lg bg-day-background dark:bg-night-background shrink-0 overflow-hidden">
-                    {thumbnail ? (
+                    {thumbnailUrl ? (
                       <img
-                        src={thumbnail}
+                        src={thumbnailUrl}
                         alt={p.city}
                         className="w-full h-full object-cover"
+                        style={getPropertyImageStyle(thumbnail)}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-2xl">

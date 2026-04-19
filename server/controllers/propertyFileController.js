@@ -4,6 +4,24 @@ const responseWrapper = require("../utils/responseWrapper");
 const FileUploadManager = require("../services/FileUploadManager");
 const FileMetadata = require("../models/FileMetadata");
 const Property = require("../models/Property");
+const {
+  clampPercentage,
+  normalizePropertyImagePresentation,
+} = require("../utils/propertyImages");
+
+const toRequestArray = (value) =>
+  Array.isArray(value) ? value : value !== undefined ? [value] : [];
+
+const parseImageWarnings = (value) => {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch (error) {
+    return [];
+  }
+};
 
 class PropertyFileController {
   constructor() {
@@ -109,8 +127,30 @@ class PropertyFileController {
 
       const uploadedImages = [];
       const currentImageCount = property.images?.length || 0;
+      const imageFocusX = toRequestArray(req.body?.imageFocusX);
+      const imageFocusY = toRequestArray(req.body?.imageFocusY);
+      const imageCropPreset = toRequestArray(req.body?.imageCropPreset);
+      const imageWidth = toRequestArray(req.body?.imageWidth);
+      const imageHeight = toRequestArray(req.body?.imageHeight);
+      const imageWarnings = toRequestArray(req.body?.imageWarnings);
+      const requestedPrimaryIndex = Number.parseInt(req.body?.primaryImageIndex, 10);
+      const hasRequestedPrimary =
+        Number.isInteger(requestedPrimaryIndex) &&
+        requestedPrimaryIndex >= 0 &&
+        requestedPrimaryIndex < req.uploadResults.length;
+
+      if (hasRequestedPrimary) {
+        property.images.forEach((image) => {
+          image.isPrimary = false;
+          image.presentation = normalizePropertyImagePresentation(image, {
+            role: "gallery",
+          });
+        });
+      }
 
       // Her resim için FileMetadata oluştur ve Property'ye ekle
+      let primaryAssigned = property.images.some((image) => image?.isPrimary);
+
       for (let i = 0; i < req.uploadResults.length; i++) {
         const result = req.uploadResults[i];
 
@@ -142,28 +182,76 @@ class PropertyFileController {
           relatedId: propertyId,
           documentType: "property_image",
           isPublic: true,
+          metadata: {
+            dimensions: uploadData.metadata?.dimensions,
+            format: uploadData.metadata?.format,
+          },
         });
 
         await fileMetadata.save();
         fileMetadata.url = this.buildPreviewUrl(fileMetadata._id);
         await fileMetadata.save();
 
+        const qualityWidth = Number.parseInt(imageWidth[i], 10);
+        const qualityHeight = Number.parseInt(imageHeight[i], 10);
+        const isSelectedPrimary =
+          hasRequestedPrimary && i === requestedPrimaryIndex;
+        const shouldBePrimary =
+          isSelectedPrimary || (!primaryAssigned && !hasRequestedPrimary);
+        const presentation = normalizePropertyImagePresentation(null, {
+          role: shouldBePrimary ? "cover" : "gallery",
+          focusX: imageFocusX[i],
+          focusY: imageFocusY[i],
+          cropPreset: imageCropPreset[i],
+        });
+
         // Property'ye ekle
         const imageData = {
           fileId: fileMetadata._id,
           url: this.buildPreviewUrl(fileMetadata._id),
-          isPrimary: currentImageCount === 0 && i === 0, // İlk resim primary
+          isPrimary: shouldBePrimary,
+          presentation,
+          quality: {
+            width:
+              Number.isFinite(qualityWidth) && qualityWidth > 0
+                ? qualityWidth
+                : uploadData.metadata?.dimensions?.width,
+            height:
+              Number.isFinite(qualityHeight) && qualityHeight > 0
+                ? qualityHeight
+                : uploadData.metadata?.dimensions?.height,
+            aspectRatio:
+              Number.isFinite(qualityWidth) &&
+              Number.isFinite(qualityHeight) &&
+              qualityWidth > 0 &&
+              qualityHeight > 0
+                ? Number((qualityWidth / qualityHeight).toFixed(3))
+                : undefined,
+            sizeBytes: uploadData.size,
+            warnings: parseImageWarnings(imageWarnings[i]),
+          },
           order: currentImageCount + i,
           uploadedAt: new Date(),
         };
 
         property.images.push(imageData);
+        primaryAssigned = primaryAssigned || shouldBePrimary;
         uploadedImages.push({
           id: fileMetadata._id,
           url: this.buildPreviewUrl(fileMetadata._id),
           filename: fileMetadata.filename,
           isPrimary: imageData.isPrimary,
+          presentation: imageData.presentation,
+          quality: imageData.quality,
         });
+      }
+
+      if (!property.images.some((image) => image?.isPrimary) && property.images.length) {
+        property.images[0].isPrimary = true;
+        property.images[0].presentation = normalizePropertyImagePresentation(
+          property.images[0],
+          { role: "cover" },
+        );
       }
 
       // Property'yi kaydet
@@ -575,6 +663,8 @@ class PropertyFileController {
             id: String(fid),
             url: img.url,
             isPrimary: !!img.isPrimary,
+            presentation: img.presentation || null,
+            quality: img.quality || null,
             order: img.order ?? 0,
             uploadedAt: img.uploadedAt || img.fileId?.createdAt || null,
           };
@@ -647,10 +737,17 @@ class PropertyFileController {
       // Tüm görsellerin isPrimary değerini false yap
       property.images.forEach((img) => {
         img.isPrimary = false;
+        img.presentation = normalizePropertyImagePresentation(img, {
+          role: "gallery",
+        });
       });
 
       // Seçilen görseli primary yap
       property.images[imageIndex].isPrimary = true;
+      property.images[imageIndex].presentation = normalizePropertyImagePresentation(
+        property.images[imageIndex],
+        { role: "cover" },
+      );
 
       await property.save();
 

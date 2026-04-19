@@ -29,8 +29,12 @@ import {
   RefreshCw,
   Download,
 } from "lucide-react";
-import { resolveFileUrl } from "../../components/property/detail/_utils";
 import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
+import {
+  getPrimaryPropertyImage,
+  getPropertyImageStyle,
+  getPropertyImageUrl,
+} from "../../utils/propertyImages";
 
 const AdminProperties = () => {
   const { t } = useTranslation();
@@ -39,29 +43,6 @@ const AdminProperties = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") === "draft" ? "draft" : "other";
   const getPropId = (p) => (p?._id ?? p?.id)?.toString() ?? "";
-  const getEntryFileId = (entry) => {
-    if (!entry || typeof entry === "string") return "";
-    const rawId =
-      entry.id ||
-      entry._id ||
-      entry.fileId?._id ||
-      entry.fileId?.id ||
-      entry.fileId;
-    return rawId ? String(rawId) : "";
-  };
-  const getImageUrl = (image) => {
-    if (!image) return "";
-    if (typeof image === "string") {
-      return resolveFileUrl(image);
-    }
-
-    return (
-      resolveFileUrl(image.url || image.path || "") ||
-      (getEntryFileId(image)
-        ? resolveFileUrl(`/api/v1/files/preview/${getEntryFileId(image)}`)
-        : "")
-    );
-  };
   // Redux state
   const properties = useSelector(selectProperties);
   const pagination = useSelector(selectPropertyPagination);
@@ -711,20 +692,18 @@ const AdminProperties = () => {
                       />
                     </td>
                     <td className="p-4">
+                      {(() => {
+                        const thumbnail = getPrimaryPropertyImage(property);
+                        const thumbnailUrl = getPropertyImageUrl(thumbnail);
+
+                        return (
                       <div className="flex items-center gap-3">
-                        {getImageUrl(
-                          property.images?.find((img) => img?.isPrimary) ||
-                            property.images?.[0] ||
-                            property.thumbnail,
-                        ) && (
+                        {thumbnailUrl && (
                           <img
-                            src={getImageUrl(
-                              property.images?.find((img) => img?.isPrimary) ||
-                                property.images?.[0] ||
-                                property.thumbnail,
-                            )}
+                            src={thumbnailUrl}
                             alt={property.title}
                             className="h-10 w-10 rounded-lg object-cover"
+                            style={getPropertyImageStyle(thumbnail)}
                           />
                         )}
                         <div>
@@ -739,6 +718,8 @@ const AdminProperties = () => {
                           </p>
                         </div>
                       </div>
+                        );
+                      })()}
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-1.5">

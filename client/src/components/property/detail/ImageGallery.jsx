@@ -1,6 +1,7 @@
 import React from "react";
 import { ChevronLeft, ChevronRight, Home } from "lucide-react";
 import { getStatusConfig, resolveFileUrl } from "./_utils";
+import { getPropertyImageStyle } from "../../../utils/propertyImages";
 
 const ImageGallery = ({
   images = [],
@@ -28,6 +29,7 @@ const ImageGallery = ({
             src={currentImageUrl}
             alt={`Property ${currentIndex + 1}`}
             className="w-full h-96 object-cover cursor-pointer"
+            style={getPropertyImageStyle(currentImage)}
             onClick={onOpenModal}
           />
 

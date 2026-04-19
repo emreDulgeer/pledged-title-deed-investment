@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const Property = require("../models/Property");
 const Investment = require("../models/Investment");
+const { getPrimaryPropertyImage } = require("../utils/propertyImages");
 
 class ProfileService {
   async getProfileById(userId, viewer = null) {
@@ -102,9 +103,7 @@ class ProfileService {
   }
 
   mapPropertySummary(property, isPrivateView = false) {
-    const primaryImage = Array.isArray(property.images)
-      ? property.images.find((image) => image?.isPrimary) || property.images[0]
-      : null;
+    const primaryImage = getPrimaryPropertyImage(property);
 
     return {
       id: String(property._id),
@@ -119,7 +118,7 @@ class ProfileService {
       contractPeriodMonths: property.contractPeriodMonths ?? null,
       status: property.status,
       createdAt: property.createdAt || null,
-      thumbnail: primaryImage?.url || null,
+      thumbnail: primaryImage || null,
     };
   }
 

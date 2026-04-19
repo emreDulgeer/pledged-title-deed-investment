@@ -3,6 +3,10 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import InvestmentController from "../../controllers/investmentController";
 import { useTranslation } from "react-i18next";
+import {
+  getPropertyImageStyle,
+  getPropertyImageUrl,
+} from "../../utils/propertyImages";
 
 const InvestorRentalPayments = () => {
   const navigate = useNavigate();
@@ -298,9 +302,12 @@ const InvestorRentalPayments = () => {
                   <div className="flex items-center space-x-3">
                     {group.investment?.property?.thumbnail && (
                       <img
-                        src={group.investment.property.thumbnail}
+                        src={getPropertyImageUrl(group.investment.property.thumbnail)}
                         alt={group.investment.property.city}
                         className="w-12 h-12 rounded-lg object-cover"
+                        style={getPropertyImageStyle(
+                          group.investment.property.thumbnail,
+                        )}
                       />
                     )}
                     <div>

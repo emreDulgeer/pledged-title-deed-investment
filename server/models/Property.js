@@ -40,6 +40,36 @@ const PropertySchema = new mongoose.Schema(
           type: Boolean,
           default: false,
         },
+        presentation: {
+          role: {
+            type: String,
+            enum: ["cover", "gallery"],
+            default: "gallery",
+          },
+          focusX: {
+            type: Number,
+            min: 0,
+            max: 100,
+            default: 50,
+          },
+          focusY: {
+            type: Number,
+            min: 0,
+            max: 100,
+            default: 50,
+          },
+          cropPreset: {
+            type: String,
+            default: "16:9",
+          },
+        },
+        quality: {
+          width: Number,
+          height: Number,
+          aspectRatio: Number,
+          sizeBytes: Number,
+          warnings: [String],
+        },
         order: Number,
         uploadedAt: Date,
       },
@@ -177,6 +207,30 @@ Rent = ${this.rentOffered}, Yield = ${this.annualYieldPercent}`,
     if (!hasPrimary) {
       this.images[0].isPrimary = true;
     }
+
+    this.images.forEach((img, index) => {
+      if (!img.presentation) {
+        img.presentation = {};
+      }
+
+      img.presentation.role = img.isPrimary ? "cover" : "gallery";
+
+      if (typeof img.presentation.focusX !== "number") {
+        img.presentation.focusX = 50;
+      }
+
+      if (typeof img.presentation.focusY !== "number") {
+        img.presentation.focusY = 50;
+      }
+
+      if (!img.presentation.cropPreset) {
+        img.presentation.cropPreset = "16:9";
+      }
+
+      if (typeof img.order !== "number") {
+        img.order = index;
+      }
+    });
   }
 
   next();

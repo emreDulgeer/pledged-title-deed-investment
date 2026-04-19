@@ -1,3 +1,5 @@
+const { getPrimaryPropertyImage } = require("../../propertyImages");
+
 class PropertyListDto {
   constructor(property) {
     this.id = property._id;
@@ -15,8 +17,7 @@ class PropertyListDto {
     this.trustScore = property.trustScore;
     this.description = property.description;
 
-    this.thumbnail =
-      property.images && property.images.length > 0 ? property.images[0] : null;
+    this.thumbnail = getPrimaryPropertyImage(property);
 
     // PDF'e göre ilan kartında görünmesi gereken ek bilgiler
     if (property.owner && typeof property.owner === "object") {

@@ -7,9 +7,23 @@ export const LocationPinPropTypes = {
 };
 
 export const PropertyImagePropTypes = {
-  fileId: PropTypes.string.isRequired,
+  fileId: PropTypes.oneOfType([PropTypes.string, PropTypes.object]),
+  id: PropTypes.string,
   url: PropTypes.string,
   isPrimary: PropTypes.bool,
+  presentation: PropTypes.shape({
+    role: PropTypes.oneOf(["cover", "gallery"]),
+    focusX: PropTypes.number,
+    focusY: PropTypes.number,
+    cropPreset: PropTypes.string,
+  }),
+  quality: PropTypes.shape({
+    width: PropTypes.number,
+    height: PropTypes.number,
+    aspectRatio: PropTypes.number,
+    sizeBytes: PropTypes.number,
+    warnings: PropTypes.arrayOf(PropTypes.string),
+  }),
   order: PropTypes.number,
   uploadedAt: PropTypes.string,
   _id: PropTypes.string,
@@ -98,6 +112,10 @@ export const PropertyPropTypes = {
   contractPeriodMonths: PropTypes.number,
 
   // Media
+  thumbnail: PropTypes.oneOfType([
+    PropTypes.string,
+    PropTypes.shape(PropertyImagePropTypes),
+  ]),
   images: PropTypes.arrayOf(PropTypes.shape(PropertyImagePropTypes)),
   documents: PropTypes.arrayOf(PropTypes.shape(PropertyDocumentPropTypes)),
   virtualTourUrl: PropTypes.string,

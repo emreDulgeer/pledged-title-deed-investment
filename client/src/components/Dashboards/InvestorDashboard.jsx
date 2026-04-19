@@ -5,6 +5,10 @@ import InvestmentController from "../../controllers/investmentController";
 import PropertyController from "../../controllers/propertyController";
 import { useTranslation } from "react-i18next";
 import StatsCard from "../../components/common/SimpleStatsCard";
+import {
+  getPropertyImageStyle,
+  getPropertyImageUrl,
+} from "../../utils/propertyImages";
 
 const InvestorDashboard = () => {
   const navigate = useNavigate();
@@ -223,9 +227,12 @@ const InvestorDashboard = () => {
                       <div className="flex items-center">
                         {investment.property?.thumbnail && (
                           <img
-                            src={investment.property.thumbnail}
+                            src={getPropertyImageUrl(investment.property.thumbnail)}
                             alt={investment.property.city}
                             className="w-12 h-12 rounded-lg object-cover mr-3"
+                            style={getPropertyImageStyle(
+                              investment.property.thumbnail,
+                            )}
                           />
                         )}
                         <div>

@@ -3,12 +3,22 @@ import { Link, useNavigate } from "react-router-dom";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import bridge from "../../controllers/bridge";
+import CoverImageEditorModal from "../../components/property/modals/CoverImageEditorModal";
 import {
   SUPPORTED_PROPERTY_COUNTRIES,
   SUPPORTED_PROPERTY_COUNTRY_NAMES,
   getSupportedPropertyCountryCode,
   normalizeSupportedPropertyCountry,
 } from "../../constants/propertyCountries";
+import {
+  buildCoverWarnings,
+  getCropAspectRatio,
+  getCropDimensions,
+  getCropPresetConfig,
+  PROPERTY_IMAGE_MAX_COUNT,
+  PROPERTY_CROP_PRESETS,
+  createPropertyImageEntry,
+} from "../../utils/propertyImages";
 
 const INITIAL_FORM = {
   country: "",
@@ -170,6 +180,26 @@ const validateFilesByExtension = (files, allowedExtensions) =>
     allowedExtensions.includes(getFileExtension(file.name)),
   );
 
+const syncImageCoverState = (entries, preferredCoverId = null) => {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return [];
+  }
+
+  const nextCoverId =
+    preferredCoverId && entries.some((entry) => entry.id === preferredCoverId)
+      ? preferredCoverId
+      : entries.find((entry) => entry.isCover)?.id || entries[0].id;
+
+  return entries.map((entry) => ({
+    ...entry,
+    isCover: entry.id === nextCoverId,
+    presentation: {
+      ...entry.presentation,
+      role: entry.id === nextCoverId ? "cover" : "gallery",
+    },
+  }));
+};
+
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 const MapPreview = ({ lat, lng, pinpointMode, onPinpointPick }) => {
   const containerRef = useRef(null);
@@ -293,11 +323,14 @@ const OwnerPropertyCreate = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [pinpointMode, setPinpointMode] = useState(false);
   const [manualPinOverride, setManualPinOverride] = useState(false);
-  const [imageFiles, setImageFiles] = useState([]);
+  const [imageEntries, setImageEntries] = useState([]);
+  const [imageAnalysisLoading, setImageAnalysisLoading] = useState(false);
+  const [coverEditorImageId, setCoverEditorImageId] = useState(null);
   const [documentEntries, setDocumentEntries] = useState([]);
   const autoGeocodeRequestIdRef = useRef(0);
   const manualGeocodeRequestIdRef = useRef(0);
   const searchRequestIdRef = useRef(0);
+  const imageEntriesRef = useRef([]);
 
   useEffect(() => {
     let active = true;
@@ -331,6 +364,25 @@ const OwnerPropertyCreate = () => {
   const providerKey = providerKeyFromInfo(providerInfo);
   const lat = Number(form.locationPin.lat);
   const lng = Number(form.locationPin.lng);
+  const coverImage =
+    imageEntries.find((entry) => entry.isCover) || imageEntries[0] || null;
+  const coverEditorImage =
+    imageEntries.find((entry) => entry.id === coverEditorImageId) || null;
+  const coverPreset = getCropPresetConfig(coverImage?.presentation?.cropPreset);
+  const coverCropMetrics = coverImage
+    ? getCropDimensions({
+        width: coverImage.width,
+        height: coverImage.height,
+        cropPreset: coverImage.presentation?.cropPreset,
+      })
+    : null;
+  const coverWarnings = coverImage
+    ? buildCoverWarnings({
+        width: coverImage.width,
+        height: coverImage.height,
+        cropPreset: coverImage.presentation?.cropPreset,
+      })
+    : [];
   const addressQuery = buildAddress(form);
   const geocodeAddressInput = buildGeocodeAddressInput(form);
   const geocodeAddressKey =
@@ -557,11 +609,42 @@ const OwnerPropertyCreate = () => {
 
       if (createdId) {
         try {
-          if (imageFiles.length > 0) {
+          if (imageEntries.length > 0) {
             const imageFormData = new FormData();
-            imageFiles.forEach((file) => {
-              imageFormData.append("images", file);
+            imageEntries.forEach((entry) => {
+              imageFormData.append("images", entry.file);
+              imageFormData.append(
+                "imageRoles",
+                entry.isCover ? "cover" : "gallery",
+              );
+              imageFormData.append(
+                "imageFocusX",
+                String(entry.presentation?.focusX ?? 50),
+              );
+              imageFormData.append(
+                "imageFocusY",
+                String(entry.presentation?.focusY ?? 50),
+              );
+              imageFormData.append(
+                "imageCropPreset",
+                String(entry.presentation?.cropPreset ?? "16:9"),
+              );
+              imageFormData.append("imageWidth", String(entry.width));
+              imageFormData.append("imageHeight", String(entry.height));
+              imageFormData.append(
+                "imageWarnings",
+                JSON.stringify(entry.warnings || []),
+              );
             });
+            const primaryImageIndex = imageEntries.findIndex(
+              (entry) => entry.isCover,
+            );
+            if (primaryImageIndex >= 0) {
+              imageFormData.append(
+                "primaryImageIndex",
+                String(primaryImageIndex),
+              );
+            }
             await bridge.properties.uploadImage(createdId, imageFormData);
           }
 
@@ -658,22 +741,52 @@ const OwnerPropertyCreate = () => {
   };
 
   const handleImageSelection = (event) => {
+    const input = event.target;
     const files = Array.from(event.target.files || []);
     const validFiles = validateFilesByExtension(
       files,
       PROPERTY_IMAGE_EXTENSIONS,
     );
+    const availableSlots = PROPERTY_IMAGE_MAX_COUNT - imageEntriesRef.current.length;
+    const filesToAnalyze = validFiles.slice(0, Math.max(0, availableSlots));
 
-    if (validFiles.length !== files.length) {
-      setSubmitError(
-        "Some image files were skipped. Allowed extensions: jpg, jpeg, png, webp.",
-      );
-    } else {
-      setSubmitError("");
-    }
+    const analyzeFiles = async () => {
+      if (validFiles.length !== files.length) {
+        setSubmitError(
+          "Some image files were skipped. Allowed extensions: jpg, jpeg, png, webp.",
+        );
+      } else if (validFiles.length > availableSlots) {
+        setSubmitError(
+          `You can upload up to ${PROPERTY_IMAGE_MAX_COUNT} images per property.`,
+        );
+      } else {
+        setSubmitError("");
+      }
 
-    setImageFiles((prev) => [...prev, ...validFiles]);
-    event.target.value = "";
+      if (filesToAnalyze.length === 0) {
+        input.value = "";
+        return;
+      }
+
+      setImageAnalysisLoading(true);
+
+      try {
+        const analyzedEntries = await Promise.all(
+          filesToAnalyze.map((file) => createPropertyImageEntry(file)),
+        );
+
+        setImageEntries((prev) =>
+          syncImageCoverState([...prev, ...analyzedEntries]),
+        );
+      } catch (error) {
+        setSubmitError(error.message || "Image preview analysis failed.");
+      } finally {
+        setImageAnalysisLoading(false);
+        input.value = "";
+      }
+    };
+
+    analyzeFiles();
   };
 
   const handleDocumentSelection = (event) => {
@@ -703,8 +816,39 @@ const OwnerPropertyCreate = () => {
     event.target.value = "";
   };
 
-  const removeImageFile = (targetName) => {
-    setImageFiles((prev) => prev.filter((file) => file.name !== targetName));
+  const removeImageFile = (entryId) => {
+    setImageEntries((prev) => {
+      const targetEntry = prev.find((entry) => entry.id === entryId);
+      if (targetEntry?.previewUrl) {
+        URL.revokeObjectURL(targetEntry.previewUrl);
+      }
+
+      return syncImageCoverState(
+        prev.filter((entry) => entry.id !== entryId),
+      );
+    });
+  };
+
+  const setCoverImage = (entryId) => {
+    setImageEntries((prev) => syncImageCoverState(prev, entryId));
+  };
+
+  const updateImagePresentation = (entryId, nextPresentation) => {
+    setImageEntries((prev) =>
+      syncImageCoverState(
+        prev.map((entry) =>
+          entry.id === entryId
+            ? {
+                ...entry,
+                presentation: {
+                  ...entry.presentation,
+                  ...nextPresentation,
+                },
+              }
+            : entry,
+        ),
+      ),
+    );
   };
 
   const removeDocumentEntry = (entryId) => {
@@ -722,6 +866,21 @@ const OwnerPropertyCreate = () => {
   const togglePinpointMode = () => {
     setPinpointMode((prev) => !prev);
   };
+
+  useEffect(() => {
+    imageEntriesRef.current = imageEntries;
+  }, [imageEntries]);
+
+  useEffect(
+    () => () => {
+      imageEntriesRef.current.forEach((entry) => {
+        if (entry?.previewUrl) {
+          URL.revokeObjectURL(entry.previewUrl);
+        }
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     const query = form.mapSearchAddress.trim();
@@ -1035,12 +1194,12 @@ const OwnerPropertyCreate = () => {
                         Property Images
                       </h3>
                       <p className="text-xs text-day-text/55 dark:text-night-text/55">
-                        Allowed: jpg, jpeg, png, webp. Multiple selection
-                        supported.
+                        Upload flexible gallery photos, then choose one cover
+                        image and adjust its 16:9 framing.
                       </p>
                     </div>
                     <label className="rounded-2xl bg-day-primary dark:bg-night-primary px-4 py-2 text-sm font-semibold text-white cursor-pointer">
-                      Select Images
+                      {imageAnalysisLoading ? "Analyzing..." : "Select Images"}
                       <input
                         type="file"
                         multiple
@@ -1052,33 +1211,157 @@ const OwnerPropertyCreate = () => {
                   </div>
 
                   <div className="space-y-2">
-                    {imageFiles.length === 0 ? (
+                    {imageEntries.length === 0 ? (
                       <div className="rounded-2xl border border-dashed border-day-border dark:border-night-border px-4 py-4 text-sm text-day-text/55 dark:text-night-text/55">
-                        No images selected yet.
+                        No images selected yet. Upload gallery photos first,
+                        then pick a cover crop preset like{" "}
+                        {PROPERTY_CROP_PRESETS.map((preset) => preset.label).join(
+                          ", ",
+                        )}
+                        .
                       </div>
                     ) : (
-                      imageFiles.map((file) => (
-                        <div
-                          key={`${file.name}-${file.size}`}
-                          className="flex items-center justify-between gap-3 rounded-2xl border border-day-border dark:border-night-border px-4 py-3"
-                        >
-                          <div>
-                            <p className="text-sm font-medium text-day-text dark:text-night-text">
-                              {file.name}
-                            </p>
-                            <p className="text-xs text-day-text/55 dark:text-night-text/55">
-                              {(file.size / 1024 / 1024).toFixed(2)} MB
-                            </p>
+                      <>
+                        {coverImage && (
+                          <div className="rounded-3xl border border-day-border dark:border-night-border p-4">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                                  Cover Preview
+                                </p>
+                                <p className="text-xs text-day-text/55 dark:text-night-text/55">
+                                  The selected crop preset and framing are shown
+                                  here before upload.
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setCoverEditorImageId(coverImage.id)}
+                                className="rounded-2xl border border-day-border dark:border-night-border px-3 py-2 text-xs font-semibold text-day-text dark:text-night-text"
+                              >
+                                Adjust cover
+                              </button>
+                            </div>
+
+                            <div
+                              className="overflow-hidden rounded-2xl bg-day-background dark:bg-night-background"
+                              style={{
+                                aspectRatio: getCropAspectRatio(
+                                  coverImage.presentation?.cropPreset,
+                                ),
+                              }}
+                            >
+                              <img
+                                src={coverImage.previewUrl}
+                                alt={`${coverImage.file.name} cover`}
+                                className="h-full w-full object-cover"
+                                style={{
+                                  objectPosition: `${coverImage.presentation?.focusX ?? 50}% ${coverImage.presentation?.focusY ?? 50}%`,
+                                }}
+                              />
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <span className="rounded-full bg-day-primary/10 px-3 py-1 text-xs font-semibold text-day-primary dark:bg-night-primary/15 dark:text-night-primary">
+                                Cover image
+                              </span>
+                              <span className="rounded-full bg-day-background px-3 py-1 text-xs text-day-text/70 dark:bg-night-background dark:text-night-text/70">
+                                {coverPreset.label}
+                              </span>
+                              <span className="rounded-full bg-day-background px-3 py-1 text-xs text-day-text/70 dark:bg-night-background dark:text-night-text/70">
+                                Crop {coverCropMetrics?.width ?? "-"} ×{" "}
+                                {coverCropMetrics?.height ?? "-"}
+                              </span>
+                              <span className="rounded-full bg-day-background px-3 py-1 text-xs text-day-text/70 dark:bg-night-background dark:text-night-text/70">
+                                {coverImage.width} × {coverImage.height} original
+                              </span>
+                            </div>
+
+                            {coverWarnings.length > 0 && (
+                              <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-300">
+                                {coverWarnings.join(" ")}
+                              </div>
+                            )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => removeImageFile(file.name)}
-                            className="rounded-xl border border-day-border dark:border-night-border px-3 py-1.5 text-xs font-semibold"
-                          >
-                            Remove
-                          </button>
+                        )}
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {imageEntries.map((entry) => (
+                            <div
+                              key={entry.id}
+                              className="overflow-hidden rounded-3xl border border-day-border dark:border-night-border"
+                            >
+                              <div className="relative h-48 bg-day-background dark:bg-night-background">
+                                <img
+                                  src={entry.previewUrl}
+                                  alt={entry.file.name}
+                                  className="h-full w-full object-cover"
+                                  style={{
+                                    objectPosition: `${entry.presentation?.focusX ?? 50}% ${entry.presentation?.focusY ?? 50}%`,
+                                  }}
+                                />
+                                <div className="absolute left-3 top-3 flex flex-wrap gap-2">
+                                  {entry.isCover && (
+                                    <span className="rounded-full bg-white/90 px-3 py-1 text-[11px] font-semibold text-day-primary">
+                                      Cover
+                                    </span>
+                                  )}
+                                  {entry.warnings.length > 0 && (
+                                    <span className="rounded-full bg-amber-500/90 px-3 py-1 text-[11px] font-semibold text-white">
+                                      Quality warning
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="space-y-3 p-4">
+                                <div>
+                                  <p className="text-sm font-medium text-day-text dark:text-night-text">
+                                    {entry.file.name}
+                                  </p>
+                                  <p className="text-xs text-day-text/55 dark:text-night-text/55">
+                                    {entry.width} × {entry.height} · {entry.sizeLabel}
+                                  </p>
+                                </div>
+
+                                {entry.warnings.length > 0 && (
+                                  <div className="rounded-2xl bg-amber-50 px-3 py-3 text-xs text-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+                                    {entry.warnings.join(" ")}
+                                  </div>
+                                )}
+
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setCoverImage(entry.id)}
+                                    className={`rounded-2xl px-3 py-2 text-xs font-semibold ${
+                                      entry.isCover
+                                        ? "bg-day-primary text-white dark:bg-night-primary"
+                                        : "border border-day-border text-day-text dark:border-night-border dark:text-night-text"
+                                    }`}
+                                  >
+                                    {entry.isCover ? "Selected cover" : "Use as cover"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setCoverEditorImageId(entry.id)}
+                                    className="rounded-2xl border border-day-border dark:border-night-border px-3 py-2 text-xs font-semibold text-day-text dark:text-night-text"
+                                  >
+                                    Adjust framing
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeImageFile(entry.id)}
+                                    className="rounded-2xl border border-day-border dark:border-night-border px-3 py-2 text-xs font-semibold text-day-text dark:text-night-text"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      ))
+                      </>
                     )}
                   </div>
                 </div>
@@ -1391,6 +1674,17 @@ const OwnerPropertyCreate = () => {
           </aside>
         </div>
       </div>
+
+      {coverEditorImage && (
+        <CoverImageEditorModal
+          imageEntry={coverEditorImage}
+          onClose={() => setCoverEditorImageId(null)}
+          onSave={(nextPresentation) => {
+            updateImagePresentation(coverEditorImage.id, nextPresentation);
+            setCoverEditorImageId(null);
+          }}
+        />
+      )}
     </div>
   );
 };
