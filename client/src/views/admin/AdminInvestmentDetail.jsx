@@ -15,6 +15,8 @@ import {
   selectCurrentInvestment,
   selectInvestmentLoading,
 } from "../../store/slices/investmentSlice";
+import bridge from "../../controllers/bridge";
+import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
 function LineItem({ label, value }) {
   return (
     <div className="flex items-center justify-between py-1">
@@ -43,8 +45,8 @@ export default function AdminInvestmentDetail() {
     dispatch(fetchInvestmentById(id));
     // belgeler & istatistikler henüz slice'ta yok; şimdilik bridge ile:
     const [docsRes, statsRes] = await Promise.all([
-      window.bridge.investments.getInvestmentDocuments(id),
-      window.bridge.investments.getInvestmentStatistics(id),
+      bridge.investments.getInvestmentDocuments(id),
+      bridge.investments.getInvestmentStatistics(id),
     ]);
     setDocuments(docsRes?.data ?? []);
     setStats(statsRes?.data ?? null);
@@ -57,7 +59,7 @@ export default function AdminInvestmentDetail() {
 
   const download = async (fileId) => {
     try {
-      await window.bridge.investments.downloadDocument(id, fileId);
+      await bridge.investments.downloadDocument(id, fileId);
     } catch (e) {
       console.error("Download error:", e);
     }
@@ -110,6 +112,10 @@ export default function AdminInvestmentDetail() {
   const statusLabel = t(
     `investments.status.${investment.status}`,
     investment.status,
+  );
+  const investorProfilePath = getUserProfilePath(getUserId(investment?.investor));
+  const ownerProfilePath = getUserProfilePath(
+    getUserId(investment?.propertyOwner),
   );
 
   const docTypeLabel = (type) => t(`documents.types.${type}`, type);
@@ -188,6 +194,14 @@ export default function AdminInvestmentDetail() {
                       label="KYC"
                       value={investment?.investor?.kycStatus || "-"}
                     />
+                    {getUserId(investment?.investor) && (
+                      <RouterLink
+                        to={investorProfilePath}
+                        className="mt-3 inline-flex items-center rounded-full border border-day-border dark:border-night-border px-3 py-1 text-xs font-medium text-day-accent dark:text-night-accent hover:bg-day-border/10 dark:hover:bg-night-border/10 transition-colors"
+                      >
+                        View investor profile
+                      </RouterLink>
+                    )}
                   </div>
                   <div className="rounded-xl border border-day-border dark:border-night-border p-4">
                     <h3 className="text-sm font-semibold text-day-text dark:text-night-text mb-2">
@@ -201,6 +215,18 @@ export default function AdminInvestmentDetail() {
                       label={t("properties.address")}
                       value={investment?.property?.fullAddress || "-"}
                     />
+                    <LineItem
+                      label="Owner"
+                      value={investment?.propertyOwner?.fullName || "-"}
+                    />
+                    {getUserId(investment?.propertyOwner) && (
+                      <RouterLink
+                        to={ownerProfilePath}
+                        className="mt-3 inline-flex items-center rounded-full border border-day-border dark:border-night-border px-3 py-1 text-xs font-medium text-day-accent dark:text-night-accent hover:bg-day-border/10 dark:hover:bg-night-border/10 transition-colors"
+                      >
+                        View owner profile
+                      </RouterLink>
+                    )}
                   </div>
                   <div className="rounded-xl border border-day-border dark:border-night-border p-4">
                     <h3 className="text-sm font-semibold text-day-text dark:text-night-text mb-2">

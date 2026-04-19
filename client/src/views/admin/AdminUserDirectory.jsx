@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Mail,
@@ -10,6 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import authController from "../../controllers/authController";
+import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
 
 const DIRECTORY_CONFIG = {
   users: {
@@ -56,6 +58,7 @@ const roleLabel = (value, t) => {
 
 const AdminUserDirectory = ({ mode = "users" }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const config = DIRECTORY_CONFIG[mode] || DIRECTORY_CONFIG.users;
   const TitleIcon = config.icon;
 
@@ -201,13 +204,16 @@ const AdminUserDirectory = ({ mode = "users" }) => {
                 <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-day-text/55 dark:text-night-text/55">
                   Membership
                 </th>
+                <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wide text-day-text/55 dark:text-night-text/55">
+                  Profile
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-day-border dark:divide-night-border">
               {loading ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-5 py-10 text-center text-day-text/60 dark:text-night-text/60"
                   >
                     {t("common.loading")}
@@ -216,7 +222,7 @@ const AdminUserDirectory = ({ mode = "users" }) => {
               ) : filteredUsers.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-5 py-10 text-center text-day-text/60 dark:text-night-text/60"
                   >
                     No records found.
@@ -265,6 +271,17 @@ const AdminUserDirectory = ({ mode = "users" }) => {
                     </td>
                     <td className="px-5 py-4 text-sm text-day-text dark:text-night-text">
                       {user.membershipPlan || "-"}
+                    </td>
+                    <td className="px-5 py-4">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate(getUserProfilePath(getUserId(user)))
+                        }
+                        className="inline-flex items-center rounded-full border border-day-border dark:border-night-border px-3 py-1 text-xs font-medium text-day-accent dark:text-night-accent hover:bg-day-border/10 dark:hover:bg-night-border/10 transition-colors"
+                      >
+                        View profile
+                      </button>
                     </td>
                   </tr>
                 ))

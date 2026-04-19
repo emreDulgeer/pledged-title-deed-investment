@@ -2,7 +2,9 @@
 
 const router = require("express").Router();
 const authController = require("../controllers/authController");
+const profileController = require("../controllers/profileController");
 const auth = require("../middlewares/auth");
+const optionalAuth = require("../middlewares/optionalAuth");
 const authorize = require("../middlewares/authorize");
 const rateLimiter = require("../middlewares/rateLimiter");
 const validateRequest = require("../middlewares/validateRequest");
@@ -79,6 +81,14 @@ router.post(
 );
 
 // ==================== AUTHENTICATED ROUTES ====================
+
+router.get(
+  "/profiles/:userId",
+  optionalAuth,
+  [param("userId").isMongoId()],
+  validateRequest,
+  profileController.getProfileById,
+);
 
 // Get Current User Profile
 router.get("/me", auth, authController.getCurrentUser);

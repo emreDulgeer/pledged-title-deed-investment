@@ -1,10 +1,11 @@
 // src/views/investor/InvestorInvestmentDetail.jsx
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import InvestmentController from "../../controllers/investmentController";
 import { useTranslation } from "react-i18next";
 import PropertySummary from "../../components/property/detail/PropertySummary";
 import DocumentsList from "../../components/property/detail/DocumentsList";
+import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
 
 const InvestorInvestmentDetail = () => {
   const { id } = useParams();
@@ -267,6 +268,32 @@ const InvestorInvestmentDetail = () => {
                 </div>
               </div>
             </div>
+
+            {investment.propertyOwner && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Property Owner
+                    </h2>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                      {investment.propertyOwner.fullName || "-"}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {investment.propertyOwner.country || "-"}
+                    </p>
+                  </div>
+                  {getUserId(investment.propertyOwner) && (
+                    <Link
+                      to={getUserProfilePath(getUserId(investment.propertyOwner))}
+                      className="inline-flex items-center justify-center rounded-full border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                    >
+                      View profile
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Progress Tracking */}
             {investment.processTracking && (

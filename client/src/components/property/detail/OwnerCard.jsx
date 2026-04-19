@@ -1,7 +1,8 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { User } from "lucide-react";
 
-const OwnerCard = ({ owner = {}, t }) => (
+const OwnerCard = ({ owner = {}, profilePath = null, t }) => (
   <div className="bg-day-surface dark:bg-night-surface rounded-lg shadow-lg p-6">
     <h3 className="text-lg font-semibold text-day-text dark:text-night-text mb-4">
       {t("properties.owner_info")}
@@ -22,6 +23,14 @@ const OwnerCard = ({ owner = {}, t }) => (
           <p className="text-sm text-day-text/70 dark:text-night-text/70">
             {owner.email}
           </p>
+          {profilePath && (
+            <Link
+              to={profilePath}
+              className="mt-2 inline-flex items-center rounded-full border border-day-border dark:border-night-border px-3 py-1 text-xs font-medium text-day-accent dark:text-night-accent hover:bg-day-background dark:hover:bg-night-background transition-colors"
+            >
+              View profile
+            </Link>
+          )}
         </div>
       </div>
 

@@ -30,6 +30,7 @@ import {
   Download,
 } from "lucide-react";
 import { resolveFileUrl } from "../../components/property/detail/_utils";
+import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
 
 const AdminProperties = () => {
   const { t } = useTranslation();
@@ -777,6 +778,17 @@ const AdminProperties = () => {
                           <p className="text-xs text-day-text/60 dark:text-night-text/60">
                             {property.owner.email}
                           </p>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(
+                                getUserProfilePath(getUserId(property.owner)),
+                              )
+                            }
+                            className="mt-2 inline-flex items-center rounded-full border border-day-border dark:border-night-border px-3 py-1 text-xs font-medium text-day-accent dark:text-night-accent hover:bg-day-border/10 dark:hover:bg-night-border/10 transition-colors"
+                          >
+                            Profile
+                          </button>
                         </div>
                       ) : (
                         <span className="text-sm text-day-text/40 dark:text-night-text/40">

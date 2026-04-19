@@ -85,7 +85,7 @@ const LocationMap = ({ property, t }) => {
 
       <div
         ref={containerRef}
-        className="h-80 w-full rounded-2xl border border-day-border dark:border-night-border overflow-hidden"
+        className="relative z-0 h-80 w-full rounded-2xl border border-day-border dark:border-night-border overflow-hidden"
       />
 
       <div className="mt-3 text-xs text-day-text/55 dark:text-night-text/55">

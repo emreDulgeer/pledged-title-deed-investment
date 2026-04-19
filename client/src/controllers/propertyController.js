@@ -54,6 +54,10 @@ const propertyController = {
     return await apiClient.post(`/properties/${id}/flag`, { issues, action });
   },
 
+  checkOfficialData: async (id) => {
+    return await apiClient.post(`/properties/${id}/official-data/check`);
+  },
+
   // Property owner endpoints
   getMyProperties: async (params = {}) => {
     return await apiClient.get("/properties/my/properties", { params });

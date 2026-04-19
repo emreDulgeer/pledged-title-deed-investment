@@ -15,10 +15,28 @@ const {
   toPropertyOwnerViewDto,
   toPropertyOwnerViewDtoArray,
 } = require("../utils/dto/Properties");
+const {
+  SUPPORTED_PROPERTY_COUNTRY_NAMES,
+  normalizeSupportedPropertyCountry,
+} = require("../utils/propertyCountries");
+const officialPropertyDataService = require("./officialPropertyData");
+
+const SUPPORTED_PROPERTY_COUNTRIES_MESSAGE = `Properties can only be created in the supported countries: ${SUPPORTED_PROPERTY_COUNTRY_NAMES.join(", ")}`;
+
+const normalizePropertyCountryOrThrow = (country) => {
+  const normalizedCountry = normalizeSupportedPropertyCountry(country);
+
+  if (!normalizedCountry) {
+    throw new Error(SUPPORTED_PROPERTY_COUNTRIES_MESSAGE);
+  }
+
+  return normalizedCountry;
+};
 
 class PropertyService {
   constructor() {
     this.propertyRepository = new PropertyRepository();
+    this.officialPropertyDataService = officialPropertyDataService;
   }
 
   buildGeocodeInput(fullAddress, city, country, mapSearchAddress = "") {
@@ -113,19 +131,24 @@ class PropertyService {
 
   // Yeni property oluÅŸtur
   async createProperty(propertyData, ownerId) {
+    const normalizedPropertyData = {
+      ...propertyData,
+      country: normalizePropertyCountryOrThrow(propertyData.country),
+    };
+
     // Business logic validations
-    if (propertyData.requestedInvestment < 10000) {
+    if (normalizedPropertyData.requestedInvestment < 10000) {
       throw new Error("Minimum yatÄ±rÄ±m tutarÄ± 10,000 EUR olmalÄ±dÄ±r");
     }
 
-    if (propertyData.contractPeriodMonths < 12) {
+    if (normalizedPropertyData.contractPeriodMonths < 12) {
       throw new Error("Minimum kontrat sÃ¼resi 12 ay olmalÄ±dÄ±r");
     }
 
-    const locationPin = await this.validateAndGeocode(propertyData);
+    const locationPin = await this.validateAndGeocode(normalizedPropertyData);
 
     const newProperty = await this.propertyRepository.create({
-      ...propertyData,
+      ...normalizedPropertyData,
       locationPin,
       owner: ownerId,
       status: "draft",
@@ -136,6 +159,7 @@ class PropertyService {
 
   // Property gÃ¼ncelle
   async updateProperty(propertyId, updateData, ownerId, isAdmin = false) {
+    const normalizedUpdateData = { ...updateData };
     const property = await this.propertyRepository.findById(propertyId);
 
     if (!property) {
@@ -148,36 +172,48 @@ class PropertyService {
     }
 
     // Status deÄŸiÅŸimi business logic
-    if (updateData.status && !isAdmin) {
-      delete updateData.status; // Sadece admin status deÄŸiÅŸtirebilir
+    if (normalizedUpdateData.status && !isAdmin) {
+      delete normalizedUpdateData.status; // Sadece admin status deÄŸiÅŸtirebilir
+    }
+
+    if (
+      Object.prototype.hasOwnProperty.call(normalizedUpdateData, "country")
+    ) {
+      normalizedUpdateData.country = normalizePropertyCountryOrThrow(
+        normalizedUpdateData.country,
+      );
     }
 
     const hasLocationInputs =
-      Object.prototype.hasOwnProperty.call(updateData, "locationPin") ||
-      Object.prototype.hasOwnProperty.call(updateData, "fullAddress") ||
-      Object.prototype.hasOwnProperty.call(updateData, "mapSearchAddress") ||
-      Object.prototype.hasOwnProperty.call(updateData, "city") ||
-      Object.prototype.hasOwnProperty.call(updateData, "country");
+      Object.prototype.hasOwnProperty.call(normalizedUpdateData, "locationPin") ||
+      Object.prototype.hasOwnProperty.call(normalizedUpdateData, "fullAddress") ||
+      Object.prototype.hasOwnProperty.call(
+        normalizedUpdateData,
+        "mapSearchAddress",
+      ) ||
+      Object.prototype.hasOwnProperty.call(normalizedUpdateData, "city") ||
+      Object.prototype.hasOwnProperty.call(normalizedUpdateData, "country");
 
     if (hasLocationInputs) {
       const mergedLocationData = {
-        fullAddress: updateData.fullAddress ?? property.fullAddress,
+        fullAddress: normalizedUpdateData.fullAddress ?? property.fullAddress,
         mapSearchAddress:
-          updateData.mapSearchAddress ?? property.mapSearchAddress,
-        city: updateData.city ?? property.city,
-        country: updateData.country ?? property.country,
+          normalizedUpdateData.mapSearchAddress ?? property.mapSearchAddress,
+        city: normalizedUpdateData.city ?? property.city,
+        country: normalizedUpdateData.country ?? property.country,
         locationPin:
-          updateData.locationPin === null
+          normalizedUpdateData.locationPin === null
             ? null
-            : updateData.locationPin ?? property.locationPin,
+            : normalizedUpdateData.locationPin ?? property.locationPin,
       };
 
-      updateData.locationPin = await this.validateAndGeocode(mergedLocationData);
+      normalizedUpdateData.locationPin =
+        await this.validateAndGeocode(mergedLocationData);
     }
 
     const updatedProperty = await this.propertyRepository.update(
       propertyId,
-      updateData,
+      normalizedUpdateData,
     );
     return toPropertyDetailDto(updatedProperty);
   }
@@ -274,6 +310,16 @@ class PropertyService {
     return isAdmin
       ? toPropertyAdminViewDto(property)
       : toPropertyOwnerViewDto(property);
+  }
+
+  async checkOfficialPropertyData(propertyId) {
+    const property = await this.propertyRepository.findById(propertyId, "owner");
+
+    if (!property) {
+      throw new Error("Property not found");
+    }
+
+    return this.officialPropertyDataService.checkProperty(property);
   }
 
   // Admin iÃ§in tÃ¼m property'ler - PAGINATION VE FÄ°LTRELEME EKLENDÄ°

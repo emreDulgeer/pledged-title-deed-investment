@@ -130,6 +130,12 @@ router.post(
   authorize(["admin"]),
   propertyController.flagProperty,
 );
+router.post(
+  "/:id/official-data/check",
+  auth,
+  authorize(["admin"]),
+  propertyController.checkOfficialPropertyData,
+);
 
 // Admin döküman onayı (title deed, annotation verification)
 router.post(

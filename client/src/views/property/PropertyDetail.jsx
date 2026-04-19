@@ -4,6 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import bridge from "../../controllers/bridge";
+import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
 
 // parçalanmış komponentler
 import {
@@ -214,6 +215,7 @@ const PropertyDetail = () => {
     );
 
   const images = property.images || [];
+  const ownerProfilePath = getUserProfilePath(getUserId(property.owner));
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -265,7 +267,7 @@ const PropertyDetail = () => {
             onOpenDelete={() => setShowDeleteModal(true)}
             t={t}
           />
-          <OwnerCard owner={property.owner} t={t} />
+          <OwnerCard owner={property.owner} profilePath={ownerProfilePath} t={t} />
           <StatsCard
             metadata={property.metadata}
             createdAt={property.createdAt}

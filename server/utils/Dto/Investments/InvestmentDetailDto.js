@@ -27,16 +27,31 @@ class InvestmentDetailDto extends InvestmentDto {
         trustScore: investment.property.trustScore,
       };
 
-      // Property owner bilgileri
-      if (
-        investment.property.owner &&
-        typeof investment.property.owner === "object"
-      ) {
+    }
+
+    // Property owner bilgileri
+    if (investment.propertyOwner && typeof investment.propertyOwner === "object") {
+      this.propertyOwner = {
+        id: investment.propertyOwner._id,
+        fullName: investment.propertyOwner.fullName,
+        email: investment.propertyOwner.email,
+        phoneNumber: investment.propertyOwner.phoneNumber,
+        country: investment.propertyOwner.country,
+        trustScore:
+          investment.propertyOwner.ownerTrustScore ??
+          investment.propertyOwner.trustScore ??
+          null,
+      };
+
+      if (this.property) {
         this.property.owner = {
-          id: investment.property.owner._id,
-          fullName: investment.property.owner.fullName,
-          email: investment.property.owner.email,
-          trustScore: investment.property.owner.trustScore,
+          id: investment.propertyOwner._id,
+          fullName: investment.propertyOwner.fullName,
+          email: investment.propertyOwner.email,
+          trustScore:
+            investment.propertyOwner.ownerTrustScore ??
+            investment.propertyOwner.trustScore ??
+            null,
         };
       }
     }

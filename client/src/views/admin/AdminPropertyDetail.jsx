@@ -26,6 +26,8 @@ import {
 import { resolveFileUrl } from "../../components/property/detail/_utils";
 import { LocationMap } from "../../components/property/detail";
 import bridge from "../../controllers/bridge";
+import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
+import OfficialDataCheckModal from "../../components/property/modals/OfficialDataCheckModal";
 
 const getEntryFileId = (entry) => {
   if (!entry) return "";
@@ -79,6 +81,10 @@ const AdminPropertyDetail = () => {
   const [showFlagModal, setShowFlagModal] = useState(false);
   const [flagInput, setFlagInput] = useState("");
   const [flags, setFlags] = useState([]);
+  const [showOfficialDataModal, setShowOfficialDataModal] = useState(false);
+  const [officialDataLoading, setOfficialDataLoading] = useState(false);
+  const [officialDataError, setOfficialDataError] = useState("");
+  const [officialDataResult, setOfficialDataResult] = useState(null);
   const listTab = property?.status === "draft" ? "draft" : "other";
   const propertiesListPath = `/admin/properties?tab=${listTab}`;
 
@@ -313,6 +319,29 @@ const AdminPropertyDetail = () => {
     } finally {
       setProcessing(false);
       setShowRejectModal(false);
+    }
+  };
+
+  const handleOfficialDataCheck = async () => {
+    setShowOfficialDataModal(true);
+    setOfficialDataLoading(true);
+    setOfficialDataError("");
+    setOfficialDataResult(null);
+
+    try {
+      const response = await bridge.properties.checkOfficialData(property.id);
+
+      if (response?.success) {
+        setOfficialDataResult(response.data);
+      } else {
+        setOfficialDataError(t("admin.property.official_data_error"));
+      }
+    } catch (error) {
+      setOfficialDataError(
+        error.message || t("admin.property.official_data_error"),
+      );
+    } finally {
+      setOfficialDataLoading(false);
     }
   };
 
@@ -606,6 +635,17 @@ const AdminPropertyDetail = () => {
                     {property.owner.phone}
                   </p>
                 )}
+                {getUserId(property.owner) && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(getUserProfilePath(getUserId(property.owner)))
+                    }
+                    className="inline-flex items-center rounded-full border border-day-border dark:border-night-border px-3 py-1 text-xs font-medium text-day-accent dark:text-night-accent hover:bg-day-border/10 dark:hover:bg-night-border/10 transition-colors"
+                  >
+                    View profile
+                  </button>
+                )}
                 <div className="grid grid-cols-2 gap-2 pt-2">
                   <Field
                     small
@@ -698,6 +738,18 @@ const AdminPropertyDetail = () => {
 
           {/* Actions */}
           <div className="space-y-3">
+            <button
+              onClick={handleOfficialDataCheck}
+              disabled={!canDecide || processing || officialDataLoading}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-sky-600 hover:bg-sky-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+            >
+              {officialDataLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <ShieldCheck className="h-5 w-5" />
+              )}
+              {t("admin.property.check_official_data")}
+            </button>
             <button
               onClick={() => handleApprove()}
               disabled={!canDecide || processing}
@@ -906,6 +958,20 @@ const AdminPropertyDetail = () => {
           </div>
         </div>
       )}
+
+      <OfficialDataCheckModal
+        open={showOfficialDataModal}
+        onClose={() => {
+          setShowOfficialDataModal(false);
+          setOfficialDataLoading(false);
+          setOfficialDataError("");
+          setOfficialDataResult(null);
+        }}
+        loading={officialDataLoading}
+        error={officialDataError}
+        data={officialDataResult}
+        t={t}
+      />
     </div>
   );
 };

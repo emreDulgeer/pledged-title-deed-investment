@@ -3,6 +3,13 @@
 const PropertyService = require("../services/propertyService");
 const responseWrapper = require("../utils/responseWrapper");
 const notificationService = require("../services/notificationService");
+
+const isPropertyValidationError = (message = "") =>
+  message.includes("Minimum") ||
+  message.includes("supported countries") ||
+  message.includes("Invalid coordinates") ||
+  message.includes("validation failed");
+
 class PropertyController {
   constructor() {
     this.propertyService = new PropertyService();
@@ -113,7 +120,7 @@ class PropertyController {
         "Property created successfully",
       );
     } catch (error) {
-      if (error.message.includes("Minimum")) {
+      if (isPropertyValidationError(error.message)) {
         return responseWrapper.badRequest(res, error.message);
       }
       return responseWrapper.error(res, error.message);
@@ -144,6 +151,31 @@ class PropertyController {
       }
       if (error.message.includes("Unauthorized")) {
         return responseWrapper.forbidden(res, error.message);
+      }
+      if (isPropertyValidationError(error.message)) {
+        return responseWrapper.badRequest(res, error.message);
+      }
+      return responseWrapper.error(res, error.message);
+    }
+  };
+
+  checkOfficialPropertyData = async (req, res) => {
+    try {
+      const result = await this.propertyService.checkOfficialPropertyData(
+        req.params.id,
+      );
+
+      return responseWrapper.success(
+        res,
+        result,
+        "Official property data check completed",
+      );
+    } catch (error) {
+      if (error.message === "Property not found") {
+        return responseWrapper.notFound(res, "Property not found");
+      }
+      if (error.message.includes("No official property data provider")) {
+        return responseWrapper.badRequest(res, error.message);
       }
       return responseWrapper.error(res, error.message);
     }

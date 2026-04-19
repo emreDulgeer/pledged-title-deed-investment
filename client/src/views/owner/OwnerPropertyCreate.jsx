@@ -3,12 +3,18 @@ import { Link, useNavigate } from "react-router-dom";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import bridge from "../../controllers/bridge";
+import {
+  SUPPORTED_PROPERTY_COUNTRIES,
+  SUPPORTED_PROPERTY_COUNTRY_NAMES,
+  getSupportedPropertyCountryCode,
+  normalizeSupportedPropertyCountry,
+} from "../../constants/propertyCountries";
 
 const INITIAL_FORM = {
-  country: "Turkey",
-  city: "Istanbul",
-  fullAddress: "Sultan Ahmet Mahallesi, Ayasofya Meydani No:1, Fatih, Istanbul",
-  mapSearchAddress: "Hagia Sophia, Sultan Ahmet, Fatih",
+  country: "",
+  city: "",
+  fullAddress: "",
+  mapSearchAddress: "",
   propertyType: "apartment",
   description: "",
   size: "",
@@ -36,6 +42,11 @@ const PROPERTY_DOCUMENT_TYPES = [
   { value: "other", label: "Other" },
 ];
 
+const SUPPORTED_PROPERTY_COUNTRIES_LABEL =
+  SUPPORTED_PROPERTY_COUNTRY_NAMES.join(", ");
+const SUPPORTED_PROPERTY_COUNTRIES_ERROR =
+  `Property yalnizca su ulkelerde olusturulabilir: ${SUPPORTED_PROPERTY_COUNTRIES_LABEL}.`;
+
 const providerKeyFromInfo = (providerInfo) => {
   const name = providerInfo?.name?.toLowerCase?.() || "";
   return name.includes("google") ? "google" : "openstreetmap";
@@ -48,7 +59,7 @@ const toNumberOrUndefined = (value) => {
 };
 
 const buildPayload = (form) => ({
-  country: form.country.trim(),
+  country: normalizeSupportedPropertyCountry(form.country) || form.country.trim(),
   city: form.city.trim(),
   fullAddress: form.fullAddress.trim(),
   mapSearchAddress: form.mapSearchAddress.trim(),
@@ -148,29 +159,6 @@ const buildGeocodeAddressInput = (form) => {
   return address;
 };
 
-const extractCountryCode = (country) => {
-  if (!country) return "";
-  const normalized = country.trim().toLowerCase();
-
-  const countryMap = {
-    turkey: "tr",
-    turkiye: "tr",
-    "türkiye": "tr",
-    portugal: "pt",
-    spain: "es",
-    germany: "de",
-    france: "fr",
-    italy: "it",
-    "united kingdom": "gb",
-    england: "gb",
-    usa: "us",
-    "united states": "us",
-  };
-
-  if (normalized.length === 2) return normalized;
-  return countryMap[normalized] || "";
-};
-
 const getAddressComponent = (components = [], type) =>
   components.find((component) => component.type === type)?.long_name || "";
 
@@ -254,7 +242,7 @@ const MapPreview = ({ lat, lng, pinpointMode, onPinpointPick }) => {
     <div className="relative">
       <div
         ref={containerRef}
-        className={`h-72 w-full rounded-2xl border border-day-border dark:border-night-border overflow-hidden ${
+        className={`relative z-0 h-72 w-full rounded-2xl border border-day-border dark:border-night-border overflow-hidden ${
           pinpointMode ? "ring-2 ring-amber-400/60" : ""
         }`}
       />
@@ -351,7 +339,7 @@ const OwnerPropertyCreate = () => {
       : JSON.stringify(geocodeAddressInput);
   const hasEnoughAddressForGeocoding =
     !!form.fullAddress.trim() || (!!form.city.trim() && !!form.country.trim());
-  const countryCode = extractCountryCode(form.country);
+  const countryCode = getSupportedPropertyCountryCode(form.country);
 
   const updateField = (field, value) => {
     if (
@@ -525,12 +513,20 @@ const OwnerPropertyCreate = () => {
         longitude,
       );
       const result = response.data;
+      const normalizedCountry = normalizeSupportedPropertyCountry(
+        result.country,
+      );
+
+      if (result.country && !normalizedCountry) {
+        setSubmitError(SUPPORTED_PROPERTY_COUNTRIES_ERROR);
+        return;
+      }
 
       setForm((prev) => ({
         ...prev,
         mapSearchAddress: result.address || prev.mapSearchAddress,
         city: result.city || prev.city,
-        country: result.country || prev.country,
+        country: normalizedCountry || prev.country,
       }));
       setManualPinOverride(false);
       setHelperMessage("Koordinatlardan adres bilgisi dolduruldu.");
@@ -548,6 +544,13 @@ const OwnerPropertyCreate = () => {
     setHelperMessage("");
 
     try {
+      const normalizedCountry = normalizeSupportedPropertyCountry(form.country);
+
+      if (!normalizedCountry) {
+        setSubmitError(SUPPORTED_PROPERTY_COUNTRIES_ERROR);
+        return;
+      }
+
       const payload = buildPayload(form);
       const response = await bridge.properties.create(payload);
       const createdId = response.data?.id || response.data?._id;
@@ -610,12 +613,22 @@ const OwnerPropertyCreate = () => {
     const countryFromSuggestion =
       getAddressComponent(suggestion.addressComponents, "country") ||
       form.country;
+    const normalizedCountry = normalizeSupportedPropertyCountry(
+      countryFromSuggestion,
+    );
+
+    if (!normalizedCountry) {
+      setSubmitError(SUPPORTED_PROPERTY_COUNTRIES_ERROR);
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
 
     setForm((prev) => ({
       ...prev,
       mapSearchAddress: suggestion.formattedAddress || prev.mapSearchAddress,
       city: cityFromSuggestion || prev.city,
-      country: countryFromSuggestion || prev.country,
+      country: normalizedCountry || prev.country,
       locationPin: {
         lat: suggestion.lat?.toString?.() || prev.locationPin.lat,
         lng: suggestion.lng?.toString?.() || prev.locationPin.lng,
@@ -801,13 +814,24 @@ const OwnerPropertyCreate = () => {
                   <span className="text-sm font-medium text-day-text dark:text-night-text">
                     Country
                   </span>
-                  <input
+                  <select
                     required
                     value={form.country}
                     onChange={(e) => updateField("country", e.target.value)}
                     className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none focus:ring-2 focus:ring-day-primary/25 dark:focus:ring-night-primary/25"
-                    placeholder="Turkey"
-                  />
+                  >
+                    <option value="" disabled>
+                      Select a supported country
+                    </option>
+                    {SUPPORTED_PROPERTY_COUNTRIES.map((country) => (
+                      <option key={country.code} value={country.name}>
+                        {country.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-day-text/55 dark:text-night-text/55">
+                    Supported countries: {SUPPORTED_PROPERTY_COUNTRIES_LABEL}
+                  </p>
                 </label>
 
                 <label className="space-y-2">

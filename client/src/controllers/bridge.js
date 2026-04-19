@@ -7,6 +7,7 @@ import fileController from "./fileController";
 import membershipPlanController from "./membershipPlanController";
 import notificationController from "./notificationController";
 import geocodingController from "./geocodingController";
+import profileController from "./profileController";
 import { tokenManager } from "../api/client";
 
 // Bridge pattern - Single point of access for all API operations
@@ -19,6 +20,7 @@ const bridge = {
   membershipPlans: membershipPlanController,
   notifications: notificationController,
   geocoding: geocodingController,
+  profiles: profileController,
 
   // Utility methods
   utils: {

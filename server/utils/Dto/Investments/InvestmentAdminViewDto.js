@@ -29,18 +29,25 @@ class InvestmentAdminViewDto {
         trustScore: investment.property.trustScore,
       };
 
-      // Property owner bilgileri
-      if (investment.property.owner) {
-        this.propertyOwner = {
-          id: investment.property.owner._id || investment.property.owner,
-          fullName: investment.property.owner.fullName,
-          email: investment.property.owner.email,
-          phone: investment.property.owner.phoneNumber,
-          country: investment.property.owner.country,
-          kycStatus: investment.property.owner.kycStatus,
-          riskScore: investment.property.owner.riskScore,
-        };
-      }
+    }
+
+    // Property owner bilgileri
+    if (
+      investment.propertyOwner &&
+      typeof investment.propertyOwner === "object"
+    ) {
+      this.propertyOwner = {
+        id: investment.propertyOwner._id,
+        fullName: investment.propertyOwner.fullName,
+        email: investment.propertyOwner.email,
+        phone: investment.propertyOwner.phoneNumber,
+        country: investment.propertyOwner.country,
+        kycStatus: investment.propertyOwner.kycStatus,
+        riskScore:
+          investment.propertyOwner.ownerTrustScore ??
+          investment.propertyOwner.trustScore ??
+          50,
+      };
     }
 
     // Investor detayları

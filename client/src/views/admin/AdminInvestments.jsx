@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
 
 const PAGE_SIZE = 10;
 
@@ -265,16 +266,55 @@ export default function AdminInvestments() {
                     {it.id || it._id}
                   </td>
                   <td className="px-4 py-3 text-day-text dark:text-night-text">
-                    {it.investor?.fullName ||
-                      `${it.investor?.firstName ?? ""} ${
-                        it.investor?.lastName ?? ""
-                      }`.trim() ||
-                      "-"}
+                    <div>
+                      <p>
+                        {it.investor?.fullName ||
+                          `${it.investor?.firstName ?? ""} ${
+                            it.investor?.lastName ?? ""
+                          }`.trim() ||
+                          "-"}
+                      </p>
+                      {getUserId(it.investor) && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(
+                              getUserProfilePath(getUserId(it.investor)),
+                            )
+                          }
+                          className="mt-2 inline-flex items-center rounded-full border border-day-border dark:border-night-border px-3 py-1 text-xs font-medium text-day-accent dark:text-night-accent hover:bg-day-border/10 dark:hover:bg-night-border/10 transition-colors"
+                        >
+                          Profile
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-day-text dark:text-night-text">
-                    {it.property?.city
-                      ? `${it.property.city}, ${it.property.country || ""}`
-                      : "-"}
+                    <div>
+                      <p>
+                        {it.property?.city
+                          ? `${it.property.city}, ${it.property.country || ""}`
+                          : "-"}
+                      </p>
+                      {it.propertyOwner?.fullName && (
+                        <p className="mt-1 text-xs text-day-text/60 dark:text-night-text/60">
+                          Owner: {it.propertyOwner.fullName}
+                        </p>
+                      )}
+                      {getUserId(it.propertyOwner) && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(
+                              getUserProfilePath(getUserId(it.propertyOwner)),
+                            )
+                          }
+                          className="mt-2 inline-flex items-center rounded-full border border-day-border dark:border-night-border px-3 py-1 text-xs font-medium text-day-accent dark:text-night-accent hover:bg-day-border/10 dark:hover:bg-night-border/10 transition-colors"
+                        >
+                          Owner profile
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-day-text dark:text-night-text">
                     {typeof it.amountInvested === "number"

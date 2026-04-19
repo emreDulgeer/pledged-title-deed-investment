@@ -29,6 +29,8 @@ import AdminMembershipPlans from "./views/admin/AdminMembershipPlans";
 import AdminUserDirectory from "./views/admin/AdminUserDirectory";
 import PropertyDetail from "./views/property/PropertyDetail";
 import AdminProperties from "./views/admin/AdminProperties";
+import UserProfilePage from "./views/profile/UserProfilePage";
+import ProfileSettingsPage from "./views/profile/ProfileSettingsPage";
 import PrivateRoute from "./routes/PrivateRoute";
 import RoleBasedRoute from "./routes/RoleBasedRoute";
 
@@ -48,6 +50,7 @@ import OwnerPropertyCreate from "./views/owner/OwnerPropertyCreate";
 
 import authController from "./controllers/authController";
 import { defaultPathByRole } from "./utils/roleRedirect";
+import { getUserId, getUserProfilePath } from "./utils/profileRoutes";
 import AdminDashboard from "./components/Dashboards/AdminDashboard";
 import { tokenManager } from "./api/client";
 
@@ -166,6 +169,25 @@ const AppContent = () => {
             }
           />
         </Route>
+        <Route path="/profiles/:userId" element={<UserProfilePage />} />
+        <Route
+          path="/profile"
+          element={
+            isAuthenticated && user ? (
+              <Navigate to={getUserProfilePath(getUserId(user))} replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/profile/settings"
+          element={
+            <PrivateRoute>
+              <ProfileSettingsPage />
+            </PrivateRoute>
+          }
+        />
         {/* Admin (nested) */}
         <Route
           path="/admin"
