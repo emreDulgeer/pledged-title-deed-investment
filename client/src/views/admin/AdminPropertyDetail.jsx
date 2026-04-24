@@ -29,6 +29,7 @@ import bridge from "../../controllers/bridge";
 import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
 import OfficialDataCheckModal from "../../components/property/modals/OfficialDataCheckModal";
 import { getPropertyImageStyle } from "../../utils/propertyImages";
+import { APP_CURRENCY } from "../../utils/currency";
 
 const getEntryFileId = (entry) => {
   if (!entry) return "";
@@ -171,16 +172,16 @@ const AdminPropertyDetail = () => {
       setProcessing(false);
     }
   };
-  const formatCurrency = (amount, currency = "USD", locale = "en-US") => {
+  const formatCurrency = (amount, locale = "en-US") => {
     if (amount === undefined || amount === null) return "-";
     try {
       return new Intl.NumberFormat(locale, {
         style: "currency",
-        currency,
+        currency: APP_CURRENCY,
         maximumFractionDigits: 0,
       }).format(amount);
     } catch {
-      return `${amount} ${currency || ""}`.trim();
+      return `${amount} ${APP_CURRENCY}`.trim();
     }
   };
 
@@ -537,21 +538,15 @@ const AdminPropertyDetail = () => {
             <div className="grid grid-cols-2 gap-4">
               <Field
                 label={t("properties.estimated_value")}
-                value={formatCurrency(
-                  property.estimatedValue,
-                  property.currency,
-                )}
+                value={formatCurrency(property.estimatedValue)}
               />
               <Field
                 label={t("properties.requested_investment")}
-                value={formatCurrency(
-                  property.requestedInvestment,
-                  property.currency,
-                )}
+                value={formatCurrency(property.requestedInvestment)}
               />
               <Field
                 label={t("properties.rent_offered")}
-                value={formatCurrency(property.rentOffered, property.currency)}
+                value={formatCurrency(property.rentOffered)}
               />
               <Field
                 label={t("properties.annual_yield")}

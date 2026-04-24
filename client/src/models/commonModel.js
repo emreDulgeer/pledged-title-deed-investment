@@ -67,7 +67,7 @@ export const AuditLogPropTypes = {
 };
 
 export const CurrencyPropTypes = {
-  code: PropTypes.oneOf(["EUR", "USD", "GBP", "TRY"]).isRequired,
+  code: PropTypes.oneOf(["EUR"]).isRequired,
   symbol: PropTypes.string.isRequired,
   name: PropTypes.string.isRequired,
   exchangeRate: PropTypes.number,

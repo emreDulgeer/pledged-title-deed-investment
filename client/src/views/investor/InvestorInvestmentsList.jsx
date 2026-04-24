@@ -7,6 +7,7 @@ import {
   getPropertyImageStyle,
   getPropertyImageUrl,
 } from "../../utils/propertyImages";
+import { APP_CURRENCY, APP_CURRENCY_SYMBOL } from "../../utils/currency";
 
 const InvestorInvestmentsList = () => {
   const navigate = useNavigate();
@@ -75,6 +76,7 @@ const InvestorInvestmentsList = () => {
         "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
       completed:
         "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
+      refunded: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
       defaulted: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
     };
     return colors[status] || "bg-gray-100 text-gray-800";
@@ -144,6 +146,7 @@ const InvestorInvestmentsList = () => {
               </option>
               <option value="active">{t("investor.active")}</option>
               <option value="completed">{t("investor.completed")}</option>
+              <option value="refunded">{t("investor.refunded")}</option>
               <option value="defaulted">{t("investor.defaulted")}</option>
             </select>
           </div>
@@ -262,7 +265,7 @@ const InvestorInvestmentsList = () => {
                       <td className="px-6 py-4">
                         <p className="font-semibold text-gray-900 dark:text-white">
                           {investment.amountInvested.toLocaleString()}{" "}
-                          {investment.currency}
+                          {APP_CURRENCY}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
                           {new Date(investment.createdAt).toLocaleDateString()}
@@ -302,12 +305,12 @@ const InvestorInvestmentsList = () => {
                         <p className="font-semibold text-green-600 dark:text-green-400">
                           {investment.rentalPaymentsSummary?.totalPaidAmount?.toLocaleString() ||
                             0}{" "}
-                          ₺
+                          {APP_CURRENCY_SYMBOL}
                         </p>
                         {investment.expectedTotalIncome && (
                           <p className="text-xs text-gray-500 dark:text-gray-400">
                             / {investment.expectedTotalIncome.toLocaleString()}{" "}
-                            ₺
+                            {APP_CURRENCY_SYMBOL}
                           </p>
                         )}
                       </td>
@@ -370,7 +373,7 @@ const InvestorInvestmentsList = () => {
                       </p>
                       <p className="font-semibold text-gray-900 dark:text-white">
                         {investment.amountInvested.toLocaleString()}{" "}
-                        {investment.currency}
+                        {APP_CURRENCY}
                       </p>
                     </div>
                     <div>
@@ -380,7 +383,7 @@ const InvestorInvestmentsList = () => {
                       <p className="font-semibold text-green-600 dark:text-green-400">
                         {investment.rentalPaymentsSummary?.totalPaidAmount?.toLocaleString() ||
                           0}{" "}
-                        ₺
+                        {APP_CURRENCY_SYMBOL}
                       </p>
                     </div>
                   </div>

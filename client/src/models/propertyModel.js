@@ -108,7 +108,7 @@ export const PropertyPropTypes = {
   requestedInvestment: PropTypes.number.isRequired,
   rentOffered: PropTypes.number,
   annualYieldPercent: PropTypes.number,
-  currency: PropTypes.oneOf(["EUR", "USD", "GBP", "TRY"]),
+  currency: PropTypes.oneOf(["EUR"]),
   contractPeriodMonths: PropTypes.number,
 
   // Media

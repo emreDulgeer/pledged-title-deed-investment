@@ -8,6 +8,7 @@ import {
   getPropertyImageStyle,
   getPropertyImageUrl,
 } from "../../utils/propertyImages";
+import { APP_CURRENCY } from "../../utils/currency";
 
 // ── Sabitler ─────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,7 @@ const INVESTMENT_STATUS_COLORS = {
   active:
     "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
   completed: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300",
+  refunded: "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300",
   defaulted: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
 };
 
@@ -286,7 +288,7 @@ const PropertyCard = ({ property, onNavigate, showMyBadge = false }) => {
               Investment
             </p>
             <p className="font-semibold text-day-text dark:text-night-text">
-              {fmt(property.requestedInvestment)} {property.currency || "EUR"}
+              {fmt(property.requestedInvestment)} {APP_CURRENCY}
             </p>
           </div>
           <div>
@@ -331,7 +333,6 @@ const PropertyCard = ({ property, onNavigate, showMyBadge = false }) => {
 
 const AllPropertiesTab = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
   const [properties, setProperties] = useState([]);
   const [pagination, setPagination] = useState(DEFAULT_PAGINATION);
   const [loading, setLoading] = useState(true);
@@ -369,13 +370,6 @@ const AllPropertiesTab = () => {
   const handleFilter = (key, value) =>
     setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
   const handlePage = (page) => setFilters((prev) => ({ ...prev, page }));
-
-  const publicStatusOptions = [
-    { value: "published", label: "Published" },
-    { value: "in_contract", label: "In Contract" },
-    { value: "active", label: "Active" },
-    { value: "completed", label: "Completed" },
-  ];
 
   return (
     <div className="space-y-5">
@@ -456,16 +450,6 @@ const MyPropertiesTab = ({ onCreateNew }) => {
     setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
   const handlePage = (page) => setFilters((prev) => ({ ...prev, page }));
 
-  const myStatusOptions = [
-    { value: "draft", label: "Draft" },
-    { value: "pending_review", label: "Pending Review" },
-    { value: "published", label: "Published" },
-    { value: "in_contract", label: "In Contract" },
-    { value: "active", label: "Active" },
-    { value: "completed", label: "Completed" },
-    { value: "rejected", label: "Rejected" },
-  ];
-
   return (
     <div className="space-y-5">
       <FilterBar
@@ -510,7 +494,7 @@ const MyPropertiesTab = ({ onCreateNew }) => {
 
 // ── OFFERS TAB ────────────────────────────────────────────────────────────────
 
-const OffersTab = () => {
+export const OffersTab = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [properties, setProperties] = useState([]);
@@ -747,7 +731,7 @@ const OffersTab = () => {
                     </div>
                     <p className="text-sm text-day-text/60 dark:text-night-text/60">
                       {p.propertyType} · {fmt(p.requestedInvestment)}{" "}
-                      {p.currency || "EUR"}
+                      {APP_CURRENCY}
                     </p>
                   </div>
 
@@ -757,7 +741,7 @@ const OffersTab = () => {
                       onClick={() => navigate(`/owner/properties/${pid}`)}
                       className="px-3 py-1.5 text-xs font-medium rounded-lg border border-day-border dark:border-night-border hover:bg-day-background dark:hover:bg-night-background transition-colors"
                     >
-                      Details
+                      {t("properties.property_details") || "Property Details"}
                     </button>
                     <button
                       onClick={() => toggleOffers(pid)}
@@ -802,7 +786,7 @@ const OffersTab = () => {
                                 </div>
                                 <p className="text-xs text-day-text/60 dark:text-night-text/60">
                                   {fmt(inv.amountInvested)}{" "}
-                                  {inv.currency || "EUR"} ·{" "}
+                                  {APP_CURRENCY} ·{" "}
                                   {formatDate(inv.createdAt)}
                                 </p>
                               </div>
@@ -815,7 +799,7 @@ const OffersTab = () => {
                                   }
                                   className="px-3 py-1.5 text-xs font-medium rounded-lg border border-day-border dark:border-night-border hover:bg-day-surface dark:hover:bg-night-surface transition-colors"
                                 >
-                                  Detail →
+                                  Offer Details →
                                 </button>
 
                                 {inv.status === "offer_sent" && (
@@ -866,7 +850,6 @@ const OffersTab = () => {
 
 const InvestedTab = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
   const [properties, setProperties] = useState([]);
   const [pagination, setPagination] = useState(DEFAULT_PAGINATION);
   const [loading, setLoading] = useState(true);

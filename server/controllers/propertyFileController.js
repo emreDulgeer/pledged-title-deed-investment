@@ -1,9 +1,12 @@
 // server/controllers/propertyFileController.js
 
+const path = require("path");
 const responseWrapper = require("../utils/responseWrapper");
 const FileUploadManager = require("../services/FileUploadManager");
 const FileMetadata = require("../models/FileMetadata");
 const Property = require("../models/Property");
+const LocalStorageProvider = require("../utils/providers/LocalStorageProvider");
+const MinioStorageProvider = require("../utils/providers/MinioStorageProvider");
 const {
   clampPercentage,
   normalizePropertyImagePresentation,
@@ -23,6 +26,89 @@ const parseImageWarnings = (value) => {
   }
 };
 
+const parseJsonArray = (value) => {
+  if (!value || typeof value !== "string") return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    return [];
+  }
+};
+
+const normalizeDocumentTypes = (value) => {
+  const values = toRequestArray(value)
+    .flatMap((item) =>
+      typeof item === "string" && item.includes(",")
+        ? item
+            .split(",")
+            .map((part) => part.trim())
+            .filter(Boolean)
+        : item,
+    )
+    .map((item) => String(item).trim())
+    .filter(Boolean);
+
+  return values;
+};
+
+const normalizePropertyFileMetadataDocumentType = (type) => {
+  if (type === "title_deed" || type === "annotation") {
+    return type;
+  }
+
+  return "other";
+};
+
+const createStorageProvider = (storageType, bucket) => {
+  if (storageType === "minio") {
+    return new MinioStorageProvider({
+      endPoint: process.env.MINIO_ENDPOINT,
+      port: process.env.MINIO_PORT,
+      useSSL: process.env.MINIO_USE_SSL,
+      accessKey: process.env.MINIO_ACCESS_KEY,
+      secretKey: process.env.MINIO_SECRET_KEY,
+      bucket: bucket || process.env.MINIO_BUCKET,
+      publicBaseUrl: process.env.MINIO_PUBLIC_URL,
+    });
+  }
+
+  return new LocalStorageProvider({
+    localPath: path.resolve(__dirname, "../../uploads"),
+  });
+};
+
+const buildUploadFailureMessage = (label, failedResults = []) => {
+  const details = failedResults
+    .slice(0, 3)
+    .map(
+      (result) =>
+        `${result.filename || "unknown file"}${result.error ? ` (${result.error})` : ""}`,
+    )
+    .join(", ");
+
+  const moreCount = Math.max(0, failedResults.length - 3);
+  const moreSuffix = moreCount > 0 ? ` and ${moreCount} more` : "";
+
+  return `${label} upload failed for ${failedResults.length} file(s): ${details}${moreSuffix}`;
+};
+
+const isUploadValidationError = (message = "") =>
+  [
+    "kabul edilmemektedir",
+    "Güvensiz dosya adı",
+    "Dosya boyutu",
+    "Dosya tipi belirlenemedi",
+    "Dosya içeriği ile belirtilen tip uyuşmuyor",
+    "Çift uzantılı dosyalar",
+    "okunamadı veya bozuk",
+    "işlenemedi",
+    "JavaScript tespit edildi",
+    "matching document type",
+    "Invalid or missing document type",
+  ].some((token) => message.includes(token));
+
 class PropertyFileController {
   constructor() {
     this.fileUploadManager = new FileUploadManager();
@@ -34,6 +120,36 @@ class PropertyFileController {
 
   buildPreviewUrl(fileId) {
     return `/api/v1/files/preview/${fileId}`;
+  }
+
+  async cleanupUploadedFiles(uploadResults = []) {
+    const successfulResults = uploadResults.filter(
+      (result) => result?.success && result?.data?.filename,
+    );
+
+    await Promise.allSettled(
+      successfulResults.map(async (result) => {
+        const uploadData = result.data;
+        const provider = createStorageProvider(
+          process.env.STORAGE_TYPE || "local",
+          uploadData.bucket,
+        );
+
+        await provider.delete(
+          uploadData.filename,
+          uploadData.directory,
+          { hard: true },
+        );
+      }),
+    );
+  }
+
+  async cleanupCreatedMetadata(metadataIds = []) {
+    if (!Array.isArray(metadataIds) || metadataIds.length === 0) {
+      return;
+    }
+
+    await FileMetadata.deleteMany({ _id: { $in: metadataIds } });
   }
 
   createPropertyUploadManager({
@@ -65,6 +181,9 @@ class PropertyFileController {
 
   // Property görseli yükle
   uploadPropertyImage = async (req, res) => {
+    const createdMetadataIds = [];
+    let uploadResultsForCleanup = [];
+
     try {
       const userId = req.user._id;
       const userRole = req.user.role;
@@ -125,6 +244,19 @@ class PropertyFileController {
         return responseWrapper.error(res, "No files uploaded");
       }
 
+      uploadResultsForCleanup = req.uploadResults;
+
+      const failedResults = req.uploadResults.filter((result) => !result.success);
+      if (failedResults.length > 0) {
+        await this.cleanupUploadedFiles(req.uploadResults);
+        uploadResultsForCleanup = [];
+
+        return responseWrapper.badRequest(
+          res,
+          buildUploadFailureMessage("Image", failedResults),
+        );
+      }
+
       const uploadedImages = [];
       const currentImageCount = property.images?.length || 0;
       const imageFocusX = toRequestArray(req.body?.imageFocusX);
@@ -152,14 +284,7 @@ class PropertyFileController {
       let primaryAssigned = property.images.some((image) => image?.isPrimary);
 
       for (let i = 0; i < req.uploadResults.length; i++) {
-        const result = req.uploadResults[i];
-
-        if (!result.success) {
-          console.error(`Image upload failed: ${result.error}`);
-          continue;
-        }
-
-        const uploadData = result.data;
+        const uploadData = req.uploadResults[i].data;
 
         // FileMetadata oluştur
         const fileMetadata = new FileMetadata({
@@ -189,6 +314,7 @@ class PropertyFileController {
         });
 
         await fileMetadata.save();
+        createdMetadataIds.push(fileMetadata._id);
         fileMetadata.url = this.buildPreviewUrl(fileMetadata._id);
         await fileMetadata.save();
 
@@ -267,13 +393,21 @@ class PropertyFileController {
         `${uploadedImages.length} images uploaded successfully`
       );
     } catch (error) {
+      await this.cleanupCreatedMetadata(createdMetadataIds);
+      await this.cleanupUploadedFiles(uploadResultsForCleanup);
       console.error("Property image upload error:", error);
+      if (isUploadValidationError(error.message)) {
+        return responseWrapper.badRequest(res, error.message);
+      }
       return responseWrapper.error(res, error.message);
     }
   };
 
   // Property dökümanı yükle (title deed, valuation report, etc.)
   uploadPropertyDocument = async (req, res) => {
+    const createdMetadataIds = [];
+    let uploadResultsForCleanup = [];
+
     try {
       const userId = req.user._id;
       const userRole = req.user.role;
@@ -332,20 +466,19 @@ class PropertyFileController {
         });
       });
       const { documentType, description } = req.body || {};
-      const documentTypes = Array.isArray(req.body?.documentTypes)
-        ? req.body.documentTypes
-        : req.body?.documentTypes
-          ? [req.body.documentTypes]
-          : documentType
-            ? [documentType]
-            : [];
-      const descriptions = Array.isArray(req.body?.documentDescriptions)
-        ? req.body.documentDescriptions
-        : req.body?.documentDescriptions
-          ? [req.body.documentDescriptions]
-          : description
-            ? [description]
-            : [];
+      const documentManifest = parseJsonArray(req.body?.documentManifest);
+      const documentTypes =
+        documentManifest.length > 0
+          ? documentManifest
+              .map((item) => String(item?.type || "").trim())
+              .filter(Boolean)
+          : normalizeDocumentTypes(req.body?.documentTypes || documentType);
+      const descriptions =
+        documentManifest.length > 0
+          ? documentManifest.map((item) => String(item?.description || ""))
+          : toRequestArray(req.body?.documentDescriptions || description).map(
+              (item) => String(item ?? ""),
+            );
       const validTypes = [
         "title_deed",
         "annotation",
@@ -368,22 +501,32 @@ class PropertyFileController {
         return responseWrapper.error(res, "File upload failed");
       }
 
-      const successfulResults = req.uploadResults.filter((item) => item.success);
-      if (successfulResults.length === 0) {
-        return responseWrapper.error(res, "File upload failed");
-      }
+      uploadResultsForCleanup = req.uploadResults;
 
-      if (successfulResults.length !== documentTypes.length) {
+      if (req.uploadResults.length !== documentTypes.length) {
+        await this.cleanupUploadedFiles(req.uploadResults);
+        uploadResultsForCleanup = [];
         return responseWrapper.badRequest(
           res,
           "Each uploaded file must have a matching document type"
         );
       }
 
+      const failedResults = req.uploadResults.filter((item) => !item.success);
+      if (failedResults.length > 0) {
+        await this.cleanupUploadedFiles(req.uploadResults);
+        uploadResultsForCleanup = [];
+
+        return responseWrapper.badRequest(
+          res,
+          buildUploadFailureMessage("Document", failedResults),
+        );
+      }
+
       const uploadedDocuments = [];
 
-      for (let i = 0; i < successfulResults.length; i++) {
-        const uploadResult = successfulResults[i].data;
+      for (let i = 0; i < req.uploadResults.length; i++) {
+        const uploadResult = req.uploadResults[i].data;
         const currentType = documentTypes[i];
         const currentDescription = descriptions[i] || "";
 
@@ -405,11 +548,17 @@ class PropertyFileController {
           uploadedBy: userId,
           relatedModel: "Property",
           relatedId: propertyId,
-          documentType: currentType,
+          documentType: normalizePropertyFileMetadataDocumentType(currentType),
           isPublic: false,
+          metadata: {
+            customData: {
+              propertyDocumentType: currentType,
+            },
+          },
         });
 
         await fileMetadata.save();
+        createdMetadataIds.push(fileMetadata._id);
         fileMetadata.url = this.buildPreviewUrl(fileMetadata._id);
         await fileMetadata.save();
 
@@ -459,7 +608,12 @@ class PropertyFileController {
         `${uploadedDocuments.length} documents uploaded successfully`
       );
     } catch (error) {
+      await this.cleanupCreatedMetadata(createdMetadataIds);
+      await this.cleanupUploadedFiles(uploadResultsForCleanup);
       console.error("Property document upload error:", error);
+      if (isUploadValidationError(error.message)) {
+        return responseWrapper.badRequest(res, error.message);
+      }
       return responseWrapper.error(res, error.message);
     }
   };

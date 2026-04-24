@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import { selectUser } from "../../store/slices/authSlice";
 import bridge from "../../controllers/bridge";
+import { APP_CURRENCY } from "../../utils/currency";
 
 // ── Sabit yardımcılar ─────────────────────────────────────────────────────────
 
@@ -26,7 +27,7 @@ const PAYMENT_STATUS_COLORS = {
   delayed: "text-red-600 dark:text-red-400",
 };
 
-const fmt = (num, currency = "") =>
+const fmt = (num, currency = APP_CURRENCY) =>
   `${(num ?? 0).toLocaleString("en-US")}${currency ? " " + currency : ""}`;
 
 const formatDate = (str) =>
@@ -466,7 +467,7 @@ const OwnerDashboard = () => {
                       {/* Value */}
                       <td className="px-4 py-3 font-medium text-day-text dark:text-night-text">
                         {prop.estimatedValue
-                          ? fmt(prop.estimatedValue, prop.currency || "TRY")
+                          ? fmt(prop.estimatedValue, APP_CURRENCY)
                           : "—"}
                       </td>
 
@@ -567,7 +568,7 @@ const OwnerDashboard = () => {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-day-text dark:text-night-text">
-                      {fmt(payment.amount)} {payment.currency || "TRY"}
+                      {fmt(payment.amount, APP_CURRENCY)}
                     </p>
                     <p
                       className={`text-xs font-medium capitalize ${PAYMENT_STATUS_COLORS[payment.status] || PAYMENT_STATUS_COLORS.pending}`}
@@ -611,7 +612,7 @@ const OwnerDashboard = () => {
 
           <QuickAction
             label={t("owner.view_offers") || "View Offers"}
-            onClick={() => navigate("/owner/investments")}
+            onClick={() => navigate("/owner/offers")}
             iconColor="text-day-secondary dark:text-night-secondary"
             icon={
               <svg

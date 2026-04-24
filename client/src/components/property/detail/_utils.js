@@ -1,5 +1,6 @@
 // _utils.js
 import { Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { APP_CURRENCY_SYMBOL } from "../../../utils/currency";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:5001/api/v1";
@@ -35,8 +36,7 @@ export const getStatusConfig = (status, t) => {
   return map[status] || map.draft;
 };
 
-export const currencySymbol = (c) =>
-  ({ USD: "$", EUR: "€", GBP: "£", TRY: "₺" }[c] || c);
+export const currencySymbol = () => APP_CURRENCY_SYMBOL;
 export const propertyTypeLabel = (t, type) =>
   t(`properties.types.${type}`, type);
 

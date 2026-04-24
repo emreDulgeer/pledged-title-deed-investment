@@ -83,6 +83,8 @@
       "notary_document": "Documento de Cartório",
       "power_of_attorney": "Procuração",
       "tax_receipt": "Recibo de Imposto",
+      "transfer_document": "Documento de Transferência",
+      "refund_receipt": "Recibo de Reembolso",
       "other": "Outro"
     }
   },
@@ -218,6 +220,7 @@
     "title_deed_pending": "Escritura Pendente",
     "active": "Ativo",
     "completed": "Concluído",
+    "refunded": "Reembolsado",
     "defaulted": "Inadimplente",
     "offerSent": "Oferta Enviada",
     "contractSigned": "Contrato Assinado",

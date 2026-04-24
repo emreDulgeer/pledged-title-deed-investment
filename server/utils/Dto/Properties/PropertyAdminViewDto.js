@@ -1,3 +1,5 @@
+const { APP_CURRENCY } = require("../../currency");
+
 class PropertyAdminViewDto {
   constructor(property) {
     this.id = property._id;
@@ -14,7 +16,7 @@ class PropertyAdminViewDto {
     this.requestedInvestment = property.requestedInvestment;
     this.rentOffered = property.rentOffered;
     this.annualYieldPercent = property.annualYieldPercent;
-    this.currency = property.currency;
+    this.currency = APP_CURRENCY;
     this.contractPeriodMonths = property.contractPeriodMonths;
     this.images = property.images;
     this.documents = property.documents;

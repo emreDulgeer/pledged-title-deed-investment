@@ -9,6 +9,7 @@ import {
   getPropertyImageStyle,
   getPropertyImageUrl,
 } from "../../utils/propertyImages";
+import { APP_CURRENCY, APP_CURRENCY_SYMBOL } from "../../utils/currency";
 
 const InvestorDashboard = () => {
   const navigate = useNavigate();
@@ -149,21 +150,21 @@ const InvestorDashboard = () => {
         <StatsCard
           t={t}
           title={t("investor.totalInvested")}
-          value={`${stats.totalInvested.toLocaleString()} ₺`}
+          value={`${stats.totalInvested.toLocaleString()} ${APP_CURRENCY_SYMBOL}`}
           icon="💰"
           color="purple"
         />
         <StatsCard
           t={t}
           title={t("investor.monthlyIncome")}
-          value={`${stats.monthlyIncome.toLocaleString()} ₺`}
+          value={`${stats.monthlyIncome.toLocaleString()} ${APP_CURRENCY_SYMBOL}`}
           icon="📈"
           color="emerald"
         />
         <StatsCard
           t={t}
           title={t("investor.totalEarnings")}
-          value={`${stats.totalEarnings.toLocaleString()} ₺`}
+          value={`${stats.totalEarnings.toLocaleString()} ${APP_CURRENCY_SYMBOL}`}
           icon="💎"
           color="amber"
         />
@@ -249,7 +250,7 @@ const InvestorDashboard = () => {
                     <td className="px-4 py-4">
                       <p className="font-semibold text-gray-900 dark:text-white">
                         {investment.amountInvested.toLocaleString()}{" "}
-                        {investment.currency}
+                        {APP_CURRENCY}
                       </p>
                     </td>
                     <td className="px-4 py-4">
@@ -263,7 +264,7 @@ const InvestorDashboard = () => {
                       <p className="text-gray-900 dark:text-white">
                         {investment.property?.rentOffered?.toLocaleString() ||
                           0}{" "}
-                        ₺
+                        {APP_CURRENCY_SYMBOL}
                       </p>
                     </td>
                     <td className="px-4 py-4">
@@ -322,7 +323,7 @@ const InvestorDashboard = () => {
                 </div>
                 <div className="text-right">
                   <p className="font-semibold text-gray-900 dark:text-white">
-                    {payment.amount?.toLocaleString()} ₺
+                    {payment.amount?.toLocaleString()} {APP_CURRENCY_SYMBOL}
                   </p>
                   <span className="text-xs text-yellow-600">
                     {t("investor.pending")}

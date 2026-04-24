@@ -1,5 +1,6 @@
 // server/services/propertyService.js
 
+const path = require("path");
 const PropertyRepository = require("../repositories/propertyRepository");
 const geocodingService = require("./geocoding");
 const {
@@ -20,8 +21,51 @@ const {
   normalizeSupportedPropertyCountry,
 } = require("../utils/propertyCountries");
 const officialPropertyDataService = require("./officialPropertyData");
+const { APP_CURRENCY } = require("../utils/currency");
+const FileMetadata = require("../models/FileMetadata");
+const Investment = require("../models/Investment");
+const Investor = require("../models/Investor");
+const PropertyOwner = require("../models/PropertyOwner");
+const LocalStorageProvider = require("../utils/providers/LocalStorageProvider");
+const MinioStorageProvider = require("../utils/providers/MinioStorageProvider");
+const { resolveStorageDirectory } = require("../utils/fileStoragePath");
 
 const SUPPORTED_PROPERTY_COUNTRIES_MESSAGE = `Properties can only be created in the supported countries: ${SUPPORTED_PROPERTY_COUNTRY_NAMES.join(", ")}`;
+const BLOCKING_PROPERTY_DELETE_INVESTMENT_STATUSES = [
+  "offer_sent",
+  "contract_signed",
+  "title_deed_pending",
+  "active",
+];
+
+const createStorageProvider = (storageType, bucket) => {
+  if (storageType === "minio") {
+    return new MinioStorageProvider({
+      endPoint: process.env.MINIO_ENDPOINT,
+      port: process.env.MINIO_PORT,
+      useSSL: process.env.MINIO_USE_SSL,
+      accessKey: process.env.MINIO_ACCESS_KEY,
+      secretKey: process.env.MINIO_SECRET_KEY,
+      bucket: bucket || process.env.MINIO_BUCKET,
+      publicBaseUrl: process.env.MINIO_PUBLIC_URL,
+    });
+  }
+
+  return new LocalStorageProvider({
+    localPath: path.resolve(__dirname, "../../uploads"),
+  });
+};
+
+const resolveMetadataLocation = (metadata) => ({
+  filename: metadata.filename,
+  directory:
+    metadata.directory ||
+    resolveStorageDirectory({
+      relatedModel: metadata.relatedModel,
+      relatedId: metadata.relatedId,
+      mimeType: metadata.mimeType,
+    }),
+});
 
 const normalizePropertyCountryOrThrow = (country) => {
   const normalizedCountry = normalizeSupportedPropertyCountry(country);
@@ -134,6 +178,7 @@ class PropertyService {
     const normalizedPropertyData = {
       ...propertyData,
       country: normalizePropertyCountryOrThrow(propertyData.country),
+      currency: APP_CURRENCY,
     };
 
     // Business logic validations
@@ -159,7 +204,10 @@ class PropertyService {
 
   // Property gÃ¼ncelle
   async updateProperty(propertyId, updateData, ownerId, isAdmin = false) {
-    const normalizedUpdateData = { ...updateData };
+    const normalizedUpdateData = {
+      ...updateData,
+      currency: APP_CURRENCY,
+    };
     const property = await this.propertyRepository.findById(propertyId);
 
     if (!property) {
@@ -236,7 +284,74 @@ class PropertyService {
       throw new Error("Cannot delete property with active contracts");
     }
 
+    const blockingInvestment = await Investment.findOne({
+      property: propertyId,
+      status: { $in: BLOCKING_PROPERTY_DELETE_INVESTMENT_STATUSES },
+    }).select("_id status");
+
+    if (blockingInvestment) {
+      throw new Error("Cannot delete property with active or pending investments");
+    }
+
+    const propertyFiles = await FileMetadata.find({
+      relatedModel: "Property",
+      relatedId: propertyId,
+    }).select("filename directory storageType bucket relatedModel relatedId mimeType");
+
+    for (const metadata of propertyFiles) {
+      const provider = createStorageProvider(
+        metadata.storageType || process.env.STORAGE_TYPE || "local",
+        metadata.bucket,
+      );
+      const location = resolveMetadataLocation(metadata);
+
+      try {
+        await provider.delete(location.filename, location.directory, {
+          hard: true,
+        });
+      } catch (error) {
+        const message = String(error?.message || "");
+        if (
+          message.includes("Dosya bulunamadı") ||
+          message.includes("Not Found") ||
+          message.includes("ENOENT")
+        ) {
+          console.warn("Property delete skipped missing physical file:", {
+            fileId: metadata._id?.toString?.(),
+            filename: location.filename,
+            directory: location.directory,
+          });
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    if (propertyFiles.length > 0) {
+      await FileMetadata.deleteMany({
+        _id: { $in: propertyFiles.map((file) => file._id) },
+      });
+    }
+
     await this.propertyRepository.delete(propertyId);
+    await Investor.updateMany(
+      { favoriteProperties: propertyId },
+      { $pull: { favoriteProperties: propertyId } },
+    );
+    await PropertyOwner.updateOne(
+      { _id: property.owner },
+      { $pull: { properties: propertyId } },
+    );
+
+    const remainingPropertyCount = await this.propertyRepository.count({
+      owner: property.owner,
+    });
+    await PropertyOwner.updateOne(
+      { _id: property.owner },
+      { $set: { totalProperties: remainingPropertyCount } },
+    );
+
     return { message: "Property deleted successfully" };
   }
 

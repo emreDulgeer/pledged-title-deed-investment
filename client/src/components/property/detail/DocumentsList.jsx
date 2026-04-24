@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { FileText, Download, Shield } from "lucide-react";
 
 const prettifyDocType = (type = "") =>
@@ -8,13 +9,16 @@ const prettifyDocType = (type = "") =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
-const DocumentsList = ({ documents = [], t }) => {
+const DocumentsList = ({ documents = [], onDownload, t: translate }) => {
+  const { t } = useTranslation();
+  const tr = translate || t;
+
   if (!documents.length) return null;
 
   return (
     <div className="bg-day-surface dark:bg-night-surface rounded-lg shadow-lg p-6">
       <h3 className="text-lg font-semibold text-day-text dark:text-night-text mb-4">
-        {t("properties.documents")}
+        {tr("properties.documents")}
       </h3>
 
       <div className="space-y-2">
@@ -28,7 +32,7 @@ const DocumentsList = ({ documents = [], t }) => {
               <FileText className="w-5 h-5 text-day-text/70 dark:text-night-text/70" />
               <span className="text-day-text/90 dark:text-night-text/90">
                 {doc.name ||
-                  t(
+                  tr(
                     `documents.types.${doc.type}`,
                     prettifyDocType(doc.type) || `Document ${index + 1}`,
                   )}
@@ -37,7 +41,19 @@ const DocumentsList = ({ documents = [], t }) => {
                 <Shield className="w-4 h-4 text-day-primary dark:text-night-primary" />
               )}
             </div>
-            <button className="text-day-secondary dark:text-night-secondary hover:underline">
+            <button
+              type="button"
+              disabled={!onDownload || !doc.fileId}
+              onClick={() =>
+                onDownload?.(
+                  doc.fileId,
+                  doc.name ||
+                    prettifyDocType(doc.type) ||
+                    `document-${index + 1}`,
+                )
+              }
+              className="text-day-secondary dark:text-night-secondary hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <Download className="w-4 h-4" />
             </button>
           </div>

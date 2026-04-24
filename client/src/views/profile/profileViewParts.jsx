@@ -12,6 +12,7 @@ import {
   getPropertyImageStyle,
   getPropertyImageUrl,
 } from "../../utils/propertyImages";
+import { APP_CURRENCY } from "../../utils/currency";
 
 export const ROLE_LABELS = {
   admin: "Admin",
@@ -94,7 +95,7 @@ export const PropertyCard = ({ property, detailPath }) => {
             <p className="mt-1 text-sm text-day-text/60 dark:text-night-text/60">
               {property.propertyType || "Property"} ·{" "}
               {property.requestedInvestment?.toLocaleString?.() || "-"}{" "}
-              {property.currency || "EUR"}
+              {APP_CURRENCY}
             </p>
           </div>
           <span className="rounded-full bg-day-accent/10 px-3 py-1 text-xs font-medium text-day-accent dark:bg-night-accent/15 dark:text-night-accent">
@@ -158,7 +159,7 @@ export const InvestmentCard = ({ investment, detailPath }) => {
           <p className="text-xs uppercase tracking-[0.12em]">Amount</p>
           <p className="mt-1 font-medium text-day-text dark:text-night-text">
             {investment.amountInvested?.toLocaleString?.() || "-"}{" "}
-            {investment.currency || "EUR"}
+            {APP_CURRENCY}
           </p>
         </div>
         <div>

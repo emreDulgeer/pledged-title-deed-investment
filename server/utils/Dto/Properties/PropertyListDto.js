@@ -1,4 +1,5 @@
 const { getPrimaryPropertyImage } = require("../../propertyImages");
+const { APP_CURRENCY } = require("../../currency");
 
 class PropertyListDto {
   constructor(property) {
@@ -11,7 +12,7 @@ class PropertyListDto {
     this.requestedInvestment = property.requestedInvestment;
     this.rentOffered = property.rentOffered;
     this.annualYieldPercent = property.annualYieldPercent;
-    this.currency = property.currency;
+    this.currency = APP_CURRENCY;
     this.contractPeriodMonths = property.contractPeriodMonths;
     this.status = property.status;
     this.trustScore = property.trustScore;

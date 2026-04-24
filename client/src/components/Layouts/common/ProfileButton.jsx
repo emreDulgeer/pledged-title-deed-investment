@@ -1,19 +1,30 @@
 // src/components/Layouts/Admin/Topbar/ProfileButton.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ChevronDown, Settings, UserRound } from "lucide-react";
 import {
+  ChevronDown,
+  LogOut,
+  MonitorCog,
+  Settings,
+  UserRound,
+} from "lucide-react";
+import {
+  getAppSettingsPath,
   getProfileSettingsPath,
   getUserProfilePath,
   getUserId,
 } from "../../../utils/profileRoutes";
 
-const ProfileButton = ({ theme, user }) => {
+const menuItemClassName =
+  "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-day-text dark:text-night-text hover:bg-day-background dark:hover:bg-night-background transition-colors";
+
+const ProfileButton = ({ theme, user, onLogout }) => {
   const location = useLocation();
   const dropdownRef = useRef(null);
   const [open, setOpen] = useState(false);
   const profilePath = getUserProfilePath(getUserId(user));
   const settingsPath = getProfileSettingsPath();
+  const appSettingsPath = getAppSettingsPath(user?.role);
 
   useEffect(() => {
     setOpen(false);
@@ -81,18 +92,33 @@ const ProfileButton = ({ theme, user }) => {
           <div className="p-2">
             <Link
               to={profilePath}
-              className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-day-text dark:text-night-text hover:bg-day-background dark:hover:bg-night-background transition-colors"
+              className={menuItemClassName}
             >
               <UserRound className="h-4 w-4" />
               Profile
             </Link>
             <Link
               to={settingsPath}
-              className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-day-text dark:text-night-text hover:bg-day-background dark:hover:bg-night-background transition-colors"
+              className={menuItemClassName}
             >
               <Settings className="h-4 w-4" />
               Profile Settings
             </Link>
+            <Link to={appSettingsPath} className={menuItemClassName}>
+              <MonitorCog className="h-4 w-4" />
+              App Settings
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onLogout?.();
+              }}
+              className={menuItemClassName}
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </button>
           </div>
         </div>
       )}

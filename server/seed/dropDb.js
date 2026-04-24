@@ -1,14 +1,27 @@
-const mongoose = require("mongoose");
+const {
+  connectToDatabase,
+  disconnectDatabase,
+  getMongoUri,
+  resetDatabaseAndStorage,
+} = require("./seedSupport");
 
 async function dropDB() {
-  await mongoose.connect(
-    process.env.MONGODB_URI ||
-      process.env.MONGO_URI ||
-      "mongodb://localhost:27021/pledged_platform"
-  );
-  await mongoose.connection.dropDatabase();
-  console.log("✅ Veritabanı tamamen silindi.");
-  await mongoose.disconnect();
+  await connectToDatabase();
+
+  const { storage } = await resetDatabaseAndStorage({ clearStorage: true });
+
+  console.log(`MongoDB reset completed: ${getMongoUri()}`);
+  if (storage.storageType === "minio") {
+    console.log(
+      `MinIO bucket reset completed: ${storage.bucket} (${storage.clearedObjects} objects removed)`,
+    );
+  }
+
+  await disconnectDatabase();
 }
 
-dropDB().catch(console.error);
+dropDB().catch(async (error) => {
+  console.error("Database reset failed:", error);
+  await disconnectDatabase();
+  process.exit(1);
+});

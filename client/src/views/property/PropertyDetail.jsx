@@ -173,6 +173,38 @@ const PropertyDetail = () => {
     }
   };
 
+  const getDocumentFileId = (document) => {
+    if (!document) return "";
+
+    const rawId =
+      document.fileId?._id ||
+      document.fileId?.id ||
+      document.fileId ||
+      document.id ||
+      document._id;
+
+    return rawId ? String(rawId) : "";
+  };
+
+  const handleDownloadDocument = (fileId, fileName) => {
+    if (!fileId) {
+      return;
+    }
+
+    try {
+      const downloadUrl = bridge.files.getDownloadUrl(fileId);
+
+      if (!downloadUrl) {
+        throw new Error("Download URL could not be created");
+      }
+
+      bridge.files.triggerBrowserDownload(downloadUrl, fileName);
+    } catch (downloadError) {
+      console.error("Property document download error:", downloadError);
+      alert(t("common.error"));
+    }
+  };
+
   // UI states
   if (loading)
     return (
@@ -248,7 +280,19 @@ const PropertyDetail = () => {
           )}
 
           {property.documents?.length > 0 && (
-            <DocumentsList documents={property.documents} t={t} />
+            <DocumentsList
+              documents={(property.documents || []).map((document) => ({
+                ...document,
+                fileId: getDocumentFileId(document),
+                name:
+                  document.fileName ||
+                  document.name ||
+                  document.originalName ||
+                  document.fileId?.originalName,
+              }))}
+              onDownload={handleDownloadDocument}
+              t={t}
+            />
           )}
         </div>
 

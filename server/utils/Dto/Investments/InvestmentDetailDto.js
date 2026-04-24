@@ -126,11 +126,14 @@ class InvestmentDetailDto extends InvestmentDto {
           "title_deed_pending",
           "active",
           "completed",
+          "refunded",
         ].includes(investment.status),
         date: investment.contractFile ? investment.updatedAt : null,
       },
       titleDeedRegistered: {
-        completed: ["active", "completed"].includes(investment.status),
+        completed: ["active", "completed", "refunded"].includes(
+          investment.status
+        ),
         date: investment.titleDeedDocument ? investment.updatedAt : null,
       },
       rentalPeriod: {
@@ -138,8 +141,10 @@ class InvestmentDetailDto extends InvestmentDto {
         startDate: investment.titleDeedDocument ? investment.updatedAt : null,
       },
       completion: {
-        completed: investment.status === "completed",
-        date: investment.status === "completed" ? investment.updatedAt : null,
+        completed: ["completed", "refunded"].includes(investment.status),
+        date: ["completed", "refunded"].includes(investment.status)
+          ? investment.updatedAt
+          : null,
         method: investment.refund?.refunded
           ? "refund"
           : investment.transferOfProperty?.transferred

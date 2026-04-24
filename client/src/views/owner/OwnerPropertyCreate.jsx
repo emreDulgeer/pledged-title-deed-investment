@@ -19,6 +19,7 @@ import {
   PROPERTY_CROP_PRESETS,
   createPropertyImageEntry,
 } from "../../utils/propertyImages";
+import { APP_CURRENCY } from "../../utils/currency";
 
 const INITIAL_FORM = {
   country: "",
@@ -33,7 +34,7 @@ const INITIAL_FORM = {
   requestedInvestment: "",
   rentOffered: "",
   annualYieldPercent: "",
-  currency: "EUR",
+  currency: APP_CURRENCY,
   contractPeriodMonths: "12",
   locationPin: {
     lat: "",
@@ -81,7 +82,7 @@ const buildPayload = (form) => ({
   requestedInvestment: toNumberOrUndefined(form.requestedInvestment),
   rentOffered: toNumberOrUndefined(form.rentOffered),
   annualYieldPercent: toNumberOrUndefined(form.annualYieldPercent),
-  currency: form.currency,
+  currency: APP_CURRENCY,
   contractPeriodMonths: toNumberOrUndefined(form.contractPeriodMonths),
   locationPin:
     form.locationPin.lat !== "" && form.locationPin.lng !== ""
@@ -658,6 +659,15 @@ const OwnerPropertyCreate = () => {
                 entry.description || "",
               );
             });
+            documentFormData.append(
+              "documentManifest",
+              JSON.stringify(
+                documentEntries.map((entry) => ({
+                  type: entry.type,
+                  description: entry.description || "",
+                })),
+              ),
+            );
             await bridge.properties.uploadDocument(createdId, documentFormData);
           }
         } catch (uploadError) {
@@ -1044,15 +1054,15 @@ const OwnerPropertyCreate = () => {
                     Currency
                   </span>
                   <select
-                    value={form.currency}
-                    onChange={(e) => updateField("currency", e.target.value)}
+                    value={APP_CURRENCY}
+                    disabled
                     className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none"
                   >
-                    <option value="EUR">EUR</option>
-                    <option value="USD">USD</option>
-                    <option value="GBP">GBP</option>
-                    <option value="TRY">TRY</option>
+                    <option value={APP_CURRENCY}>{APP_CURRENCY}</option>
                   </select>
+                  <p className="text-xs text-day-text/55 dark:text-night-text/55">
+                    Currency is fixed to Euro.
+                  </p>
                 </label>
 
                 <label className="space-y-2">

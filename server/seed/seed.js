@@ -1,10 +1,7 @@
-// seed/seed.js - Updated with new models
-
-const mongoose = require("mongoose");
+const path = require("path");
 const bcrypt = require("bcryptjs");
-require("dotenv").config();
+require("../models");
 
-// Models
 const User = require("../models/User");
 const Investor = require("../models/Investor");
 const PropertyOwner = require("../models/PropertyOwner");
@@ -15,39 +12,306 @@ const Investment = require("../models/Investment");
 const Notification = require("../models/Notification");
 const MembershipPlan = require("../models/MembershipPlan");
 const Membership = require("../models/Membership");
-const FileMetadata = require("../models/FileMetadata");
 const RentalPayment = require("../models/RentalPayment");
 const ActivityLog = require("../models/ActivityLog");
+const {
+  addDays,
+  addMonths,
+  buildInvestmentDownloadUrl,
+  buildMembershipFeatures,
+  buildPreviewUrl,
+  connectToDatabase,
+  createObjectId,
+  createStorageProvider,
+  disconnectDatabase,
+  resetDatabaseAndStorage,
+  startOfMonthOffset,
+  uploadSeedAsset,
+} = require("./seedSupport");
 
-// MongoDB Connection
-mongoose
-  .connect(
-    process.env.MONGODB_URI ||
-      process.env.MONGO_URI ||
-      "mongodb://localhost:27021/pledged_platform"
-  )
-  .then(async () => {
-    console.log("🟢 MongoDB connected. Checking existing data...");
+const now = new Date();
+const daysAgo = (days) => addDays(now, -days);
+const daysFromNow = (days) => addDays(now, days);
+const monthsFromNow = (months) => addMonths(now, months);
+const monthKey = (offset) => {
+  const value = startOfMonthOffset(now, offset);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
+};
 
-    // Check if data exists
-    const existingUsers = await User.countDocuments();
-    if (existingUsers > 0) {
-      console.log(
-        `⚠️ Found ${existingUsers} existing users. Dropping database...`
-      );
-      await mongoose.connection.db.dropDatabase();
-      console.log("🗑️ Database dropped.");
-    } else {
-      console.log("🗑️ No existing data found. Proceeding with fresh seed...");
-    }
+const dummyDir = path.resolve(__dirname, "../../misc/Dummy Files");
+const dummyFiles = {
+  titleDeed: path.join(dummyDir, "TitleDeed_Dummy.pdf"),
+  annotation: path.join(dummyDir, "Annotation_Dummy.pdf"),
+  valuation: path.join(dummyDir, "ValuationReport_Dummy.pdf"),
+  tax: path.join(dummyDir, "TaxDocument_Dummy.pdf"),
+  floorPlan: path.join(dummyDir, "FloorPlan_Dummy.pdf"),
+  other: path.join(dummyDir, "Other_Dummy.pdf"),
+  genericPdf: path.join(dummyDir, "DummyPdf.pdf"),
+  investmentContract: path.join(dummyDir, "InvestmentContract_Dummy.pdf"),
+  investmentOther: path.join(dummyDir, "InvestmentOther_Dummy.pdf"),
+  paymentReceipt: path.join(dummyDir, "PaymentReceipt_Dummy.pdf"),
+  investmentTaxReceipt: path.join(dummyDir, "InvestmentTaxReceipt_Dummy.pdf"),
+  investmentTitleDeed: path.join(
+    dummyDir,
+    "InvestmentTitleDeedDocument_Dummy.pdf"
+  ),
+  notaryDocument: path.join(dummyDir, "NotaryDocument_Dummy.pdf"),
+  powerOfAttorney: path.join(dummyDir, "PowerOfAttorney_Dummy.pdf"),
+  refundReceipt: path.join(dummyDir, "RefundReceipt_Dummy.pdf"),
+  rentalReceipt: path.join(dummyDir, "RentalReceipt_Dummy.pdf"),
+  transferDocument: path.join(dummyDir, "TransferDocument_Dummy.pdf"),
+  imageWideA: path.join(dummyDir, "DallE1792x1024.webp"),
+  imageWideB: path.join(dummyDir, "DallE1792x1024-2.webp"),
+  imageLandscape: path.join(dummyDir, "DallE1600x1200.webp"),
+  imageTablet: path.join(dummyDir, "DallE1024x768.webp"),
+  imageBanner: path.join(dummyDir, "DallE1280x720.webp"),
+  imagePhone: path.join(dummyDir, "DallE Phone.webp"),
+  imageSquare: path.join(dummyDir, "DallE Kare.webp"),
+};
 
-    // ==================== MEMBERSHIP PLANS ====================
-    console.log("📋 Creating Membership Plans...");
+async function hashPassword(password) {
+  return bcrypt.hash(password, 12);
+}
 
-    const basicPlan = await MembershipPlan.create({
+function baseConsents(marketing = false) {
+  return {
+    terms: true,
+    gdpr: true,
+    marketing,
+    timestamp: daysAgo(120),
+  };
+}
+
+function baseTrustedIp(ip, name) {
+  return [
+    {
+      ip,
+      name,
+      addedAt: daysAgo(60),
+      lastUsedAt: daysAgo(1),
+    },
+  ];
+}
+
+function baseLoginHistory(ip, success = true) {
+  return [
+    {
+      ip,
+      userAgent: "Seeded Browser",
+      location: "Istanbul",
+      success,
+      reason: success ? "seed-login" : "seed-failure",
+      timestamp: daysAgo(1),
+    },
+  ];
+}
+
+function buildPropertyImageEntry(fileMetadata, options = {}) {
+  const width = fileMetadata.metadata?.dimensions?.width;
+  const height = fileMetadata.metadata?.dimensions?.height;
+
+  return {
+    fileId: fileMetadata._id,
+    url: fileMetadata.url,
+    isPrimary: !!options.isPrimary,
+    presentation: {
+      role: options.isPrimary ? "cover" : "gallery",
+      focusX: options.focusX ?? 50,
+      focusY: options.focusY ?? 50,
+      cropPreset: options.cropPreset || "16:9",
+    },
+    quality: {
+      width,
+      height,
+      aspectRatio:
+        width && height ? Number((width / height).toFixed(3)) : undefined,
+      sizeBytes: fileMetadata.size,
+      warnings: options.warnings || [],
+    },
+    order: options.order ?? 0,
+    uploadedAt: options.uploadedAt || daysAgo(1),
+  };
+}
+
+function buildPropertyDocumentEntry(fileMetadata, options = {}) {
+  return {
+    type: options.type,
+    fileId: fileMetadata._id,
+    url: fileMetadata.url,
+    fileName: fileMetadata.originalName,
+    description: options.description,
+    uploadedAt: options.uploadedAt || daysAgo(1),
+    uploadedBy: options.uploadedBy,
+    verifiedBy: options.verifiedBy,
+    verifiedAt: options.verifiedAt,
+  };
+}
+
+function buildInvestmentFileEntry(fileMetadata, options = {}) {
+  return {
+    fileId: fileMetadata._id,
+    url: fileMetadata.url,
+    uploadedAt: options.uploadedAt || daysAgo(1),
+    uploadedBy: options.uploadedBy,
+    verifiedBy: options.verifiedBy,
+    verifiedAt: options.verifiedAt,
+  };
+}
+
+function buildEmbeddedFileRef(fileMetadata) {
+  return {
+    fileId: fileMetadata._id,
+    url: fileMetadata.url,
+  };
+}
+
+async function finalizePropertyFile(fileMetadata) {
+  fileMetadata.url = buildPreviewUrl(fileMetadata._id);
+  await fileMetadata.save();
+  return fileMetadata;
+}
+
+async function finalizeInvestmentFile(fileMetadata, investmentId) {
+  fileMetadata.url = buildInvestmentDownloadUrl(investmentId, fileMetadata._id);
+  await fileMetadata.save();
+  return fileMetadata;
+}
+
+async function createPropertyImage(
+  provider,
+  { sourcePath, seedKey, propertyId, ownerId, order, isPrimary, focusX, focusY },
+) {
+  const fileMetadata = await uploadSeedAsset({
+    provider,
+    sourcePath,
+    seedKey,
+    uploadedBy: ownerId,
+    relatedModel: "Property",
+    relatedId: propertyId,
+    documentType: "property_image",
+    isPublic: true,
+    tags: ["seed", "property", "image"],
+  });
+
+  await finalizePropertyFile(fileMetadata);
+
+  return buildPropertyImageEntry(fileMetadata, {
+    order,
+    isPrimary,
+    focusX,
+    focusY,
+    uploadedAt: daysAgo(20 - order),
+  });
+}
+
+async function createPropertyDocument(
+  provider,
+  {
+    sourcePath,
+    seedKey,
+    propertyId,
+    uploadedBy,
+    type,
+    description,
+    verifiedBy,
+    verifiedAt,
+    uploadedAt,
+  },
+) {
+  const documentType =
+    type === "title_deed" || type === "annotation" ? type : "other";
+
+  const fileMetadata = await uploadSeedAsset({
+    provider,
+    sourcePath,
+    seedKey,
+    uploadedBy,
+    relatedModel: "Property",
+    relatedId: propertyId,
+    documentType,
+    isPublic: false,
+    description,
+    tags: ["seed", "property", "document", type],
+    customData: {
+      propertyDocumentType: type,
+    },
+  });
+
+  await finalizePropertyFile(fileMetadata);
+
+  return buildPropertyDocumentEntry(fileMetadata, {
+    type,
+    description,
+    uploadedBy,
+    uploadedAt,
+    verifiedBy,
+    verifiedAt,
+  });
+}
+
+async function createInvestmentDocument(
+  provider,
+  {
+    sourcePath,
+    seedKey,
+    investmentId,
+    uploadedBy,
+    documentType,
+    description,
+    uploadedAt,
+    verifiedBy,
+    verifiedAt,
+  },
+) {
+  const normalizedDocumentType = [
+    "contract",
+    "title_deed",
+    "payment_receipt",
+    "rental_receipt",
+    "notary_document",
+    "power_of_attorney",
+    "tax_receipt",
+    "transfer_document",
+    "refund_receipt",
+  ].includes(documentType)
+    ? documentType
+    : "other";
+
+  const fileMetadata = await uploadSeedAsset({
+    provider,
+    sourcePath,
+    seedKey,
+    uploadedBy,
+    relatedModel: "Investment",
+    relatedId: investmentId,
+    documentType: normalizedDocumentType,
+    isPublic: false,
+    description,
+    tags: ["seed", "investment", "document", documentType],
+    customData: {
+      investmentDocumentType: documentType,
+    },
+  });
+
+  await finalizeInvestmentFile(fileMetadata, investmentId);
+
+  return {
+    fileMetadata,
+    embedded: buildInvestmentFileEntry(fileMetadata, {
+      uploadedAt,
+      uploadedBy,
+      verifiedBy,
+      verifiedAt,
+    }),
+  };
+}
+
+async function createMembershipPlans() {
+  const plans = await MembershipPlan.create([
+    {
       name: "basic",
       displayName: "Basic",
-      description: "Perfect for getting started with real estate investments",
+      description: "Entry level plan for browsing and a first investment.",
       tier: 1,
       order: 1,
       isActive: true,
@@ -71,36 +335,57 @@ mongoose
         commissions: {
           platformCommissionDiscount: 0,
           rentalCommissionDiscount: 0,
+          referralBonusMultiplier: 1,
         },
         support: {
           level: "email",
           responseTime: "48h",
+          hasLiveChat: false,
+        },
+        services: {
+          includedServices: [],
+          serviceDiscounts: {
+            visa_consultancy: 0,
+            legal_support: 0,
+            tax_advisory: 0,
+            property_management: 0,
+          },
+        },
+        analytics: {
+          hasBasicAnalytics: true,
+          hasAdvancedAnalytics: false,
+          hasMarketReports: false,
+          hasCustomReports: false,
         },
       },
-    });
-
-    const proPlan = await MembershipPlan.create({
+    },
+    {
       name: "pro",
       displayName: "Pro",
-      description: "For serious investors and property owners",
+      description: "Balanced plan for active investors and property owners.",
       tier: 2,
       order: 2,
       isActive: true,
       isVisible: true,
       isHighlighted: true,
       pricing: {
-        monthly: { amount: 19, currency: "EUR" },
-        yearly: { amount: 199, currency: "EUR", discountPercentage: 15 },
+        monthly: { amount: 29, currency: "EUR" },
+        yearly: { amount: 290, currency: "EUR", discountPercentage: 17 },
+        trial: {
+          enabled: true,
+          days: 7,
+          requiresCard: false,
+        },
       },
       features: {
         investments: {
           maxActiveInvestments: 5,
-          maxMonthlyInvestments: 3,
+          maxMonthlyInvestments: 5,
           minInvestmentAmount: 5000,
           maxInvestmentAmount: 500000,
         },
         properties: {
-          maxActiveProperties: 5,
+          maxActiveProperties: 6,
           canListProperties: true,
           priorityListing: true,
           featuredListingDays: 7,
@@ -108,38 +393,54 @@ mongoose
         commissions: {
           platformCommissionDiscount: 1,
           rentalCommissionDiscount: 1,
+          referralBonusMultiplier: 1.2,
         },
         support: {
           level: "priority",
           responseTime: "24h",
           hasPhoneSupport: true,
+          hasLiveChat: true,
+        },
+        services: {
+          includedServices: ["legal_support", "translation_services"],
+          serviceDiscounts: {
+            visa_consultancy: 10,
+            legal_support: 15,
+            tax_advisory: 10,
+            property_management: 5,
+          },
+        },
+        analytics: {
+          hasBasicAnalytics: true,
+          hasAdvancedAnalytics: true,
+          hasMarketReports: false,
+          hasCustomReports: false,
         },
       },
       metadata: {
-        color: "#3B82F6",
-        icon: "star",
-        badge: "Most Popular",
+        badge: "Popular",
+        color: "#2563EB",
       },
-    });
-
-    const enterprisePlan = await MembershipPlan.create({
+    },
+    {
       name: "enterprise",
       displayName: "Enterprise",
-      description: "For institutions and high-volume investors",
+      description: "Unlimited usage with dedicated support and premium services.",
       tier: 3,
       order: 3,
       isActive: true,
       isVisible: true,
       pricing: {
-        monthly: { amount: 99, currency: "EUR" },
-        yearly: { amount: 999, currency: "EUR", discountPercentage: 20 },
+        monthly: { amount: 129, currency: "EUR" },
+        yearly: { amount: 1290, currency: "EUR", discountPercentage: 17 },
       },
       features: {
         investments: {
-          maxActiveInvestments: -1, // unlimited
+          maxActiveInvestments: -1,
           maxMonthlyInvestments: -1,
           minInvestmentAmount: 1000,
           maxInvestmentAmount: -1,
+          allowBulkInvestments: true,
         },
         properties: {
           maxActiveProperties: -1,
@@ -150,782 +451,2017 @@ mongoose
         commissions: {
           platformCommissionDiscount: 3,
           rentalCommissionDiscount: 2,
+          referralBonusMultiplier: 1.5,
         },
         support: {
           level: "dedicated",
-          responseTime: "1h",
+          responseTime: "2h",
           hasPhoneSupport: true,
           hasDedicatedManager: true,
+          hasLiveChat: true,
+        },
+        services: {
+          includedServices: [
+            "visa_consultancy",
+            "legal_support",
+            "tax_advisory",
+            "property_management",
+            "investment_advisory",
+          ],
+          serviceDiscounts: {
+            visa_consultancy: 100,
+            legal_support: 50,
+            tax_advisory: 50,
+            property_management: 25,
+          },
+        },
+        analytics: {
+          hasBasicAnalytics: true,
+          hasAdvancedAnalytics: true,
+          hasMarketReports: true,
+          hasCustomReports: true,
         },
       },
       metadata: {
-        color: "#10B981",
-        icon: "crown",
         badge: "Best Value",
+        color: "#059669",
       },
-    });
+    },
+  ]);
 
-    console.log("✅ Membership Plans created");
+  return {
+    basic: plans[0],
+    pro: plans[1],
+    enterprise: plans[2],
+  };
+}
 
-    // ==================== USERS ====================
-    console.log("👥 Creating Users...");
+async function createUsers() {
+  const passwordHashes = {
+    emre: await hashPassword("Test123!@#"),
+    lara: await hashPassword("Lara123!@#"),
+    selin: await hashPassword("Selin123!@#"),
+    ayse: await hashPassword("Owner123!@#"),
+    mehmet: await hashPassword("Mehmet123!@#"),
+    john: await hashPassword("Rep123!@#"),
+    admin: await hashPassword("Admin123!@#"),
+  };
 
-    // Hash passwords
-    const hashedPasswordInvestor = await bcrypt.hash("Test123!@#", 12);
-    const hashedPasswordOwner = await bcrypt.hash("Owner123!@#", 12);
-    const hashedPasswordMehmet = await bcrypt.hash("Mehmet123!@#", 12);
-    const hashedPasswordRep = await bcrypt.hash("Rep123!@#", 12);
-    const hashedPasswordAdmin = await bcrypt.hash("Admin123!@#", 12);
-
-    // INVESTOR
-    const investor = await Investor.create({
-      email: "emre@investor.com",
-      password: hashedPasswordInvestor,
-      firstName: "Emre",
-      lastName: "Yilmaz",
-      fullName: "Emre Yilmaz",
-      role: "investor",
-      country: "TR",
-      phoneNumber: "+905551234567",
-      emailVerified: true,
-      phoneVerified: false,
-      twoFactorEnabled: false,
-      accountStatus: "active",
-      kycStatus: "Approved",
-      membershipPlan: "basic",
-      membershipStatus: "active",
-      membershipActivatedAt: new Date(),
-      membershipExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-      trustedIPs: [{ ip: "192.168.1.1", label: "home", addedAt: new Date() }],
-      consents: {
-        gdpr: true,
-        terms: true,
-        consentedAt: new Date(),
+  const investorEmre = await Investor.create({
+    email: "emre@investor.com",
+    password: passwordHashes.emre,
+    firstName: "Emre",
+    lastName: "Yilmaz",
+    fullName: "Emre Yilmaz",
+    role: "investor",
+    phoneNumber: "+905551234567",
+    country: "Turkey",
+    emailVerified: true,
+    emailVerifiedAt: daysAgo(180),
+    phoneVerified: true,
+    phoneVerifiedAt: daysAgo(170),
+    accountStatus: "active",
+    membershipPlan: "pro",
+    membershipStatus: "active",
+    membershipActivatedAt: daysAgo(90),
+    membershipExpiresAt: monthsFromNow(3),
+    lastLoginAt: daysAgo(1),
+    lastLoginIP: "95.70.1.10",
+    registrationIP: "95.70.1.10",
+    trustedIPs: [
+      ...baseTrustedIp("95.70.1.10", "Home"),
+      {
+        ip: "85.105.21.90",
+        name: "Office",
+        addedAt: daysAgo(30),
+        lastUsedAt: daysAgo(4),
       },
-
-      investments: [],
-      rentalIncome: [],
-      favoriteProperties: [],
-      bankAccountInfo: {
-        iban: "TR1234567890123456789012",
-        bankName: "Example Bank",
-      },
-      activeInvestmentCount: 0,
-      investmentLimit: 1, // Basic plan limit
-    });
-
-    // PROPERTY OWNER 1
-    const owner = await PropertyOwner.create({
-      email: "ayse@owner.com",
-      password: hashedPasswordOwner,
-      firstName: "Ayse",
-      lastName: "Demir",
-      fullName: "Ayse Demir",
-      role: "property_owner",
-      country: "PT",
-      phoneNumber: "+351912345678",
-      emailVerified: true,
-      phoneVerified: true,
-      twoFactorEnabled: true,
-      accountStatus: "active",
-      kycStatus: "Approved",
-      membershipPlan: "pro",
-      membershipStatus: "active",
-      membershipActivatedAt: new Date(),
-      membershipExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      trustedIPs: [
-        { ip: "192.168.1.2", label: "home", addedAt: new Date() },
-        { ip: "10.0.0.1", label: "office", addedAt: new Date() },
-      ],
-      consents: {
-        gdpr: true, // dataProcessing true idi; GDPR onayı olarak true verelim
-        terms: true, // şartlar onayı
-        consentedAt: new Date(),
-      },
-      properties: [],
-      rentPaymentHistory: [],
-      bankAccountInfo: {
-        iban: "PT50000201231234567890154",
-        bankName: "Banco Example",
-      },
-      completedContracts: 2,
-      ongoingContracts: 1,
-      totalProperties: 2,
-      ownerTrustScore: 85,
-    });
-
-    // PROPERTY OWNER 2
-    const owner2 = await PropertyOwner.create({
-      email: "mehmet@owner.com",
-      password: hashedPasswordMehmet,
-      firstName: "Mehmet",
-      lastName: "Kaya",
-      fullName: "Mehmet Kaya",
-      role: "property_owner",
-      country: "ES",
-      phoneNumber: "+34612345678",
-      emailVerified: true,
-      phoneVerified: false,
-      twoFactorEnabled: false,
-      accountStatus: "active",
-      kycStatus: "Approved",
-      membershipPlan: "basic",
-      membershipStatus: "active",
-      membershipActivatedAt: new Date(),
-      membershipExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      trustedIPs: [{ ip: "192.168.1.3", label: "home", addedAt: new Date() }],
-      consents: {
-        gdpr: true,
-        terms: true,
-        consentedAt: new Date(),
-      },
-      properties: [],
-      rentPaymentHistory: [],
-      bankAccountInfo: {
-        iban: "ES9121000418450200051332",
-        bankName: "Banco Santander",
-      },
-      completedContracts: 0,
-      ongoingContracts: 0,
-      totalProperties: 1,
-      ownerTrustScore: 50,
-    });
-
-    // LOCAL REPRESENTATIVE
-    const localRep = await LocalRepresentative.create({
-      email: "john@rep.com",
-      password: hashedPasswordRep,
-      firstName: "John",
-      lastName: "Doe",
-      fullName: "John Doe",
-      role: "local_representative",
-      country: "PT",
-      phoneNumber: "+351923456789",
-      emailVerified: true,
-      phoneVerified: true,
-      twoFactorEnabled: true,
-      accountStatus: "active",
-      kycStatus: "Approved",
-      membershipPlan: "enterprise",
-      membershipStatus: "active",
-      membershipActivatedAt: new Date(),
-      membershipExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
-      trustedIPs: [
-        { ip: "192.168.1.4", label: "home", addedAt: new Date() },
-        { ip: "10.0.0.2", label: "office", addedAt: new Date() },
-        { ip: "172.16.0.1", label: "vpn", addedAt: new Date() },
-      ],
-      consents: {
-        gdpr: true,
-        terms: true,
-        consentedAt: new Date(),
-      },
-      region: "Portugal",
-      managedProperties: [],
-      assistedTransactions: [],
-      commissionEarned: {
-        total: 5000,
-        pending: 500,
-        paid: 4500,
-        history: [],
-      },
-      bankAccountInfo: {
-        iban: "PT50000201239876543210987",
-        bankName: "Millennium BCP",
-      },
-    });
-
-    // ADMIN
-    const admin = await Admin.create({
-      email: "admin@admin.com",
-      password: hashedPasswordAdmin,
-      firstName: "Admin",
-      lastName: "User",
-      fullName: "Admin User",
-      role: "admin",
-      country: "TR",
-      phoneNumber: "+905559876543",
-      emailVerified: true,
-      phoneVerified: true,
-      twoFactorEnabled: true,
-      accountStatus: "active",
-      kycStatus: "Approved",
-      membershipPlan: "enterprise",
-      membershipStatus: "active",
-      trustedIPs: [
-        { ip: "192.168.1.100", label: "office", addedAt: new Date() },
-        { ip: "10.0.0.100", label: "dc", addedAt: new Date() },
-      ],
-      consents: {
-        gdpr: true,
-        terms: true,
-        consentedAt: new Date(),
-      },
-      adminLevel: "super_admin",
-      permissions: ["all"],
-      department: "Management",
-      lastPasswordChange: new Date(),
-    });
-
-    console.log("✅ Users created");
-
-    // ==================== MEMBERSHIPS ====================
-    console.log("💳 Creating Memberships...");
-
-    // Investor - Basic membership
-    await Membership.create({
-      user: investor._id,
-      plan: basicPlan._id,
-      planName: "basic",
-      status: "active",
-      pricing: {
-        amount: 0,
+    ],
+    consents: baseConsents(true),
+    kycStatus: "Approved",
+    is2FAEnabled: false,
+    riskScore: 24,
+    trustScore: 94,
+    paymentHistory: [
+      {
+        paymentId: "pay_seed_emre_pro_01",
+        amount: 29,
         currency: "EUR",
-        interval: "monthly",
+        method: "credit_card",
+        plan: "pro",
+        type: "membership_activation",
+        status: "completed",
+        date: daysAgo(90),
       },
-      activatedAt: new Date(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      features: basicPlan.features,
-    });
+    ],
+    loginHistory: baseLoginHistory("95.70.1.10"),
+    activeSessions: [
+      {
+        tokenId: "sess_seed_emre",
+        deviceInfo: "Chrome on macOS",
+        ip: "95.70.1.10",
+        location: "Istanbul",
+        createdAt: daysAgo(1),
+        lastActivityAt: daysAgo(1),
+      },
+    ],
+    investments: [],
+    rentalIncome: [],
+    favoriteProperties: [],
+    bankAccountInfo: {
+      iban: "TR120006700000000000123456",
+      bankName: "Example Bank TR",
+    },
+    referralCode: "EMRE-PRO",
+    activeInvestmentCount: 3,
+    investmentLimit: 5,
+    subscription: {
+      currentPlan: "Pro",
+      startDate: daysAgo(90),
+      endDate: monthsFromNow(3),
+      autoRenew: true,
+    },
+  });
 
-    // Property Owner 1 - Pro membership
-    await Membership.create({
-      user: owner._id,
-      plan: proPlan._id,
-      planName: "pro",
-      status: "active",
-      pricing: {
-        amount: 19,
-        currency: "EUR",
-        interval: "monthly",
+  const investorLara = await Investor.create({
+    email: "lara@investor.com",
+    password: passwordHashes.lara,
+    firstName: "Lara",
+    lastName: "Costa",
+    fullName: "Lara Costa",
+    role: "investor",
+    phoneNumber: "+351912000111",
+    country: "Portugal",
+    emailVerified: true,
+    emailVerifiedAt: daysAgo(80),
+    phoneVerified: true,
+    phoneVerifiedAt: daysAgo(79),
+    accountStatus: "active",
+    membershipPlan: "basic",
+    membershipStatus: "active",
+    membershipActivatedAt: daysAgo(45),
+    membershipExpiresAt: monthsFromNow(1),
+    lastLoginAt: daysAgo(2),
+    lastLoginIP: "89.214.44.33",
+    registrationIP: "89.214.44.33",
+    trustedIPs: baseTrustedIp("89.214.44.33", "Home"),
+    consents: baseConsents(false),
+    kycStatus: "Approved",
+    riskScore: 31,
+    trustScore: 88,
+    loginHistory: baseLoginHistory("89.214.44.33"),
+    investments: [],
+    rentalIncome: [],
+    favoriteProperties: [],
+    bankAccountInfo: {
+      iban: "PT50000201239876543219876",
+      bankName: "Banco Seed",
+    },
+    activeInvestmentCount: 0,
+    investmentLimit: 1,
+    subscription: {
+      currentPlan: "Basic",
+      startDate: daysAgo(45),
+      endDate: monthsFromNow(1),
+      autoRenew: true,
+    },
+  });
+
+  const investorSelin = await Investor.create({
+    email: "selin@investor.com",
+    password: passwordHashes.selin,
+    firstName: "Selin",
+    lastName: "Arslan",
+    fullName: "Selin Arslan",
+    role: "investor",
+    phoneNumber: "+905302223344",
+    country: "Turkey",
+    emailVerified: true,
+    emailVerifiedAt: daysAgo(5),
+    phoneVerified: false,
+    accountStatus: "active",
+    membershipPlan: "basic",
+    membershipStatus: "inactive",
+    lastLoginAt: null,
+    lastLoginIP: null,
+    registrationIP: "78.189.12.44",
+    trustedIPs: baseTrustedIp("78.189.12.44", "Registration"),
+    consents: baseConsents(false),
+    kycStatus: "Pending",
+    riskScore: 50,
+    trustScore: 75,
+    loginHistory: [],
+    investments: [],
+    rentalIncome: [],
+    favoriteProperties: [],
+    activeInvestmentCount: 0,
+    investmentLimit: 1,
+    subscription: {
+      currentPlan: "Basic",
+      autoRenew: false,
+    },
+  });
+
+  const ownerAyse = await PropertyOwner.create({
+    email: "ayse@owner.com",
+    password: passwordHashes.ayse,
+    firstName: "Ayse",
+    lastName: "Demir",
+    fullName: "Ayse Demir",
+    role: "property_owner",
+    phoneNumber: "+351913456789",
+    country: "Portugal",
+    emailVerified: true,
+    emailVerifiedAt: daysAgo(220),
+    phoneVerified: true,
+    phoneVerifiedAt: daysAgo(215),
+    accountStatus: "active",
+    membershipPlan: "pro",
+    membershipStatus: "active",
+    membershipActivatedAt: daysAgo(120),
+    membershipExpiresAt: monthsFromNow(2),
+    lastLoginAt: daysAgo(1),
+    lastLoginIP: "85.240.14.21",
+    registrationIP: "85.240.14.21",
+    trustedIPs: [
+      ...baseTrustedIp("85.240.14.21", "Home"),
+      {
+        ip: "85.240.14.22",
+        name: "Office",
+        addedAt: daysAgo(40),
+        lastUsedAt: daysAgo(2),
       },
-      activatedAt: new Date(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      features: proPlan.features,
-      paymentHistory: [
+    ],
+    consents: baseConsents(true),
+    kycStatus: "Approved",
+    is2FAEnabled: true,
+    riskScore: 18,
+    trustScore: 96,
+    loginHistory: baseLoginHistory("85.240.14.21"),
+    properties: [],
+    rentPaymentHistory: [],
+    bankAccountInfo: {
+      iban: "PT50000201230000000001234",
+      bankName: "Banco Lisboa",
+    },
+    completedContracts: 0,
+    ongoingContracts: 2,
+    totalProperties: 4,
+    ownerTrustScore: 91,
+  });
+
+  const ownerMehmet = await PropertyOwner.create({
+    email: "mehmet@owner.com",
+    password: passwordHashes.mehmet,
+    firstName: "Mehmet",
+    lastName: "Kaya",
+    fullName: "Mehmet Kaya",
+    role: "property_owner",
+    phoneNumber: "+995599223344",
+    country: "Georgia",
+    emailVerified: true,
+    emailVerifiedAt: daysAgo(200),
+    phoneVerified: true,
+    phoneVerifiedAt: daysAgo(195),
+    accountStatus: "active",
+    membershipPlan: "basic",
+    membershipStatus: "active",
+    membershipActivatedAt: daysAgo(150),
+    membershipExpiresAt: monthsFromNow(1),
+    lastLoginAt: daysAgo(3),
+    lastLoginIP: "176.221.15.31",
+    registrationIP: "176.221.15.31",
+    trustedIPs: baseTrustedIp("176.221.15.31", "Home"),
+    consents: baseConsents(false),
+    kycStatus: "Approved",
+    riskScore: 29,
+    trustScore: 87,
+    loginHistory: baseLoginHistory("176.221.15.31"),
+    properties: [],
+    rentPaymentHistory: [],
+    bankAccountInfo: {
+      iban: "GE29NB0000000101904917",
+      bankName: "Tbilisi Capital",
+    },
+    completedContracts: 1,
+    ongoingContracts: 2,
+    totalProperties: 4,
+    ownerTrustScore: 84,
+  });
+
+  const localRepJohn = await LocalRepresentative.create({
+    email: "john@rep.com",
+    password: passwordHashes.john,
+    firstName: "John",
+    lastName: "Pereira",
+    fullName: "John Pereira",
+    role: "local_representative",
+    phoneNumber: "+35699223311",
+    country: "Malta",
+    region: "Portugal & Malta",
+    emailVerified: true,
+    emailVerifiedAt: daysAgo(260),
+    phoneVerified: true,
+    phoneVerifiedAt: daysAgo(255),
+    accountStatus: "active",
+    membershipPlan: "enterprise",
+    membershipStatus: "active",
+    membershipActivatedAt: daysAgo(200),
+    membershipExpiresAt: monthsFromNow(6),
+    lastLoginAt: daysAgo(1),
+    lastLoginIP: "91.198.77.44",
+    registrationIP: "91.198.77.44",
+    trustedIPs: baseTrustedIp("91.198.77.44", "Field Tablet"),
+    consents: baseConsents(false),
+    kycStatus: "Approved",
+    is2FAEnabled: true,
+    riskScore: 12,
+    trustScore: 97,
+    loginHistory: baseLoginHistory("91.198.77.44"),
+    managedProperties: [],
+    assistedTransactions: [],
+    commissionEarned: {
+      total: 4200,
+      pending: 850,
+      paid: 3350,
+      history: [
         {
-          date: new Date(),
-          amount: 19,
-          currency: "EUR",
-          paymentMethod: "card",
-          transactionId: "pay_123456789",
-          status: "completed",
-          description: "Pro Plan - Monthly subscription",
+          amount: 1200,
+          type: "investment",
+          date: daysAgo(30),
+          status: "paid",
+          description: "Valletta property transfer assistance",
         },
       ],
-    });
+    },
+    bankAccountInfo: {
+      iban: "MT84MALT011000012345MTLCAST001S",
+      bankName: "Malta Operations Bank",
+      accountHolder: "John Pereira",
+    },
+    referralStats: {
+      totalReferred: 3,
+      activeUsers: 2,
+      totalCommissionFromReferrals: 600,
+    },
+  });
 
-    // Property Owner 2 - Basic membership
+  const adminUser = await Admin.create({
+    email: "admin@admin.com",
+    password: passwordHashes.admin,
+    firstName: "Admin",
+    lastName: "User",
+    fullName: "Admin User",
+    role: "admin",
+    phoneNumber: "+905559876543",
+    country: "Turkey",
+    emailVerified: true,
+    emailVerifiedAt: daysAgo(300),
+    phoneVerified: true,
+    phoneVerifiedAt: daysAgo(290),
+    accountStatus: "active",
+    membershipPlan: "enterprise",
+    membershipStatus: "active",
+    membershipActivatedAt: daysAgo(300),
+    membershipExpiresAt: monthsFromNow(12),
+    lastLoginAt: daysAgo(1),
+    lastLoginIP: "10.0.0.10",
+    registrationIP: "10.0.0.10",
+    trustedIPs: baseTrustedIp("10.0.0.10", "HQ"),
+    consents: baseConsents(false),
+    kycStatus: "Approved",
+    is2FAEnabled: true,
+    riskScore: 5,
+    trustScore: 100,
+    loginHistory: baseLoginHistory("10.0.0.10"),
+    accessLevel: "Global",
+  });
+
+  return {
+    investorEmre,
+    investorLara,
+    investorSelin,
+    ownerAyse,
+    ownerMehmet,
+    localRepJohn,
+    adminUser,
+  };
+}
+
+async function createMemberships(plans, users) {
+  const memberships = [
+    {
+      user: users.investorEmre,
+      plan: plans.pro,
+      amount: 29,
+      interval: "monthly",
+    },
+    {
+      user: users.investorLara,
+      plan: plans.basic,
+      amount: 0,
+      interval: "monthly",
+    },
+    {
+      user: users.ownerAyse,
+      plan: plans.pro,
+      amount: 29,
+      interval: "monthly",
+    },
+    {
+      user: users.ownerMehmet,
+      plan: plans.basic,
+      amount: 0,
+      interval: "monthly",
+    },
+    {
+      user: users.localRepJohn,
+      plan: plans.enterprise,
+      amount: 1290,
+      interval: "yearly",
+    },
+    {
+      user: users.adminUser,
+      plan: plans.enterprise,
+      amount: 0,
+      interval: "yearly",
+    },
+  ];
+
+  for (const item of memberships) {
     await Membership.create({
-      user: owner2._id,
-      plan: basicPlan._id,
-      planName: "basic",
+      user: item.user._id,
+      plan: item.plan._id,
+      planName: item.plan.name,
       status: "active",
       pricing: {
-        amount: 0,
+        amount: item.amount,
         currency: "EUR",
-        interval: "monthly",
+        interval: item.interval,
       },
-      activatedAt: new Date(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      features: basicPlan.features,
-    });
-
-    // Local Rep - Enterprise membership
-    await Membership.create({
-      user: localRep._id,
-      plan: enterprisePlan._id,
-      planName: "enterprise",
-      status: "active",
-      pricing: {
-        amount: 999,
-        currency: "EUR",
-        interval: "yearly",
+      subscription: {
+        currentPeriodStart: daysAgo(30),
+        currentPeriodEnd: monthsFromNow(item.interval === "yearly" ? 12 : 1),
+        cancelAtPeriodEnd: false,
+        trialUsed: false,
       },
-      activatedAt: new Date(),
-      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-      features: enterprisePlan.features,
+      activatedAt: daysAgo(30),
+      expiresAt: monthsFromNow(item.interval === "yearly" ? 12 : 1),
+      renewalDate: monthsFromNow(item.interval === "yearly" ? 12 : 1),
+      lastPaymentDate: item.amount > 0 ? daysAgo(30) : null,
+      nextBillingDate: monthsFromNow(item.interval === "yearly" ? 12 : 1),
+      features: buildMembershipFeatures(item.plan),
+      payments:
+        item.amount > 0
+          ? [
+              {
+                paymentId: `seed_membership_${item.user._id}`,
+                amount: item.amount,
+                currency: "EUR",
+                status: "succeeded",
+                method: "card",
+                type: "subscription",
+                description: `${item.plan.displayName} membership`,
+                processedAt: daysAgo(30),
+              },
+            ]
+          : [],
+      usage: {
+        currentActiveInvestments:
+          item.user.role === "investor" ? item.user.activeInvestmentCount || 0 : 0,
+        totalInvestmentsMade:
+          item.user.role === "investor" ? item.user.investments?.length || 0 : 0,
+        lastActivityAt: daysAgo(1),
+      },
+      notifications: {
+        emailReminders: true,
+        renewalReminder: true,
+        paymentFailureAlert: true,
+        planChangeAlert: true,
+      },
+      metadata: {
+        source: "seed",
+      },
     });
+  }
+}
 
-    console.log("✅ Memberships created");
-    // ==================== FILE METADATA (for new file system) ====================
-    console.log("📁 Creating File Metadata...");
+async function createProperties(provider, users) {
+  const propertyIds = {
+    lisbon: createObjectId(),
+    portoDraft: createObjectId(),
+    barcelona: createObjectId(),
+    valletta: createObjectId(),
+    riga: createObjectId(),
+    tallinn: createObjectId(),
+    tbilisi: createObjectId(),
+    batumi: createObjectId(),
+  };
 
-    // Contract file for investment
-    const contractFile = await FileMetadata.create({
-      filename: "contract_lisbon_emre_signed.pdf",
-      originalName: "Investment Contract - Lisbon Property.pdf",
-      mimeType: "application/pdf",
-      size: 2458624, // ~2.4MB
-      directory: "investments/contracts",
-      url: "/uploads/investments/contracts/contract_lisbon_emre_signed.pdf",
-      path: "uploads/investments/contracts/contract_lisbon_emre_signed.pdf",
-      storageType: "local",
-      hash: "a1b2c3d4e5f6789",
-      uploadedBy: investor._id,
-      relatedModel: "Investment",
-      documentType: "contract",
-      isPublic: false,
-      virusScanStatus: "clean",
-    });
+  const verifiedRecently = daysAgo(10);
+  const verifiedEarlier = daysAgo(35);
 
-    // Title deed for property
-    const titleDeedFile = await FileMetadata.create({
-      filename: "title_deed_lisbon_property.pdf",
-      originalName: "Title Deed - Lisbon Property.pdf",
-      mimeType: "application/pdf",
-      size: 1548234,
-      directory: "properties/documents",
-      url: "/uploads/properties/documents/title_deed_lisbon_property.pdf",
-      path: "uploads/properties/documents/title_deed_lisbon_property.pdf",
-      storageType: "local",
-      hash: "b2c3d4e5f67890",
-      uploadedBy: owner._id,
-      relatedModel: "Property",
+  const lisbonImages = [
+    await createPropertyImage(provider, {
+      sourcePath: dummyFiles.imageWideA,
+      seedKey: "property-lisbon-cover",
+      propertyId: propertyIds.lisbon,
+      ownerId: users.ownerAyse._id,
+      order: 0,
+      isPrimary: true,
+      focusX: 52,
+      focusY: 46,
+    }),
+    await createPropertyImage(provider, {
+      sourcePath: dummyFiles.imagePhone,
+      seedKey: "property-lisbon-gallery-1",
+      propertyId: propertyIds.lisbon,
+      ownerId: users.ownerAyse._id,
+      order: 1,
+      isPrimary: false,
+      focusX: 50,
+      focusY: 38,
+    }),
+  ];
 
-      documentType: "title_deed",
-      isPublic: false,
-      virusScanStatus: "clean",
-    });
-    const lisbonImg1 = await FileMetadata.create({
-      filename: "lisbon-apt-1.jpg",
-      originalName: "lisbon-apt-1.jpg",
-      mimeType: "image/jpeg",
-      directory: "properties/images",
-      url: "/uploads/properties/images/lisbon-apt-1.jpg",
-      path: "uploads/properties/images/lisbon-apt-1.jpg",
-      storageType: "local",
-      uploadedBy: owner._id, // mantıklı bir user
-      relatedModel: "Property", // şemana uygun
-      documentType: "other",
-      isPublic: true,
-      hash: "c3d4e5f67890",
-      size: 345678, // ~345KB
-    });
-    const contractFilePorto = await FileMetadata.create({
-      filename: "contract_porto_emre_signed.pdf",
-      originalName: "Investment Contract - Porto Property.pdf",
-      mimeType: "application/pdf",
-      size: 2458624, // ~2.4MB
-      directory: "investments/contracts",
-      url: "/uploads/investments/contracts/contract_porto_emre_signed.pdf",
-      path: "uploads/investments/contracts/contract_porto_emre_signed.pdf",
-      storageType: "local",
-      hash: "a1b2c3d4e5f6789",
-      uploadedBy: investor._id,
-      relatedModel: "Investment",
-      documentType: "contract",
-      isPublic: false,
-      virusScanStatus: "clean",
-    });
-    const titleDeedPorto = await FileMetadata.create({
-      filename: "title_deed_porto_property.pdf",
-      originalName: "Title Deed - Porto Property.pdf",
-      mimeType: "application/pdf",
-      size: 1548234,
-      directory: "properties/documents",
-      url: "/uploads/properties/documents/title_deed_porto_property.pdf",
-      path: "uploads/properties/documents/title_deed_porto_property.pdf",
-      storageType: "local",
-      hash: "b2c3d4e5f67890",
-      uploadedBy: owner._id,
-      relatedModel: "Property",
-      documentType: "title_deed",
-      isPublic: false,
-      virusScanStatus: "clean",
-    });
-    const PortoTmg = await FileMetadata.create({
-      filename: "porto_tmg.pdf",
-      originalName: "Porto TMG.pdf",
-      mimeType: "application/pdf",
-      size: 1548234,
-      directory: "properties/documents",
-      url: "/uploads/properties/documents/porto_tmg.pdf",
-      path: "uploads/properties/documents/porto_tmg.pdf",
-      storageType: "local",
-      hash: "b2c3d4e5f67890",
-      uploadedBy: owner._id,
-      relatedModel: "Property",
-      documentType: "title_deed",
-      isPublic: false,
-      virusScanStatus: "clean",
-    });
-    const barcelonaTitleDeed = await FileMetadata.create({
-      filename: "title_deed_barcelona_property.pdf",
-      originalName: "Title Deed - Barcelona Property.pdf",
-      mimeType: "application/pdf",
-      size: 1548234,
-      directory: "properties/documents",
-      url: "/uploads/properties/documents/title_deed_barcelona_property.pdf",
-      path: "uploads/properties/documents/title_deed_barcelona_property.pdf",
-      storageType: "local",
-      hash: "b2c3d4e5f67890",
-      uploadedBy: owner._id,
-      relatedModel: "Property",
+  const lisbonTitleDeed = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.titleDeed,
+    seedKey: "property-lisbon-title-deed",
+    propertyId: propertyIds.lisbon,
+    uploadedBy: users.ownerAyse._id,
+    type: "title_deed",
+    description: "Signed title deed for Lisbon listing",
+    verifiedBy: users.adminUser._id,
+    verifiedAt: verifiedRecently,
+    uploadedAt: daysAgo(18),
+  });
+  const lisbonValuation = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.valuation,
+    seedKey: "property-lisbon-valuation",
+    propertyId: propertyIds.lisbon,
+    uploadedBy: users.ownerAyse._id,
+    type: "valuation_report",
+    description: "Latest valuation report",
+    verifiedBy: users.adminUser._id,
+    verifiedAt: verifiedRecently,
+    uploadedAt: daysAgo(17),
+  });
+  const lisbonFloorPlan = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.floorPlan,
+    seedKey: "property-lisbon-floor-plan",
+    propertyId: propertyIds.lisbon,
+    uploadedBy: users.ownerAyse._id,
+    type: "floor_plan",
+    description: "Floor plan package",
+    uploadedAt: daysAgo(16),
+  });
 
-      documentType: "title_deed",
-      isPublic: false,
-      virusScanStatus: "clean",
-    });
-    const barcelonaTmg = await FileMetadata.create({
-      filename: "barcelona_tmg.pdf",
-      originalName: "Barcelona TMG.pdf",
-      mimeType: "application/pdf",
-      size: 1548234,
-      directory: "properties/documents",
-      url: "/uploads/properties/documents/barcelona_tmg.pdf",
-      path: "uploads/properties/documents/barcelona_tmg.pdf",
-      storageType: "local",
-      hash: "b2c3d4e5f67890",
-      uploadedBy: owner._id,
-      relatedModel: "Property",
-      documentType: "title_deed",
-      isPublic: false,
-      virusScanStatus: "clean",
-    });
+  const portoImages = [
+    await createPropertyImage(provider, {
+      sourcePath: dummyFiles.imageBanner,
+      seedKey: "property-porto-cover",
+      propertyId: propertyIds.portoDraft,
+      ownerId: users.ownerAyse._id,
+      order: 0,
+      isPrimary: true,
+      focusX: 48,
+      focusY: 50,
+    }),
+    await createPropertyImage(provider, {
+      sourcePath: dummyFiles.imageSquare,
+      seedKey: "property-porto-gallery-1",
+      propertyId: propertyIds.portoDraft,
+      ownerId: users.ownerAyse._id,
+      order: 1,
+      isPrimary: false,
+      focusX: 50,
+      focusY: 45,
+    }),
+  ];
 
-    console.log("✅ File Metadata created");
-    // ==================== PROPERTIES ====================
-    console.log("🏠 Creating Properties...");
+  const portoTitleDeed = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.titleDeed,
+    seedKey: "property-porto-title-deed",
+    propertyId: propertyIds.portoDraft,
+    uploadedBy: users.ownerAyse._id,
+    type: "title_deed",
+    description: "Draft listing title deed",
+    uploadedAt: daysAgo(7),
+  });
+  const portoAnnotation = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.annotation,
+    seedKey: "property-porto-annotation",
+    propertyId: propertyIds.portoDraft,
+    uploadedBy: users.ownerAyse._id,
+    type: "annotation",
+    description: "Annotation document to review before publishing",
+    uploadedAt: daysAgo(6),
+  });
 
-    const property1 = await Property.create({
+  const barcelonaImages = [
+    await createPropertyImage(provider, {
+      sourcePath: dummyFiles.imageLandscape,
+      seedKey: "property-barcelona-cover",
+      propertyId: propertyIds.barcelona,
+      ownerId: users.ownerMehmet._id,
+      order: 0,
+      isPrimary: true,
+      focusX: 50,
+      focusY: 45,
+    }),
+    await createPropertyImage(provider, {
+      sourcePath: dummyFiles.imageTablet,
+      seedKey: "property-barcelona-gallery-1",
+      propertyId: propertyIds.barcelona,
+      ownerId: users.ownerMehmet._id,
+      order: 1,
+      isPrimary: false,
+      focusX: 51,
+      focusY: 52,
+    }),
+  ];
+
+  const barcelonaTitleDeed = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.titleDeed,
+    seedKey: "property-barcelona-title-deed",
+    propertyId: propertyIds.barcelona,
+    uploadedBy: users.ownerMehmet._id,
+    type: "title_deed",
+    description: "Barcelona title deed",
+    verifiedBy: users.adminUser._id,
+    verifiedAt: verifiedEarlier,
+    uploadedAt: daysAgo(50),
+  });
+  const barcelonaAnnotation = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.annotation,
+    seedKey: "property-barcelona-annotation",
+    propertyId: propertyIds.barcelona,
+    uploadedBy: users.ownerMehmet._id,
+    type: "annotation",
+    description: "Land registry annotation package",
+    verifiedBy: users.adminUser._id,
+    verifiedAt: verifiedEarlier,
+    uploadedAt: daysAgo(49),
+  });
+  const barcelonaTax = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.tax,
+    seedKey: "property-barcelona-tax",
+    propertyId: propertyIds.barcelona,
+    uploadedBy: users.ownerMehmet._id,
+    type: "tax_document",
+    description: "Latest property tax filing",
+    uploadedAt: daysAgo(48),
+  });
+
+  const vallettaImages = [
+    await createPropertyImage(provider, {
+      sourcePath: dummyFiles.imageWideB,
+      seedKey: "property-valletta-cover",
+      propertyId: propertyIds.valletta,
+      ownerId: users.ownerAyse._id,
+      order: 0,
+      isPrimary: true,
+      focusX: 49,
+      focusY: 44,
+    }),
+    await createPropertyImage(provider, {
+      sourcePath: dummyFiles.imageLandscape,
+      seedKey: "property-valletta-gallery-1",
+      propertyId: propertyIds.valletta,
+      ownerId: users.ownerAyse._id,
+      order: 1,
+      isPrimary: false,
+      focusX: 50,
+      focusY: 50,
+    }),
+  ];
+
+  const vallettaTitleDeed = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.titleDeed,
+    seedKey: "property-valletta-title-deed",
+    propertyId: propertyIds.valletta,
+    uploadedBy: users.ownerAyse._id,
+    type: "title_deed",
+    description: "Active investment title deed",
+    verifiedBy: users.adminUser._id,
+    verifiedAt: daysAgo(55),
+    uploadedAt: daysAgo(70),
+  });
+  const vallettaAnnotation = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.annotation,
+    seedKey: "property-valletta-annotation",
+    propertyId: propertyIds.valletta,
+    uploadedBy: users.localRepJohn._id,
+    type: "annotation",
+    description: "Representative annotation document",
+    verifiedBy: users.adminUser._id,
+    verifiedAt: daysAgo(54),
+    uploadedAt: daysAgo(69),
+  });
+  const vallettaValuation = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.valuation,
+    seedKey: "property-valletta-valuation",
+    propertyId: propertyIds.valletta,
+    uploadedBy: users.ownerAyse._id,
+    type: "valuation_report",
+    description: "Independent valuation for active contract",
+    verifiedBy: users.adminUser._id,
+    verifiedAt: daysAgo(53),
+    uploadedAt: daysAgo(68),
+  });
+  const vallettaTax = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.tax,
+    seedKey: "property-valletta-tax",
+    propertyId: propertyIds.valletta,
+    uploadedBy: users.ownerAyse._id,
+    type: "tax_document",
+    description: "Property tax clearance",
+    uploadedAt: daysAgo(67),
+  });
+  const vallettaFloorPlan = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.floorPlan,
+    seedKey: "property-valletta-floor-plan",
+    propertyId: propertyIds.valletta,
+    uploadedBy: users.ownerAyse._id,
+    type: "floor_plan",
+    description: "Approved floor plan",
+    uploadedAt: daysAgo(66),
+  });
+
+  const rigaImages = [
+    await createPropertyImage(provider, {
+      sourcePath: dummyFiles.imageSquare,
+      seedKey: "property-riga-cover",
+      propertyId: propertyIds.riga,
+      ownerId: users.ownerAyse._id,
+      order: 0,
+      isPrimary: true,
+      focusX: 50,
+      focusY: 48,
+    }),
+  ];
+
+  const rigaTitleDeed = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.titleDeed,
+    seedKey: "property-riga-title-deed",
+    propertyId: propertyIds.riga,
+    uploadedBy: users.ownerAyse._id,
+    type: "title_deed",
+    description: "Rejected listing title deed",
+    uploadedAt: daysAgo(20),
+  });
+  const rigaAnnotation = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.annotation,
+    seedKey: "property-riga-annotation",
+    propertyId: propertyIds.riga,
+    uploadedBy: users.ownerAyse._id,
+    type: "annotation",
+    description: "Annotation with missing pages",
+    uploadedAt: daysAgo(19),
+  });
+
+  const tallinnImages = [
+    await createPropertyImage(provider, {
+      sourcePath: dummyFiles.imageBanner,
+      seedKey: "property-tallinn-cover",
+      propertyId: propertyIds.tallinn,
+      ownerId: users.ownerMehmet._id,
+      order: 0,
+      isPrimary: true,
+      focusX: 50,
+      focusY: 46,
+    }),
+  ];
+
+  const tallinnTitleDeed = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.titleDeed,
+    seedKey: "property-tallinn-title-deed",
+    propertyId: propertyIds.tallinn,
+    uploadedBy: users.ownerMehmet._id,
+    type: "title_deed",
+    description: "Completed contract title deed",
+    verifiedBy: users.adminUser._id,
+    verifiedAt: daysAgo(140),
+    uploadedAt: daysAgo(180),
+  });
+  const tallinnValuation = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.valuation,
+    seedKey: "property-tallinn-valuation",
+    propertyId: propertyIds.tallinn,
+    uploadedBy: users.ownerMehmet._id,
+    type: "valuation_report",
+    description: "Pre-investment valuation report",
+    verifiedBy: users.adminUser._id,
+    verifiedAt: daysAgo(140),
+    uploadedAt: daysAgo(179),
+  });
+
+  const tbilisiImages = [
+    await createPropertyImage(provider, {
+      sourcePath: dummyFiles.imageTablet,
+      seedKey: "property-tbilisi-cover",
+      propertyId: propertyIds.tbilisi,
+      ownerId: users.ownerMehmet._id,
+      order: 0,
+      isPrimary: true,
+      focusX: 52,
+      focusY: 47,
+    }),
+    await createPropertyImage(provider, {
+      sourcePath: dummyFiles.imagePhone,
+      seedKey: "property-tbilisi-gallery-1",
+      propertyId: propertyIds.tbilisi,
+      ownerId: users.ownerMehmet._id,
+      order: 1,
+      isPrimary: false,
+      focusX: 48,
+      focusY: 42,
+    }),
+  ];
+
+  const tbilisiTitleDeed = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.titleDeed,
+    seedKey: "property-tbilisi-title-deed",
+    propertyId: propertyIds.tbilisi,
+    uploadedBy: users.ownerMehmet._id,
+    type: "title_deed",
+    description: "Tbilisi public listing title deed",
+    verifiedBy: users.adminUser._id,
+    verifiedAt: daysAgo(22),
+    uploadedAt: daysAgo(30),
+  });
+  const tbilisiValuation = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.valuation,
+    seedKey: "property-tbilisi-valuation",
+    propertyId: propertyIds.tbilisi,
+    uploadedBy: users.ownerMehmet._id,
+    type: "valuation_report",
+    description: "Valuation for public listing",
+    verifiedBy: users.adminUser._id,
+    verifiedAt: daysAgo(21),
+    uploadedAt: daysAgo(29),
+  });
+
+  const batumiImages = [
+    await createPropertyImage(provider, {
+      sourcePath: dummyFiles.imageWideA,
+      seedKey: "property-batumi-cover",
+      propertyId: propertyIds.batumi,
+      ownerId: users.ownerMehmet._id,
+      order: 0,
+      isPrimary: true,
+      focusX: 49,
+      focusY: 44,
+    }),
+  ];
+
+  const batumiTitleDeed = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.titleDeed,
+    seedKey: "property-batumi-title-deed",
+    propertyId: propertyIds.batumi,
+    uploadedBy: users.ownerMehmet._id,
+    type: "title_deed",
+    description: "Title deed awaiting admin verification",
+    uploadedAt: daysAgo(15),
+  });
+  const batumiTax = await createPropertyDocument(provider, {
+    sourcePath: dummyFiles.tax,
+    seedKey: "property-batumi-tax",
+    propertyId: propertyIds.batumi,
+    uploadedBy: users.ownerMehmet._id,
+    type: "tax_document",
+    description: "Tax clearance before activation",
+    uploadedAt: daysAgo(14),
+  });
+
+  const properties = await Property.create([
+    {
+      _id: propertyIds.lisbon,
       country: "Portugal",
       city: "Lisbon",
-      fullAddress: "123 Main Street, Lisbon",
-      locationPin: { lat: 38.7223, lng: -9.1393 },
-      description: "Beautiful apartment in central Lisbon with river view",
+      fullAddress: "Rua Augusta 120, Lisbon",
+      mapSearchAddress: "Rua Augusta 120, Lisbon, Portugal",
+      locationPin: { lat: 38.710173, lng: -9.138447 },
+      description:
+        "Central Lisbon apartment prepared for a first offer flow and public listing tests.",
       propertyType: "apartment",
-      size: 85,
+      size: 92,
       rooms: 2,
-      estimatedValue: 250000,
-      requestedInvestment: 50000,
-      rentOffered: 500,
+      estimatedValue: 320000,
+      requestedInvestment: 65000,
+      rentOffered: 720,
       currency: "EUR",
-      contractPeriodMonths: 36,
-      images: [{ fileId: lisbonImg1._id, type: "other" }],
-      documents: [{ fileId: titleDeedFile._id, type: "title_deed" }],
-      status: "in_contract",
-      owner: owner._id,
-      trustScore: 85,
-      viewCount: 120,
-      favoriteCount: 0,
-      investmentOfferCount: 4,
-      isFeatured: false,
-    });
-
-    const property2 = await Property.create({
+      contractPeriodMonths: 24,
+      images: lisbonImages,
+      documents: [lisbonTitleDeed, lisbonValuation, lisbonFloorPlan],
+      titleDeedDocument: {
+        fileId: lisbonTitleDeed.fileId,
+        url: lisbonTitleDeed.url,
+        verified: true,
+      },
+      status: "published",
+      trustScore: 88,
+      owner: users.ownerAyse._id,
+      viewCount: 183,
+      favoriteCount: 1,
+      investmentOfferCount: 1,
+      favorites: [users.investorEmre._id],
+      isFeatured: true,
+      featuredAt: daysAgo(7),
+      featuredUntil: daysFromNow(14),
+      featuredWeeks: 3,
+    },
+    {
+      _id: propertyIds.portoDraft,
       country: "Portugal",
       city: "Porto",
-      fullAddress: "456 Beach Road, Porto",
-      locationPin: { lat: 41.1579, lng: -8.6291 },
-      description: "Modern house near the beach with ocean view",
+      fullAddress: "Avenida dos Aliados 45, Porto",
+      mapSearchAddress: "Avenida dos Aliados 45, Porto, Portugal",
+      locationPin: { lat: 41.148451, lng: -8.611007 },
+      description:
+        "Draft property with documents uploaded but still waiting for admin publication review.",
       propertyType: "house",
-      size: 150,
+      size: 134,
       rooms: 3,
-      estimatedValue: 350000,
-      requestedInvestment: 75000,
-      rentOffered: 800,
+      estimatedValue: 410000,
+      requestedInvestment: 82000,
+      rentOffered: 890,
       currency: "EUR",
-      contractPeriodMonths: 48,
-      images: [{ fileId: PortoTmg._id, type: "other" }],
-      documents: [
-        { fileId: contractFilePorto._id, type: "title_deed" },
-        { fileId: titleDeedPorto._id, type: "valuation_report" },
-      ],
-      status: "published",
-      owner: owner._id,
-      trustScore: 75,
-      viewCount: 85,
-      favoriteCount: 1,
-      investmentOfferCount: 2,
-      isFeatured: true,
-      featuredAt: new Date(),
-      featuredUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      featuredWeeks: 1,
-    });
-
-    const property3 = await Property.create({
+      contractPeriodMonths: 36,
+      images: portoImages,
+      documents: [portoTitleDeed, portoAnnotation],
+      titleDeedDocument: {
+        fileId: portoTitleDeed.fileId,
+        url: portoTitleDeed.url,
+        verified: false,
+      },
+      annotationDocument: {
+        fileId: portoAnnotation.fileId,
+        url: portoAnnotation.url,
+        hasAnnotation: true,
+      },
+      status: "draft",
+      trustScore: 73,
+      owner: users.ownerAyse._id,
+      viewCount: 21,
+      favoriteCount: 0,
+      investmentOfferCount: 0,
+    },
+    {
+      _id: propertyIds.barcelona,
       country: "Spain",
       city: "Barcelona",
-      fullAddress: "789 Las Ramblas, Barcelona",
-      locationPin: { lat: 41.3851, lng: 2.1734 },
-      description: "Luxury penthouse with panoramic city views",
+      fullAddress: "Carrer de Balmes 84, Barcelona",
+      mapSearchAddress: "Carrer de Balmes 84, Barcelona, Spain",
+      locationPin: { lat: 41.389378, lng: 2.161933 },
+      description:
+        "Barcelona property already in contract stage for document exchange and approval tests.",
       propertyType: "apartment",
-      size: 120,
-      rooms: 4,
-      estimatedValue: 300000,
-      requestedInvestment: 100000,
-      rentOffered: 1200,
+      size: 118,
+      rooms: 3,
+      estimatedValue: 480000,
+      requestedInvestment: 85000,
+      rentOffered: 980,
       currency: "EUR",
-      contractPeriodMonths: 48,
-      images: [{ fileId: barcelonaTmg._id, type: "other" }],
-      documents: [{ fileId: barcelonaTitleDeed._id, type: "title_deed" }],
-      status: "published",
-      owner: owner2._id,
+      contractPeriodMonths: 30,
+      images: barcelonaImages,
+      documents: [barcelonaTitleDeed, barcelonaAnnotation, barcelonaTax],
+      titleDeedDocument: {
+        fileId: barcelonaTitleDeed.fileId,
+        url: barcelonaTitleDeed.url,
+        verified: true,
+      },
+      annotationDocument: {
+        fileId: barcelonaAnnotation.fileId,
+        url: barcelonaAnnotation.url,
+        hasAnnotation: true,
+      },
+      status: "in_contract",
       trustScore: 90,
-      viewCount: 250,
-      favoriteCount: 1,
-      investmentOfferCount: 5,
-      isFeatured: false,
-    });
-
-    // Update owner properties array
-    owner.properties = [property1._id, property2._id];
-    await owner.save();
-    owner2.properties = [property3._id];
-    await owner2.save();
-    titleDeedFile.relatedId = property1._id;
-    await titleDeedFile.save();
-    lisbonImg1.relatedId = property1._id;
-    await lisbonImg1.save();
-    contractFilePorto.relatedId = property2._id;
-    await contractFilePorto.save();
-    titleDeedPorto.relatedId = property2._id;
-    await titleDeedPorto.save();
-    barcelonaTitleDeed.relatedId = property3._id;
-    await barcelonaTitleDeed.save();
-    barcelonaTmg.relatedId = property3._id;
-    await barcelonaTmg.save();
-    console.log("✅ Properties created");
-
-    // ==================== INVESTMENT ====================
-    console.log("💰 Creating Investment...");
-
-    const investment = await Investment.create({
-      property: property1._id,
-      investor: investor._id,
-      propertyOwner: owner._id,
-      amountInvested: 50000,
+      owner: users.ownerMehmet._id,
+      viewCount: 109,
+      favoriteCount: 0,
+      investmentOfferCount: 1,
+    },
+    {
+      _id: propertyIds.valletta,
+      country: "Malta",
+      city: "Valletta",
+      fullAddress: "Republic Street 14, Valletta",
+      mapSearchAddress: "Republic Street 14, Valletta, Malta",
+      locationPin: { lat: 35.898909, lng: 14.514553 },
+      description:
+        "Active contract scenario with paid, delayed and upcoming rental payments.",
+      propertyType: "commercial",
+      size: 140,
+      rooms: 4,
+      estimatedValue: 540000,
+      requestedInvestment: 110000,
+      rentOffered: 950,
       currency: "EUR",
-      status: "active",
-      contractFile: contractFile._id, // Reference to FileMetadata
-      titleDeedDocument: titleDeedFile._id, // Reference to FileMetadata
-      rentalPayments: [
-        {
-          month: "2025-01",
-          amount: 500,
-          status: "paid",
-          paidAt: new Date("2025-01-15"),
-          paymentReceipt: null,
-        },
-        {
-          month: "2025-02",
-          amount: 500,
-          status: "pending",
-          dueDate: new Date("2025-02-01"),
-        },
-        {
-          month: "2025-03",
-          amount: 500,
-          status: "pending",
-          dueDate: new Date("2025-03-01"),
-        },
+      contractPeriodMonths: 24,
+      images: vallettaImages,
+      documents: [
+        vallettaTitleDeed,
+        vallettaAnnotation,
+        vallettaValuation,
+        vallettaTax,
+        vallettaFloorPlan,
       ],
-    });
-
-    // Update contract file relation
-    contractFile.relatedId = investment._id;
-    await contractFile.save();
-
-    // Update investor
-    investor.investments.push(investment._id);
-    investor.activeInvestmentCount = 1;
-    investor.favoriteProperties.push(property2._id, property3._id);
-    await investor.save();
-
-    // Update property favorites
-    property2.favorites.push(investor._id);
-    property2.favoriteCount = 1;
-    await property2.save();
-
-    property3.favorites.push(investor._id);
-    property3.favoriteCount = 1;
-    await property3.save();
-
-    console.log("✅ Investment created");
-
-    // ==================== RENTAL PAYMENTS ====================
-    console.log("💸 Creating Rental Payments...");
-
-    await RentalPayment.create({
-      investment: investment._id,
-      property: property1._id,
-      investor: investor._id,
-      propertyOwner: owner._id,
-      month: "2025-01",
-      amount: 500,
+      titleDeedDocument: {
+        fileId: vallettaTitleDeed.fileId,
+        url: vallettaTitleDeed.url,
+        verified: true,
+      },
+      annotationDocument: {
+        fileId: vallettaAnnotation.fileId,
+        url: vallettaAnnotation.url,
+        hasAnnotation: true,
+      },
+      status: "active",
+      trustScore: 94,
+      owner: users.ownerAyse._id,
+      viewCount: 146,
+      favoriteCount: 0,
+      investmentOfferCount: 1,
+    },
+    {
+      _id: propertyIds.riga,
+      country: "Latvia",
+      city: "Riga",
+      fullAddress: "Brivibas iela 88, Riga",
+      mapSearchAddress: "Brivibas iela 88, Riga, Latvia",
+      locationPin: { lat: 56.956777, lng: 24.127187 },
+      description:
+        "Rejected property with review notes and flagged issues for owner feedback flows.",
+      propertyType: "other",
+      size: 76,
+      rooms: 2,
+      estimatedValue: 180000,
+      requestedInvestment: 45000,
+      rentOffered: 430,
       currency: "EUR",
+      contractPeriodMonths: 18,
+      images: rigaImages,
+      documents: [rigaTitleDeed, rigaAnnotation],
+      titleDeedDocument: {
+        fileId: rigaTitleDeed.fileId,
+        url: rigaTitleDeed.url,
+        verified: false,
+      },
+      annotationDocument: {
+        fileId: rigaAnnotation.fileId,
+        url: rigaAnnotation.url,
+        hasAnnotation: true,
+      },
+      status: "rejected",
+      trustScore: 58,
+      owner: users.ownerAyse._id,
+      viewCount: 8,
+      favoriteCount: 0,
+      investmentOfferCount: 0,
+      reviewNotes:
+        "Replace the annotation package and upload a recent tax document before resubmitting.",
+      flaggedIssues: [
+        "Annotation file is incomplete",
+        "Tax document is older than twelve months",
+      ],
+      lastStatusChange: daysAgo(4),
+    },
+    {
+      _id: propertyIds.tallinn,
+      country: "Estonia",
+      city: "Tallinn",
+      fullAddress: "Pikk 18, Tallinn",
+      mapSearchAddress: "Pikk 18, Tallinn, Estonia",
+      locationPin: { lat: 59.437, lng: 24.745 },
+      description:
+        "Completed investment scenario with full payment history and transfer metadata.",
+      propertyType: "house",
+      size: 156,
+      rooms: 4,
+      estimatedValue: 460000,
+      requestedInvestment: 90000,
+      rentOffered: 820,
+      currency: "EUR",
+      contractPeriodMonths: 12,
+      images: tallinnImages,
+      documents: [tallinnTitleDeed, tallinnValuation],
+      titleDeedDocument: {
+        fileId: tallinnTitleDeed.fileId,
+        url: tallinnTitleDeed.url,
+        verified: true,
+      },
+      status: "completed",
+      trustScore: 86,
+      owner: users.ownerMehmet._id,
+      viewCount: 91,
+      favoriteCount: 0,
+      investmentOfferCount: 1,
+    },
+    {
+      _id: propertyIds.tbilisi,
+      country: "Georgia",
+      city: "Tbilisi",
+      fullAddress: "Rustaveli Avenue 55, Tbilisi",
+      mapSearchAddress: "Rustaveli Avenue 55, Tbilisi, Georgia",
+      locationPin: { lat: 41.701251, lng: 44.793083 },
+      description:
+        "Second published listing kept open for browsing and favorites scenarios.",
+      propertyType: "apartment",
+      size: 101,
+      rooms: 3,
+      estimatedValue: 295000,
+      requestedInvestment: 70000,
+      rentOffered: 690,
+      currency: "EUR",
+      contractPeriodMonths: 24,
+      images: tbilisiImages,
+      documents: [tbilisiTitleDeed, tbilisiValuation],
+      titleDeedDocument: {
+        fileId: tbilisiTitleDeed.fileId,
+        url: tbilisiTitleDeed.url,
+        verified: true,
+      },
+      status: "published",
+      trustScore: 82,
+      owner: users.ownerMehmet._id,
+      viewCount: 57,
+      favoriteCount: 2,
+      favorites: [users.investorEmre._id, users.investorLara._id],
+      investmentOfferCount: 0,
+    },
+    {
+      _id: propertyIds.batumi,
+      country: "Georgia",
+      city: "Batumi",
+      fullAddress: "Zurab Gorgiladze 12, Batumi",
+      mapSearchAddress: "Zurab Gorgiladze 12, Batumi, Georgia",
+      locationPin: { lat: 41.647178, lng: 41.636932 },
+      description:
+        "In-contract property where title deed has been uploaded and awaits admin approval.",
+      propertyType: "apartment",
+      size: 94,
+      rooms: 2,
+      estimatedValue: 305000,
+      requestedInvestment: 76000,
+      rentOffered: 740,
+      currency: "EUR",
+      contractPeriodMonths: 20,
+      images: batumiImages,
+      documents: [batumiTitleDeed, batumiTax],
+      titleDeedDocument: {
+        fileId: batumiTitleDeed.fileId,
+        url: batumiTitleDeed.url,
+        verified: false,
+      },
+      status: "in_contract",
+      trustScore: 80,
+      owner: users.ownerMehmet._id,
+      viewCount: 43,
+      favoriteCount: 0,
+      investmentOfferCount: 1,
+    },
+  ]);
+
+  users.ownerAyse.properties = [
+    propertyIds.lisbon,
+    propertyIds.portoDraft,
+    propertyIds.valletta,
+    propertyIds.riga,
+  ];
+  users.ownerAyse.totalProperties = 4;
+  users.ownerAyse.ongoingContracts = 2;
+  await users.ownerAyse.save();
+
+  users.ownerMehmet.properties = [
+    propertyIds.barcelona,
+    propertyIds.tallinn,
+    propertyIds.tbilisi,
+    propertyIds.batumi,
+  ];
+  users.ownerMehmet.totalProperties = 4;
+  users.ownerMehmet.completedContracts = 1;
+  users.ownerMehmet.ongoingContracts = 2;
+  await users.ownerMehmet.save();
+
+  users.investorEmre.favoriteProperties = [propertyIds.lisbon, propertyIds.tbilisi];
+  await users.investorEmre.save();
+
+  users.investorLara.favoriteProperties = [propertyIds.tbilisi];
+  await users.investorLara.save();
+
+  return {
+    lisbon: properties[0],
+    portoDraft: properties[1],
+    barcelona: properties[2],
+    valletta: properties[3],
+    riga: properties[4],
+    tallinn: properties[5],
+    tbilisi: properties[6],
+    batumi: properties[7],
+  };
+}
+
+async function createInvestments(provider, users, properties) {
+  const investmentIds = {
+    lisbonOffer: createObjectId(),
+    barcelonaContract: createObjectId(),
+    vallettaActive: createObjectId(),
+    tallinnCompleted: createObjectId(),
+    batumiTitlePending: createObjectId(),
+  };
+
+  const lisbonOffer = await Investment.create({
+    _id: investmentIds.lisbonOffer,
+    property: properties.lisbon._id,
+    investor: users.investorLara._id,
+    propertyOwner: users.ownerAyse._id,
+    amountInvested: properties.lisbon.requestedInvestment,
+    currency: "EUR",
+    status: "offer_sent",
+    rentalPayments: [],
+  });
+
+  const barcelonaContractFile = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.investmentContract,
+    seedKey: "investment-barcelona-contract",
+    investmentId: investmentIds.barcelonaContract,
+    uploadedBy: users.ownerMehmet._id,
+    documentType: "contract",
+    description: "Draft contract signed by owner",
+    uploadedAt: daysAgo(12),
+  });
+  const barcelonaPaymentReceipt = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.paymentReceipt,
+    seedKey: "investment-barcelona-payment-receipt",
+    investmentId: investmentIds.barcelonaContract,
+    uploadedBy: users.investorEmre._id,
+    documentType: "payment_receipt",
+    description: "Initial payment receipt",
+    uploadedAt: daysAgo(11),
+  });
+  const barcelonaApostillePackage = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.investmentOther,
+    seedKey: "investment-barcelona-apostille-package",
+    investmentId: investmentIds.barcelonaContract,
+    uploadedBy: users.investorEmre._id,
+    documentType: "other",
+    description: "Apostille and courier tracking package",
+    uploadedAt: daysAgo(10),
+  });
+
+  const barcelonaContract = await Investment.create({
+    _id: investmentIds.barcelonaContract,
+    property: properties.barcelona._id,
+    investor: users.investorEmre._id,
+    propertyOwner: users.ownerMehmet._id,
+    amountInvested: properties.barcelona.requestedInvestment,
+    currency: "EUR",
+    status: "contract_signed",
+    representativeRequestedBy: users.investorEmre._id,
+    representativeRequestDate: daysAgo(8),
+    contractFile: barcelonaContractFile.embedded,
+    paymentReceipt: barcelonaPaymentReceipt.embedded,
+    additionalDocuments: [
+      {
+        type: "other",
+        fileId: barcelonaApostillePackage.fileMetadata._id,
+        url: barcelonaApostillePackage.fileMetadata.url,
+        description: "Apostille and courier tracking package",
+        uploadedAt: daysAgo(10),
+        uploadedBy: users.investorEmre._id,
+      },
+    ],
+    rentalPayments: [
+      {
+        month: monthKey(1),
+        amount: properties.barcelona.rentOffered,
+        status: "pending",
+        dueDate: addDays(startOfMonthOffset(now, 1), 7),
+      },
+      {
+        month: monthKey(2),
+        amount: properties.barcelona.rentOffered,
+        status: "pending",
+        dueDate: addDays(startOfMonthOffset(now, 2), 7),
+      },
+    ],
+  });
+
+  const batumiContractFile = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.investmentContract,
+    seedKey: "investment-batumi-contract",
+    investmentId: investmentIds.batumiTitlePending,
+    uploadedBy: users.ownerMehmet._id,
+    documentType: "contract",
+    description: "Executed contract before title deed approval",
+    uploadedAt: daysAgo(20),
+  });
+  const batumiPaymentReceipt = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.paymentReceipt,
+    seedKey: "investment-batumi-payment-receipt",
+    investmentId: investmentIds.batumiTitlePending,
+    uploadedBy: users.investorEmre._id,
+    documentType: "payment_receipt",
+    description: "Wire receipt for Batumi investment",
+    uploadedAt: daysAgo(19),
+  });
+  const batumiTitleDeed = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.investmentTitleDeed,
+    seedKey: "investment-batumi-title-deed",
+    investmentId: investmentIds.batumiTitlePending,
+    uploadedBy: users.localRepJohn._id,
+    documentType: "title_deed",
+    description: "Submitted title deed awaiting admin approval",
+    uploadedAt: daysAgo(16),
+  });
+  const batumiNotaryDoc = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.notaryDocument,
+    seedKey: "investment-batumi-notary",
+    investmentId: investmentIds.batumiTitlePending,
+    uploadedBy: users.localRepJohn._id,
+    documentType: "notary_document",
+    description: "Notary reference package",
+    uploadedAt: daysAgo(15),
+  });
+
+  const batumiTitlePending = await Investment.create({
+    _id: investmentIds.batumiTitlePending,
+    property: properties.batumi._id,
+    investor: users.investorEmre._id,
+    propertyOwner: users.ownerMehmet._id,
+    localRepresentative: users.localRepJohn._id,
+    representativeRequestedBy: users.investorEmre._id,
+    representativeRequestDate: daysAgo(18),
+    amountInvested: properties.batumi.requestedInvestment,
+    currency: "EUR",
+    status: "title_deed_pending",
+    contractFile: batumiContractFile.embedded,
+    paymentReceipt: batumiPaymentReceipt.embedded,
+    titleDeedDocument: batumiTitleDeed.embedded,
+    additionalDocuments: [
+      {
+        type: "notary_document",
+        fileId: batumiNotaryDoc.fileMetadata._id,
+        url: batumiNotaryDoc.fileMetadata.url,
+        description: "Supporting notary package for approval",
+        uploadedAt: daysAgo(15),
+        uploadedBy: users.localRepJohn._id,
+      },
+    ],
+    rentalPayments: [
+      {
+        month: monthKey(1),
+        amount: properties.batumi.rentOffered,
+        status: "pending",
+        dueDate: addDays(startOfMonthOffset(now, 1), 10),
+      },
+      {
+        month: monthKey(2),
+        amount: properties.batumi.rentOffered,
+        status: "pending",
+        dueDate: addDays(startOfMonthOffset(now, 2), 10),
+      },
+    ],
+  });
+
+  const vallettaContractFile = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.investmentContract,
+    seedKey: "investment-valletta-contract",
+    investmentId: investmentIds.vallettaActive,
+    uploadedBy: users.ownerAyse._id,
+    documentType: "contract",
+    description: "Fully signed Valletta contract",
+    uploadedAt: daysAgo(70),
+  });
+  const vallettaPaymentReceipt = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.paymentReceipt,
+    seedKey: "investment-valletta-payment-receipt",
+    investmentId: investmentIds.vallettaActive,
+    uploadedBy: users.investorEmre._id,
+    documentType: "payment_receipt",
+    description: "Investor wire transfer receipt",
+    uploadedAt: daysAgo(69),
+  });
+  const vallettaTitleDeed = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.investmentTitleDeed,
+    seedKey: "investment-valletta-title-deed",
+    investmentId: investmentIds.vallettaActive,
+    uploadedBy: users.ownerAyse._id,
+    documentType: "title_deed",
+    description: "Verified Valletta title deed",
+    uploadedAt: daysAgo(60),
+    verifiedBy: users.adminUser._id,
+    verifiedAt: daysAgo(58),
+  });
+  const vallettaTaxReceipt = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.investmentTaxReceipt,
+    seedKey: "investment-valletta-tax-receipt",
+    investmentId: investmentIds.vallettaActive,
+    uploadedBy: users.localRepJohn._id,
+    documentType: "tax_receipt",
+    description: "Tax receipt for post-transfer package",
+    uploadedAt: daysAgo(57),
+  });
+  const vallettaReceiptMonthMinusTwo = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.rentalReceipt,
+    seedKey: "investment-valletta-rental-receipt-1",
+    investmentId: investmentIds.vallettaActive,
+    uploadedBy: users.ownerAyse._id,
+    documentType: "rental_receipt",
+    description: `Rental receipt for ${monthKey(-2)}`,
+    uploadedAt: addDays(startOfMonthOffset(now, -2), 12),
+  });
+  const vallettaReceiptMonthMinusOne = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.rentalReceipt,
+    seedKey: "investment-valletta-rental-receipt-2",
+    investmentId: investmentIds.vallettaActive,
+    uploadedBy: users.ownerAyse._id,
+    documentType: "rental_receipt",
+    description: `Rental receipt for ${monthKey(-1)}`,
+    uploadedAt: addDays(startOfMonthOffset(now, -1), 13),
+  });
+
+  const activePayments = [
+    {
+      month: monthKey(-2),
+      amount: properties.valletta.rentOffered,
       status: "paid",
-      dueDate: new Date("2025-01-01"),
-      paidAt: new Date("2025-01-15"),
-      paymentMethod: "bank_transfer",
-    });
-
-    await RentalPayment.create({
-      investment: investment._id,
-      property: property1._id,
-      investor: investor._id,
-      propertyOwner: owner._id,
-      month: "2025-02",
-      amount: 500,
-      currency: "EUR",
+      dueDate: addDays(startOfMonthOffset(now, -2), 10),
+      paidAt: addDays(startOfMonthOffset(now, -2), 12),
+      paymentReceipt: buildEmbeddedFileRef(
+        vallettaReceiptMonthMinusTwo.fileMetadata
+      ),
+    },
+    {
+      month: monthKey(-1),
+      amount: properties.valletta.rentOffered,
+      status: "paid",
+      dueDate: addDays(startOfMonthOffset(now, -1), 10),
+      paidAt: addDays(startOfMonthOffset(now, -1), 13),
+      paymentReceipt: buildEmbeddedFileRef(
+        vallettaReceiptMonthMinusOne.fileMetadata
+      ),
+    },
+    {
+      month: monthKey(0),
+      amount: properties.valletta.rentOffered,
+      status: "delayed",
+      dueDate: addDays(startOfMonthOffset(now, 0), 10),
+    },
+    {
+      month: monthKey(1),
+      amount: properties.valletta.rentOffered,
       status: "pending",
-      dueDate: new Date("2025-02-01"),
-    });
+      dueDate: addDays(startOfMonthOffset(now, 1), 10),
+    },
+  ];
 
-    console.log("✅ Rental Payments created");
+  const vallettaActive = await Investment.create({
+    _id: investmentIds.vallettaActive,
+    property: properties.valletta._id,
+    investor: users.investorEmre._id,
+    propertyOwner: users.ownerAyse._id,
+    localRepresentative: users.localRepJohn._id,
+    representativeRequestedBy: users.ownerAyse._id,
+    representativeRequestDate: daysAgo(72),
+    amountInvested: properties.valletta.requestedInvestment,
+    currency: "EUR",
+    status: "active",
+    contractFile: vallettaContractFile.embedded,
+    paymentReceipt: vallettaPaymentReceipt.embedded,
+    titleDeedDocument: vallettaTitleDeed.embedded,
+    additionalDocuments: [
+      {
+        type: "tax_receipt",
+        fileId: vallettaTaxReceipt.fileMetadata._id,
+        url: vallettaTaxReceipt.fileMetadata.url,
+        description: "Tax receipt shared with investor",
+        uploadedAt: daysAgo(57),
+        uploadedBy: users.localRepJohn._id,
+      },
+    ],
+    rentalPayments: activePayments,
+  });
 
-    // ==================== NOTIFICATIONS ====================
-    console.log("🔔 Creating Notifications...");
+  const tallinnContractFile = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.investmentContract,
+    seedKey: "investment-tallinn-contract",
+    investmentId: investmentIds.tallinnCompleted,
+    uploadedBy: users.ownerMehmet._id,
+    documentType: "contract",
+    description: "Historic completed contract",
+    uploadedAt: daysAgo(180),
+  });
+  const tallinnPaymentReceipt = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.paymentReceipt,
+    seedKey: "investment-tallinn-payment-receipt",
+    investmentId: investmentIds.tallinnCompleted,
+    uploadedBy: users.investorEmre._id,
+    documentType: "payment_receipt",
+    description: "Historic payment receipt",
+    uploadedAt: daysAgo(179),
+  });
+  const tallinnTitleDeed = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.investmentTitleDeed,
+    seedKey: "investment-tallinn-title-deed",
+    investmentId: investmentIds.tallinnCompleted,
+    uploadedBy: users.ownerMehmet._id,
+    documentType: "title_deed",
+    description: "Historic verified title deed",
+    uploadedAt: daysAgo(175),
+    verifiedBy: users.adminUser._id,
+    verifiedAt: daysAgo(174),
+  });
+  const tallinnPoa = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.powerOfAttorney,
+    seedKey: "investment-tallinn-poa",
+    investmentId: investmentIds.tallinnCompleted,
+    uploadedBy: users.localRepJohn._id,
+    documentType: "power_of_attorney",
+    description: "Power of attorney for completed transfer",
+    uploadedAt: daysAgo(173),
+  });
+  const tallinnTransferDocument = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.transferDocument,
+    seedKey: "investment-tallinn-transfer-document",
+    investmentId: investmentIds.tallinnCompleted,
+    uploadedBy: users.adminUser._id,
+    documentType: "transfer_document",
+    description: "Market sale transfer record",
+    uploadedAt: daysAgo(15),
+  });
+  const tallinnReceiptMonthMinusSix = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.rentalReceipt,
+    seedKey: "investment-tallinn-rental-receipt-1",
+    investmentId: investmentIds.tallinnCompleted,
+    uploadedBy: users.ownerMehmet._id,
+    documentType: "rental_receipt",
+    description: `Rental receipt for ${monthKey(-6)}`,
+    uploadedAt: addDays(startOfMonthOffset(now, -6), 9),
+  });
+  const tallinnReceiptMonthMinusFive = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.rentalReceipt,
+    seedKey: "investment-tallinn-rental-receipt-2",
+    investmentId: investmentIds.tallinnCompleted,
+    uploadedBy: users.ownerMehmet._id,
+    documentType: "rental_receipt",
+    description: `Rental receipt for ${monthKey(-5)}`,
+    uploadedAt: addDays(startOfMonthOffset(now, -5), 9),
+  });
+  const tallinnReceiptMonthMinusFour = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.rentalReceipt,
+    seedKey: "investment-tallinn-rental-receipt-3",
+    investmentId: investmentIds.tallinnCompleted,
+    uploadedBy: users.ownerMehmet._id,
+    documentType: "rental_receipt",
+    description: `Rental receipt for ${monthKey(-4)}`,
+    uploadedAt: addDays(startOfMonthOffset(now, -4), 10),
+  });
+  const tallinnReceiptMonthMinusThree = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.rentalReceipt,
+    seedKey: "investment-tallinn-rental-receipt-4",
+    investmentId: investmentIds.tallinnCompleted,
+    uploadedBy: users.ownerMehmet._id,
+    documentType: "rental_receipt",
+    description: `Rental receipt for ${monthKey(-3)}`,
+    uploadedAt: addDays(startOfMonthOffset(now, -3), 9),
+  });
 
-    await Notification.create({
-      recipient: investor._id,
-      recipientRole: "investor",
-      type: "offer_accepted",
-      title: "Investment Offer Accepted",
-      message: "Your investment offer for Lisbon property has been accepted!",
+  const completedPayments = [
+    {
+      month: monthKey(-6),
+      amount: properties.tallinn.rentOffered,
+      status: "paid",
+      dueDate: addDays(startOfMonthOffset(now, -6), 8),
+      paidAt: addDays(startOfMonthOffset(now, -6), 9),
+      paymentReceipt: buildEmbeddedFileRef(
+        tallinnReceiptMonthMinusSix.fileMetadata
+      ),
+    },
+    {
+      month: monthKey(-5),
+      amount: properties.tallinn.rentOffered,
+      status: "paid",
+      dueDate: addDays(startOfMonthOffset(now, -5), 8),
+      paidAt: addDays(startOfMonthOffset(now, -5), 9),
+      paymentReceipt: buildEmbeddedFileRef(
+        tallinnReceiptMonthMinusFive.fileMetadata
+      ),
+    },
+    {
+      month: monthKey(-4),
+      amount: properties.tallinn.rentOffered,
+      status: "paid",
+      dueDate: addDays(startOfMonthOffset(now, -4), 8),
+      paidAt: addDays(startOfMonthOffset(now, -4), 10),
+      paymentReceipt: buildEmbeddedFileRef(
+        tallinnReceiptMonthMinusFour.fileMetadata
+      ),
+    },
+    {
+      month: monthKey(-3),
+      amount: properties.tallinn.rentOffered,
+      status: "paid",
+      dueDate: addDays(startOfMonthOffset(now, -3), 8),
+      paidAt: addDays(startOfMonthOffset(now, -3), 9),
+      paymentReceipt: buildEmbeddedFileRef(
+        tallinnReceiptMonthMinusThree.fileMetadata
+      ),
+    },
+  ];
+
+  const tallinnCompleted = await Investment.create({
+    _id: investmentIds.tallinnCompleted,
+    property: properties.tallinn._id,
+    investor: users.investorEmre._id,
+    propertyOwner: users.ownerMehmet._id,
+    localRepresentative: users.localRepJohn._id,
+    representativeRequestedBy: users.investorEmre._id,
+    representativeRequestDate: daysAgo(182),
+    amountInvested: properties.tallinn.requestedInvestment,
+    currency: "EUR",
+    status: "completed",
+    contractFile: tallinnContractFile.embedded,
+    paymentReceipt: tallinnPaymentReceipt.embedded,
+    titleDeedDocument: tallinnTitleDeed.embedded,
+    additionalDocuments: [
+      {
+        type: "power_of_attorney",
+        fileId: tallinnPoa.fileMetadata._id,
+        url: tallinnPoa.fileMetadata.url,
+        description: "Representative transfer authority",
+        uploadedAt: daysAgo(173),
+        uploadedBy: users.localRepJohn._id,
+      },
+    ],
+    rentalPayments: completedPayments,
+    transferOfProperty: {
+      transferred: true,
+      date: daysAgo(15),
+      method: "market_sale",
+      transferDocument: {
+        fileId: tallinnTransferDocument.fileMetadata._id,
+        url: tallinnTransferDocument.fileMetadata.url,
+      },
+    },
+  });
+
+  users.investorEmre.investments = [
+    barcelonaContract._id,
+    batumiTitlePending._id,
+    vallettaActive._id,
+    tallinnCompleted._id,
+  ];
+  users.investorEmre.activeInvestmentCount = 3;
+  users.investorEmre.rentalIncome = [
+    {
+      propertyId: properties.valletta._id,
+      amount: properties.valletta.rentOffered,
+      currency: "EUR",
+      status: "Paid",
+      date: addDays(startOfMonthOffset(now, -2), 12),
+    },
+    {
+      propertyId: properties.valletta._id,
+      amount: properties.valletta.rentOffered,
+      currency: "EUR",
+      status: "Paid",
+      date: addDays(startOfMonthOffset(now, -1), 13),
+    },
+  ];
+  await users.investorEmre.save();
+
+  users.investorLara.investments = [lisbonOffer._id];
+  await users.investorLara.save();
+
+  users.localRepJohn.managedProperties = [properties.valletta._id, properties.batumi._id];
+  users.localRepJohn.assistedTransactions = [
+    {
+      property: properties.valletta._id,
+      investor: users.investorEmre._id,
+      transactionDate: daysAgo(58),
+      status: "active",
+      commission: 1200,
+    },
+    {
+      property: properties.tallinn._id,
+      investor: users.investorEmre._id,
+      transactionDate: daysAgo(15),
+      status: "completed",
+      commission: 900,
+    },
+  ];
+  await users.localRepJohn.save();
+
+  return {
+    lisbonOffer,
+    barcelonaContract,
+    vallettaActive,
+    tallinnCompleted,
+    batumiTitlePending,
+  };
+}
+
+async function createRentalPaymentCollection(users, properties, investments) {
+  const activePayments = investments.vallettaActive.rentalPayments.map((payment) => ({
+    investment: investments.vallettaActive._id,
+    property: properties.valletta._id,
+    investor: users.investorEmre._id,
+    propertyOwner: users.ownerAyse._id,
+    month: payment.month,
+    amount: payment.amount,
+    currency: "EUR",
+    status: payment.status,
+    dueDate: payment.dueDate,
+    paidAt: payment.paidAt,
+    paymentMethod: payment.status === "paid" ? "bank_transfer" : undefined,
+    paymentReceipt: payment.paymentReceipt?.url,
+    transactionId:
+      payment.status === "paid" ? `seed_${payment.month.replace("-", "")}` : undefined,
+  }));
+
+  const completedPayments = investments.tallinnCompleted.rentalPayments.map((payment) => ({
+    investment: investments.tallinnCompleted._id,
+    property: properties.tallinn._id,
+    investor: users.investorEmre._id,
+    propertyOwner: users.ownerMehmet._id,
+    month: payment.month,
+    amount: payment.amount,
+    currency: "EUR",
+    status: payment.status,
+    dueDate: payment.dueDate,
+    paidAt: payment.paidAt,
+    paymentMethod: "wise",
+    paymentReceipt: payment.paymentReceipt?.url,
+    transactionId: `completed_${payment.month.replace("-", "")}`,
+  }));
+
+  await RentalPayment.insertMany([...activePayments, ...completedPayments]);
+}
+
+async function createUserKycFiles(provider, users) {
+  const identityFile = await uploadSeedAsset({
+    provider,
+    sourcePath: dummyFiles.genericPdf,
+    seedKey: "user-selin-kyc-identity",
+    uploadedBy: users.investorSelin._id,
+    relatedModel: "User",
+    relatedId: users.investorSelin._id,
+    documentType: "kyc_document",
+    isPublic: false,
+    description: "Pending KYC identity document",
+    tags: ["seed", "user", "kyc"],
+  });
+
+  identityFile.url = buildPreviewUrl(identityFile._id);
+  await identityFile.save();
+
+  const addressFile = await uploadSeedAsset({
+    provider,
+    sourcePath: dummyFiles.other,
+    seedKey: "user-selin-kyc-address",
+    uploadedBy: users.investorSelin._id,
+    relatedModel: "User",
+    relatedId: users.investorSelin._id,
+    documentType: "kyc_document",
+    isPublic: false,
+    description: "Pending KYC proof of address",
+    tags: ["seed", "user", "kyc"],
+  });
+
+  addressFile.url = buildPreviewUrl(addressFile._id);
+  await addressFile.save();
+}
+
+async function createNotifications(users, properties, investments) {
+  await Notification.insertMany([
+    {
+      recipient: users.ownerAyse._id,
+      recipientRole: "property_owner",
+      type: "new_investment_offer",
+      title: "New offer for Lisbon listing",
+      message: "Lara Costa sent a new investment offer for the Lisbon property.",
       relatedEntity: {
         entityType: "investment",
-        entityId: investment._id,
+        entityId: investments.lisbonOffer._id,
       },
       priority: "high",
       isRead: false,
-    });
-
-    await Notification.create({
-      recipient: owner._id,
-      recipientRole: "property_owner",
-      type: "rent_payment_received",
-      title: "Rent Payment Received",
-      message:
-        "January 2025 rent payment has been received for your Lisbon property",
+      createdAt: daysAgo(2),
+      updatedAt: daysAgo(2),
+    },
+    {
+      recipient: users.investorEmre._id,
+      recipientRole: "investor",
+      type: "offer_accepted",
+      title: "Barcelona offer accepted",
+      message: "Your Barcelona investment moved to contract stage.",
       relatedEntity: {
-        entityType: "payment",
-        entityId: investment._id,
+        entityType: "investment",
+        entityId: investments.barcelonaContract._id,
+      },
+      priority: "high",
+      isRead: false,
+      createdAt: daysAgo(10),
+      updatedAt: daysAgo(10),
+    },
+    {
+      recipient: users.investorEmre._id,
+      recipientRole: "investor",
+      type: "title_deed_registered",
+      title: "Valletta title deed registered",
+      message: "The Valletta investment is active and rent distribution has started.",
+      relatedEntity: {
+        entityType: "investment",
+        entityId: investments.vallettaActive._id,
       },
       priority: "medium",
       isRead: true,
-      readAt: new Date(),
-    });
-
-    await Notification.create({
-      recipient: owner._id,
-      recipientRole: "property_owner",
-      type: "upcoming_rent_payment",
-      title: "Upcoming Rent Payment",
-      message: "February 2025 rent payment is due in 5 days",
+      readAt: daysAgo(30),
+      createdAt: daysAgo(58),
+      updatedAt: daysAgo(30),
+    },
+    {
+      recipient: users.adminUser._id,
+      recipientRole: "admin",
+      type: "user_registration",
+      title: "KYC approval waiting",
+      message: "Selin Arslan has submitted documents and is waiting for KYC approval.",
+      relatedEntity: {
+        entityType: "user",
+        entityId: users.investorSelin._id,
+      },
+      priority: "medium",
+      isRead: false,
+      createdAt: daysAgo(3),
+      updatedAt: daysAgo(3),
+    },
+    {
+      recipient: users.adminUser._id,
+      recipientRole: "admin",
+      type: "general_announcement",
+      title: "Title deed approval queue",
+      message: "Batumi investment title deed is ready for admin approval.",
       relatedEntity: {
         entityType: "investment",
-        entityId: investment._id,
+        entityId: investments.batumiTitlePending._id,
       },
-      priority: "low",
+      priority: "urgent",
       isRead: false,
-    });
-
-    console.log("✅ Notifications created");
-
-    // ==================== ACTIVITY LOGS ====================
-    console.log("📊 Creating Activity Logs...");
-
-    await ActivityLog.create({
-      user: investor._id,
-      action: "user_login",
-      details: { loginMethod: "email" },
-      ip: "192.168.1.1",
-      userAgent: "Mozilla/5.0...",
-    });
-
-    await ActivityLog.create({
-      user: investor._id,
-      action: "investment_offer_sent",
-      details: {
-        propertyId: property1._id,
-        amount: 50000,
+      createdAt: daysAgo(1),
+      updatedAt: daysAgo(1),
+    },
+    {
+      recipient: users.ownerMehmet._id,
+      recipientRole: "property_owner",
+      type: "contract_uploaded",
+      title: "Barcelona contract uploaded",
+      message: "The Barcelona contract package is available for review.",
+      relatedEntity: {
+        entityType: "document",
+        entityId: investments.barcelonaContract.contractFile.fileId,
       },
-      severity: "medium",
-    });
+      priority: "medium",
+      isRead: true,
+      readAt: daysAgo(9),
+      createdAt: daysAgo(12),
+      updatedAt: daysAgo(9),
+    },
+  ]);
+}
 
-    await ActivityLog.create({
-      user: owner._id,
+async function createActivityLogs(users, properties, investments) {
+  await ActivityLog.insertMany([
+    {
+      user: users.ownerAyse._id,
       action: "property_created",
       details: {
-        propertyId: property1._id,
-        city: "Lisbon",
+        propertyId: properties.portoDraft._id,
+        city: properties.portoDraft.city,
+        status: properties.portoDraft.status,
       },
-    });
+      ip: users.ownerAyse.lastLoginIP,
+      severity: "low",
+      createdAt: daysAgo(7),
+      updatedAt: daysAgo(7),
+    },
+    {
+      user: users.investorLara._id,
+      action: "investment_offer_sent",
+      details: {
+        propertyId: properties.lisbon._id,
+        investmentId: investments.lisbonOffer._id,
+        amount: investments.lisbonOffer.amountInvested,
+      },
+      ip: users.investorLara.lastLoginIP,
+      severity: "medium",
+      createdAt: daysAgo(2),
+      updatedAt: daysAgo(2),
+    },
+    {
+      user: users.investorEmre._id,
+      action: "contract_signed",
+      details: {
+        investmentId: investments.barcelonaContract._id,
+        propertyId: properties.barcelona._id,
+      },
+      ip: users.investorEmre.lastLoginIP,
+      severity: "medium",
+      createdAt: daysAgo(12),
+      updatedAt: daysAgo(12),
+    },
+    {
+      user: users.adminUser._id,
+      action: "kyc_verification_requested",
+      details: {
+        userId: users.investorSelin._id,
+      },
+      ip: users.adminUser.lastLoginIP,
+      severity: "high",
+      isAdminAction: true,
+      performedBy: users.adminUser._id,
+      createdAt: daysAgo(3),
+      updatedAt: daysAgo(3),
+    },
+    {
+      user: users.ownerAyse._id,
+      action: "title_deed_registered",
+      details: {
+        investmentId: investments.vallettaActive._id,
+        propertyId: properties.valletta._id,
+      },
+      ip: users.ownerAyse.lastLoginIP,
+      severity: "medium",
+      createdAt: daysAgo(58),
+      updatedAt: daysAgo(58),
+    },
+  ]);
+}
 
-    console.log("✅ Activity Logs created");
+function printSummary(users, properties, investments) {
+  console.log("");
+  console.log("Seed completed successfully.");
+  console.log("");
+  console.log("Credentials:");
+  console.log("  admin@admin.com / Admin123!@#");
+  console.log("  emre@investor.com / Test123!@#");
+  console.log("  lara@investor.com / Lara123!@#");
+  console.log("  selin@investor.com / Selin123!@#");
+  console.log("  ayse@owner.com / Owner123!@#");
+  console.log("  mehmet@owner.com / Mehmet123!@#");
+  console.log("  john@rep.com / Rep123!@#");
+  console.log("");
+  console.log("Scenario coverage:");
+  console.log(
+    `  properties: published=${[properties.lisbon, properties.tbilisi].length}, draft=1, in_contract=2, active=1, completed=1, rejected=1`,
+  );
+  console.log(
+    `  investments: offer_sent=1, contract_signed=1, title_deed_pending=1, active=1, completed=1`,
+  );
+  console.log(
+    `  pending kyc users: 1 (${users.investorSelin.email})`,
+  );
+  console.log("");
+  console.log("High value records:");
+  console.log(`  active investment id: ${investments.vallettaActive._id}`);
+  console.log(`  title deed pending id: ${investments.batumiTitlePending._id}`);
+  console.log(`  draft property id: ${properties.portoDraft._id}`);
+  console.log(`  published property id: ${properties.lisbon._id}`);
+}
 
-    // ==================== SUMMARY ====================
-    console.log("\n📊 SEED DATA SUMMARY:");
-    console.log("====================");
+async function seed() {
+  await connectToDatabase();
+  const provider = createStorageProvider();
 
-    console.log("\n✅ MEMBERSHIP PLANS:");
-    console.log("• Basic Plan (Free)");
-    console.log("• Pro Plan (€19/month)");
-    console.log("• Enterprise Plan (€99/month)");
+  try {
+    const { storage } = await resetDatabaseAndStorage({ clearStorage: true });
 
-    console.log("\n✅ USERS CREATED:");
-    console.log(
-      "┌────────────────────┬────────────────────┬─────────────────┐"
-    );
-    console.log(
-      "│ Role               │ Email              │ Password        │"
-    );
-    console.log(
-      "├────────────────────┼────────────────────┼─────────────────┤"
-    );
-    console.log(
-      "│ Investor           │ emre@investor.com  │ Test123!@#      │"
-    );
-    console.log(
-      "│ Property Owner     │ ayse@owner.com     │ Owner123!@#     │"
-    );
-    console.log(
-      "│ Property Owner     │ mehmet@owner.com   │ Mehmet123!@#    │"
-    );
-    console.log(
-      "│ Local Rep          │ john@rep.com       │ Rep123!@#       │"
-    );
-    console.log(
-      "│ Admin              │ admin@admin.com    │ Admin123!@#     │"
-    );
-    console.log(
-      "└────────────────────┴────────────────────┴─────────────────┘"
-    );
+    if (storage.storageType === "minio") {
+      console.log(
+        `Storage reset: bucket=${storage.bucket}, removed=${storage.clearedObjects}`,
+      );
+    }
 
-    console.log("\n🏠 PROPERTIES:");
-    console.log("• 1 In-contract property (Lisbon)");
-    console.log("• 1 Featured property (Porto)");
-    console.log("• 1 Published property (Barcelona)");
+    const plans = await createMembershipPlans();
+    const users = await createUsers();
+    await createMemberships(plans, users);
+    await createUserKycFiles(provider, users);
+    const properties = await createProperties(provider, users);
+    const investments = await createInvestments(provider, users, properties);
+    await createRentalPaymentCollection(users, properties, investments);
+    await createNotifications(users, properties, investments);
+    await createActivityLogs(users, properties, investments);
 
-    console.log("\n💰 INVESTMENTS:");
-    console.log("• Active investment: €50,000 in Lisbon property");
-    console.log("• January 2025: Paid (€500)");
-    console.log("• February 2025: Pending (€500)");
-    console.log("• Contract and Title Deed uploaded");
+    printSummary(users, properties, investments);
+  } finally {
+    await disconnectDatabase();
+  }
+}
 
-    console.log("\n📁 FILE SYSTEM:");
-    console.log("• FileMetadata collection initialized");
-    console.log("• Contract PDF uploaded");
-    console.log("• Title Deed PDF uploaded");
-
-    console.log("\n💳 MEMBERSHIPS:");
-    console.log("• Investor: Basic (Active)");
-    console.log("• Ayse: Pro (Active)");
-    console.log("• Mehmet: Basic (Active)");
-    console.log("• John: Enterprise (Active)");
-
-    console.log("\n🔔 NOTIFICATIONS:");
-    console.log("• 3 notifications created");
-    console.log("• Activity logs initialized");
-
-    console.log("\n✨ SEED COMPLETED SUCCESSFULLY!");
-    console.log("====================\n");
-
-    process.exit();
-  })
-  .catch((err) => {
-    console.error("❌ MongoDB connection error:", err);
-    process.exit(1);
-  });
+seed().catch(async (error) => {
+  console.error("Seed failed:", error);
+  await disconnectDatabase();
+  process.exit(1);
+});

@@ -31,6 +31,7 @@ import PropertyDetail from "./views/property/PropertyDetail";
 import AdminProperties from "./views/admin/AdminProperties";
 import UserProfilePage from "./views/profile/UserProfilePage";
 import ProfileSettingsPage from "./views/profile/ProfileSettingsPage";
+import AppSettingsPage from "./views/settings/AppSettingsPage";
 import PrivateRoute from "./routes/PrivateRoute";
 import RoleBasedRoute from "./routes/RoleBasedRoute";
 
@@ -44,6 +45,8 @@ import InvestorRentalPayments from "./views/investor/InvestorRentalPayments";
 // Owner imports
 import OwnerLayout from "./views/layouts/OwnerLayout";
 import OwnerDashboard from "./components/Dashboards/OwnerDashboard";
+import OwnerOffers from "./views/owner/OwnerOffers";
+import OwnerInvestmentDetail from "./views/owner/OwnerInvestmentDetail";
 import OwnerProperties from "./views/owner/OwnerProperties";
 import OwnerRentalPayments from "./views/owner/OwnerRentalPayments";
 import OwnerPropertyCreate from "./views/owner/OwnerPropertyCreate";
@@ -188,6 +191,36 @@ const AppContent = () => {
             </PrivateRoute>
           }
         />
+        <Route
+          path="/admin/settings"
+          element={
+            <PrivateRoute>
+              <RoleBasedRoute allowedRoles={["admin"]}>
+                <AppSettingsPage />
+              </RoleBasedRoute>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/investor/settings"
+          element={
+            <PrivateRoute>
+              <RoleBasedRoute allowedRoles={["investor"]}>
+                <AppSettingsPage />
+              </RoleBasedRoute>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/owner/settings"
+          element={
+            <PrivateRoute>
+              <RoleBasedRoute allowedRoles={["property_owner"]}>
+                <AppSettingsPage />
+              </RoleBasedRoute>
+            </PrivateRoute>
+          }
+        />
         {/* Admin (nested) */}
         <Route
           path="/admin"
@@ -202,6 +235,10 @@ const AppContent = () => {
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="properties" element={<AdminProperties />} />
+          <Route
+            path="properties/:propertyId"
+            element={<AdminPropertyDetail />}
+          />
           <Route path="membership-plans" element={<AdminMembershipPlans />} />
           <Route path="investments" element={<AdminInvestments />} />
           <Route path="investments/:id" element={<AdminInvestmentDetail />} />
@@ -253,11 +290,11 @@ const AppContent = () => {
         >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<OwnerDashboard />} />
+          <Route path="offers" element={<OwnerOffers />} />
           <Route path="properties" element={<OwnerProperties />} />
           <Route path="properties/new" element={<OwnerPropertyCreate />} />
           <Route path="rental-payments" element={<OwnerRentalPayments />} />
-          {/* Placeholder routes - ileride doldurulacak */}
-          {/* <Route path="investments/:id" element={<OwnerInvestmentDetail />} /> */}
+          <Route path="investments/:id" element={<OwnerInvestmentDetail />} />
           {/* <Route path="notifications" element={<OwnerNotifications />} /> */}
           {/* <Route path="settings" element={<OwnerSettings />} /> */}
         </Route>
@@ -265,10 +302,6 @@ const AppContent = () => {
         <Route
           path="/auth/admin/pending-kyc/:userId"
           element={<AdminPendingKycDetail />}
-        />
-        <Route
-          path="/admin/properties/:propertyId"
-          element={<AdminPropertyDetail />}
         />
         <Route path="/owner/properties/:id" element={<PropertyDetail />} />
 

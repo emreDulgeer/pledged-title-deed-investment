@@ -71,7 +71,7 @@ const UserSchema = new mongoose.Schema(
         amount: Number,
         currency: {
           type: String,
-          default: "USD",
+          default: "EUR",
         },
         method: {
           type: String,

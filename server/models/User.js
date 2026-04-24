@@ -11,10 +11,16 @@ const UserSchema = new mongoose.Schema(
     },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
+    firstName: String,
+    lastName: String,
     fullName: { type: String, required: true },
     phoneNumber: String,
     country: String,
     region: String,
+    membershipPlan: {
+      type: String,
+      default: "basic",
+    },
     riskScore: { type: Number, default: 50 },
     emailVerified: { type: Boolean, default: false },
     emailVerifiedAt: Date,
@@ -74,7 +80,7 @@ const UserSchema = new mongoose.Schema(
         amount: Number,
         currency: {
           type: String,
-          default: "USD",
+          default: "EUR",
         },
         method: {
           type: String,

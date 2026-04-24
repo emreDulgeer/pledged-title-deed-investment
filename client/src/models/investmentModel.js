@@ -74,7 +74,7 @@ export const InvestmentPropTypes = {
 
   // Financial Details
   amountInvested: PropTypes.number.isRequired,
-  currency: PropTypes.oneOf(["EUR", "USD", "GBP", "TRY"]),
+  currency: PropTypes.oneOf(["EUR"]),
   exchangeRate: PropTypes.number,
   localCurrencyAmount: PropTypes.number,
 

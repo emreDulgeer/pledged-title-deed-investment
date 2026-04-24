@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import bridge from "../../controllers/bridge";
+import { APP_CURRENCY } from "../../utils/currency";
 
 // ── Sabitler ─────────────────────────────────────────────────────────────────
 
@@ -224,7 +225,7 @@ const OwnerRentalPayments = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <SummaryCard
           label="Total Collected"
-          value={fmt(summary.paidAmount, "€")}
+          value={fmt(summary.paidAmount, APP_CURRENCY)}
           sub={`${summary.paid} payment${summary.paid !== 1 ? "s" : ""}`}
           colorClass="text-green-600 dark:text-green-400"
         />
@@ -367,7 +368,7 @@ const OwnerRentalPayments = () => {
                       {/* Amount */}
                       <td className="px-4 py-3">
                         <p className="text-sm font-semibold text-day-text dark:text-night-text">
-                          {fmt(payment.amount)} {payment.currency || "EUR"}
+                          {fmt(payment.amount, APP_CURRENCY)}
                         </p>
                       </td>
 
@@ -465,7 +466,7 @@ const OwnerRentalPayments = () => {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-semibold text-day-text dark:text-night-text">
-                      {fmt(payment.amount)} {payment.currency || "€"}
+                      {fmt(payment.amount, APP_CURRENCY)}
                     </p>
                     {payment.paidAt && (
                       <p className="text-xs text-day-text/50 dark:text-night-text/50">

@@ -17,6 +17,7 @@ import {
 } from "../../store/slices/investmentSlice";
 import bridge from "../../controllers/bridge";
 import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
+import { APP_CURRENCY } from "../../utils/currency";
 function LineItem({ label, value }) {
   return (
     <div className="flex items-center justify-between py-1">
@@ -236,7 +237,7 @@ export default function AdminInvestmentDetail() {
                       label={t("investments.amount_invested")}
                       value={`${(
                         investment?.amountInvested ?? 0
-                      ).toLocaleString()} ${investment?.currency || "EUR"}`}
+                      ).toLocaleString()} ${APP_CURRENCY}`}
                     />
                     <LineItem
                       label={t("common.created")}
@@ -317,7 +318,7 @@ export default function AdminInvestmentDetail() {
                           </td>
                           <td className="px-4 py-2 text-day-text dark:text-night-text">
                             {(p.amount ?? 0).toLocaleString()}{" "}
-                            {investment?.currency || "EUR"}
+                            {APP_CURRENCY}
                           </td>
                           <td className="px-4 py-2">
                             <span className="text-xs px-2 py-1 rounded-full border border-day-border dark:border-night-border text-day-text dark:text-night-text">
@@ -396,7 +397,7 @@ export default function AdminInvestmentDetail() {
                 />
                 <LineItem
                   label={t("properties.currency")}
-                  value={investment?.currency || "EUR"}
+                  value={APP_CURRENCY}
                 />
               </div>
             </aside>

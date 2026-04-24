@@ -23,10 +23,10 @@ class FileUploadManager {
         config.blockedExtensions || this.getDefaultBlockedExtensions(),
 
       // Güvenlik ayarları
-      enableVirusScan: config.enableVirusScan || false,
+      enableVirusScan: config.enableVirusScan ?? false,
       enableSecurityValidation: config.enableSecurityValidation ?? true,
-      enableMagicNumberCheck: config.enableMagicNumberCheck || true,
-      enableContentValidation: config.enableContentValidation || true,
+      enableMagicNumberCheck: config.enableMagicNumberCheck ?? true,
+      enableContentValidation: config.enableContentValidation ?? true,
       quarantineDir: config.quarantineDir || "./uploads/quarantine",
 
       // Storage ayarları
@@ -39,8 +39,8 @@ class FileUploadManager {
       chunkSize: config.chunkSize || 1024 * 1024, // 1MB chunks for streaming
 
       // Metadata
-      generateThumbnails: config.generateThumbnails || true,
-      extractMetadata: config.extractMetadata || true,
+      generateThumbnails: config.generateThumbnails ?? true,
+      extractMetadata: config.extractMetadata ?? true,
       hashAlgorithm: config.hashAlgorithm || "sha256",
     };
 
@@ -275,6 +275,24 @@ class FileUploadManager {
    * Ön validasyon
    */
   async validatePreUpload(file) {
+    const rawFilename = String(file.originalname || file.name || "");
+
+    if (
+      rawFilename.includes("..") ||
+      rawFilename.includes("/") ||
+      rawFilename.includes("\\")
+    ) {
+      throw new Error("Güvensiz dosya adı tespit edildi");
+    }
+
+    const filename = this.normalizeFilename(rawFilename);
+    if (file.originalname !== undefined) {
+      file.originalname = filename;
+    }
+    if (file.name !== undefined) {
+      file.name = filename;
+    }
+
     // Dosya boyutu kontrolü
     if (file.size > this.config.maxFileSize) {
       throw new Error(
@@ -285,7 +303,6 @@ class FileUploadManager {
     }
 
     // Dosya adı güvenlik kontrolü
-    const filename = file.originalname || file.name;
     if (this.isFilenameUnsafe(filename)) {
       throw new Error("Güvensiz dosya adı tespit edildi");
     }
@@ -556,6 +573,18 @@ class FileUploadManager {
     ];
 
     return unsafePatterns.some((pattern) => pattern.test(filename));
+  }
+
+  normalizeFilename(filename) {
+    const normalized = String(filename || "")
+      .normalize("NFKC")
+      .replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
+      .replace(/\uFFFD/g, "-")
+      .replace(/[<>:"|?*]/g, "-")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return normalized || `upload-${Date.now()}`;
   }
 
   hasDoubleExtension(filename) {

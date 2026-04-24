@@ -40,6 +40,7 @@ const InvestmentSchema = new mongoose.Schema(
         "title_deed_pending",
         "active",
         "completed",
+        "refunded",
         "defaulted",
       ],
       default: "offer_sent",
@@ -120,6 +121,7 @@ const InvestmentSchema = new mongoose.Schema(
       {
         month: String, // "2025-07"
         amount: Number,
+        dueDate: Date,
         status: {
           type: String,
           enum: ["paid", "pending", "delayed"],

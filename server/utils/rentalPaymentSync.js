@@ -2,6 +2,7 @@
 
 const Investment = require("../models/Investment");
 const RentalPayment = require("../models/RentalPayment");
+const { APP_CURRENCY } = require("./currency");
 
 class RentalPaymentSync {
   // Mevcut investment'lardan RentalPayment kayıtları oluştur
@@ -39,7 +40,7 @@ class RentalPaymentSync {
           propertyOwner: investment.propertyOwner || investment.property.owner,
           month: payment.month,
           amount: payment.amount,
-          currency: investment.currency,
+          currency: APP_CURRENCY,
           status: payment.status,
           dueDate: dueDate,
           paidAt: payment.paidAt,
@@ -69,7 +70,7 @@ class RentalPaymentSync {
         propertyOwner: investment.propertyOwner,
         month: payment.month,
         amount: payment.amount,
-        currency: investment.currency,
+        currency: APP_CURRENCY,
         status: payment.status,
         dueDate: dueDate,
       });

@@ -15,6 +15,7 @@ const InvestorTopbar = ({
   currentLanguage,
   changeLanguage,
   user,
+  onLogout,
 }) => (
   <>
     <button
@@ -47,7 +48,7 @@ const InvestorTopbar = ({
       />
 
       <NotificationBell />
-      <ProfileButton theme={theme} user={user} />
+      <ProfileButton theme={theme} user={user} onLogout={onLogout} />
     </div>
   </>
 );

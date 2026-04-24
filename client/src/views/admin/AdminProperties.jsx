@@ -35,6 +35,7 @@ import {
   getPropertyImageStyle,
   getPropertyImageUrl,
 } from "../../utils/propertyImages";
+import { APP_CURRENCY } from "../../utils/currency";
 
 const AdminProperties = () => {
   const { t } = useTranslation();
@@ -236,7 +237,7 @@ const AdminProperties = () => {
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "USD",
+      currency: APP_CURRENCY,
       minimumFractionDigits: 0,
     }).format(amount);
   };

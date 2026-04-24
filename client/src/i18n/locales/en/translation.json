@@ -84,6 +84,8 @@
       "notary_document": "Notary Document",
       "power_of_attorney": "Power of Attorney",
       "tax_receipt": "Tax Receipt",
+      "transfer_document": "Transfer Document",
+      "refund_receipt": "Refund Receipt",
       "other": "Other"
     }
   },
@@ -219,6 +221,7 @@
     "title_deed_pending": "Title Deed Pending",
     "active": "Active",
     "completed": "Completed",
+    "refunded": "Refunded",
     "defaulted": "Defaulted",
     "offerSent": "Offer Sent",
     "contractSigned": "Contract Signed",

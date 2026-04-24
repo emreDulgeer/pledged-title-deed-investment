@@ -16,6 +16,7 @@ const {
   toInvestmentDetailDto,
   toInvestmentAdminViewDto,
 } = require("../utils/dto/Investments");
+const { APP_CURRENCY } = require("../utils/currency");
 
 class InvestmentService {
   constructor() {
@@ -89,7 +90,7 @@ class InvestmentService {
       property: propertyId,
       investor: investorId,
       propertyOwner: property.owner?._id,
-      currency: property.currency,
+      currency: APP_CURRENCY,
       amountInvested,
       status: "offer_sent",
       rentalPayments,
@@ -475,7 +476,38 @@ class InvestmentService {
   async getInvestmentDocuments(investmentId, userId, userRole) {
     const investment = await this.investmentRepository.findById(
       investmentId,
-      "property investor contractFile.fileId titleDeedDocument.fileId paymentReceipt.fileId",
+      [
+        { path: "property", select: "owner" },
+        { path: "investor", select: "_id" },
+        {
+          path: "contractFile.fileId",
+          select: "originalName filename",
+        },
+        {
+          path: "titleDeedDocument.fileId",
+          select: "originalName filename",
+        },
+        {
+          path: "paymentReceipt.fileId",
+          select: "originalName filename",
+        },
+        {
+          path: "additionalDocuments.fileId",
+          select: "originalName filename",
+        },
+        {
+          path: "rentalPayments.paymentReceipt.fileId",
+          select: "originalName filename",
+        },
+        {
+          path: "refund.refundReceipt.fileId",
+          select: "originalName filename",
+        },
+        {
+          path: "transferOfProperty.transferDocument.fileId",
+          select: "originalName filename",
+        },
+      ],
     );
 
     if (!investment) {
@@ -496,12 +528,20 @@ class InvestmentService {
     }
 
     const documents = [];
+    const pushDocument = (document) => {
+      if (!document?.fileId) return;
+      documents.push(document);
+    };
 
     // Contract
     if (investment.contractFile?.fileId) {
-      documents.push({
+      pushDocument({
         type: "contract",
-        fileId: investment.contractFile.fileId,
+        fileId:
+          investment.contractFile.fileId._id || investment.contractFile.fileId,
+        name:
+          investment.contractFile.fileId.originalName ||
+          investment.contractFile.fileId.filename,
         url: investment.contractFile.url,
         uploadedAt: investment.contractFile.uploadedAt,
         uploadedBy: investment.contractFile.uploadedBy,
@@ -510,9 +550,14 @@ class InvestmentService {
 
     // Title Deed
     if (investment.titleDeedDocument?.fileId) {
-      documents.push({
+      pushDocument({
         type: "title_deed",
-        fileId: investment.titleDeedDocument.fileId,
+        fileId:
+          investment.titleDeedDocument.fileId._id ||
+          investment.titleDeedDocument.fileId,
+        name:
+          investment.titleDeedDocument.fileId.originalName ||
+          investment.titleDeedDocument.fileId.filename,
         url: investment.titleDeedDocument.url,
         uploadedAt: investment.titleDeedDocument.uploadedAt,
         uploadedBy: investment.titleDeedDocument.uploadedBy,
@@ -522,9 +567,14 @@ class InvestmentService {
 
     // Payment Receipt
     if (investment.paymentReceipt?.fileId) {
-      documents.push({
+      pushDocument({
         type: "payment_receipt",
-        fileId: investment.paymentReceipt.fileId,
+        fileId:
+          investment.paymentReceipt.fileId._id ||
+          investment.paymentReceipt.fileId,
+        name:
+          investment.paymentReceipt.fileId.originalName ||
+          investment.paymentReceipt.fileId.filename,
         url: investment.paymentReceipt.url,
         uploadedAt: investment.paymentReceipt.uploadedAt,
         uploadedBy: investment.paymentReceipt.uploadedBy,
@@ -534,9 +584,10 @@ class InvestmentService {
     // Additional Documents
     if (investment.additionalDocuments?.length > 0) {
       investment.additionalDocuments.forEach((doc) => {
-        documents.push({
+        pushDocument({
           type: doc.type,
-          fileId: doc.fileId,
+          fileId: doc.fileId?._id || doc.fileId,
+          name: doc.fileId?.originalName || doc.fileId?.filename,
           url: doc.url,
           description: doc.description,
           uploadedAt: doc.uploadedAt,
@@ -545,7 +596,65 @@ class InvestmentService {
       });
     }
 
-    return documents;
+    // Rental payment receipts
+    if (investment.rentalPayments?.length > 0) {
+      investment.rentalPayments.forEach((payment) => {
+        if (!payment.paymentReceipt?.fileId) {
+          return;
+        }
+
+        pushDocument({
+          type: "rental_receipt",
+          fileId:
+            payment.paymentReceipt.fileId._id ||
+            payment.paymentReceipt.fileId,
+          name:
+            payment.paymentReceipt.fileId.originalName ||
+            payment.paymentReceipt.fileId.filename,
+          url: payment.paymentReceipt.url,
+          description: payment.month
+            ? `Rental receipt for ${payment.month}`
+            : undefined,
+          uploadedAt: payment.paidAt || payment.dueDate,
+          uploadedBy: investment.property?.owner,
+          month: payment.month,
+        });
+      });
+    }
+
+    if (investment.refund?.refundReceipt?.fileId) {
+      pushDocument({
+        type: "refund_receipt",
+        fileId:
+          investment.refund.refundReceipt.fileId._id ||
+          investment.refund.refundReceipt.fileId,
+        name:
+          investment.refund.refundReceipt.fileId.originalName ||
+          investment.refund.refundReceipt.fileId.filename,
+        url: investment.refund.refundReceipt.url,
+        uploadedAt: investment.refund.refundedAt,
+      });
+    }
+
+    if (investment.transferOfProperty?.transferDocument?.fileId) {
+      pushDocument({
+        type: "transfer_document",
+        fileId:
+          investment.transferOfProperty.transferDocument.fileId._id ||
+          investment.transferOfProperty.transferDocument.fileId,
+        name:
+          investment.transferOfProperty.transferDocument.fileId.originalName ||
+          investment.transferOfProperty.transferDocument.fileId.filename,
+        url: investment.transferOfProperty.transferDocument.url,
+        uploadedAt: investment.transferOfProperty.date,
+      });
+    }
+
+    return documents.sort((a, b) => {
+      const dateA = a.uploadedAt ? new Date(a.uploadedAt).valueOf() : 0;
+      const dateB = b.uploadedAt ? new Date(b.uploadedAt).valueOf() : 0;
+      return dateB - dateA;
+    });
   }
   async markDelayedPayments() {
     const RentalPayment = require("../models/RentalPayment");
@@ -975,6 +1084,7 @@ class InvestmentService {
           investorName: this.displayNameOf(investment.investor),
           month: payment.month,
           amount: payment.amount,
+          currency: APP_CURRENCY,
           status: payment.status,
           dueDate: payment.dueDate,
           paidAt: payment.paidAt,
@@ -1009,12 +1119,10 @@ class InvestmentService {
         incomes.push({
           investmentId: investment._id,
           propertyCity: investment.property.city,
-          propertyOwnerName:
-            investment.propertyOwner.firstName +
-            " " +
-            investment.propertyOwner.lastName,
+          propertyOwnerName: this.displayNameOf(investment.propertyOwner),
           month: payment.month,
           amount: payment.amount,
+          currency: APP_CURRENCY,
           status: payment.status,
           expectedDate: payment.dueDate,
           receivedAt: payment.paidAt,
@@ -1059,16 +1167,11 @@ class InvestmentService {
           upcomingPayments.push({
             investmentId: investment._id,
             property: investment.property.city,
-            investor:
-              investment.investor.firstName +
-              " " +
-              investment.investor.lastName,
-            propertyOwner:
-              investment.propertyOwner.firstName +
-              " " +
-              investment.propertyOwner.lastName,
+            investor: this.displayNameOf(investment.investor),
+            propertyOwner: this.displayNameOf(investment.propertyOwner),
             month: payment.month,
             amount: payment.amount,
+            currency: APP_CURRENCY,
             dueDate: payment.dueDate,
             daysRemaining: Math.ceil(
               (payment.dueDate - today) / (1000 * 60 * 60 * 24),
@@ -1104,16 +1207,11 @@ class InvestmentService {
           delayedPayments.push({
             investmentId: investment._id,
             property: investment.property.city,
-            investor:
-              investment.investor.firstName +
-              " " +
-              investment.investor.lastName,
-            propertyOwner:
-              investment.propertyOwner.firstName +
-              " " +
-              investment.propertyOwner.lastName,
+            investor: this.displayNameOf(investment.investor),
+            propertyOwner: this.displayNameOf(investment.propertyOwner),
             month: payment.month,
             amount: payment.amount,
+            currency: APP_CURRENCY,
             dueDate: payment.dueDate,
             daysDelayed: Math.ceil(
               (today - payment.dueDate) / (1000 * 60 * 60 * 24),

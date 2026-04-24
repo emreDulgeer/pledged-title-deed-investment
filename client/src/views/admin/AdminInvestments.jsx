@@ -18,6 +18,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
+import { APP_CURRENCY } from "../../utils/currency";
 
 const PAGE_SIZE = 10;
 
@@ -321,7 +322,7 @@ export default function AdminInvestments() {
                       ? it.amountInvested.toLocaleString()
                       : "-"}{" "}
                     <span className="text-day-text/60 dark:text-night-text/60">
-                      {it.currency || "EUR"}
+                      {APP_CURRENCY}
                     </span>
                   </td>
                   <td className="px-4 py-3">

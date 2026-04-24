@@ -7,6 +7,7 @@ import {
   getPropertyImageStyle,
   getPropertyImageUrl,
 } from "../../utils/propertyImages";
+import { APP_CURRENCY_SYMBOL } from "../../utils/currency";
 
 const InvestorRentalPayments = () => {
   const navigate = useNavigate();
@@ -160,7 +161,7 @@ const InvestorRentalPayments = () => {
                 {t("investor.totalPaid")}
               </p>
               <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                {stats.totalPaid.toLocaleString()} ₺
+                {stats.totalPaid.toLocaleString()} {APP_CURRENCY_SYMBOL}
               </p>
             </div>
             <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-lg">
@@ -176,7 +177,7 @@ const InvestorRentalPayments = () => {
                 {t("investor.pending")}
               </p>
               <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                {stats.totalPending.toLocaleString()} ₺
+                {stats.totalPending.toLocaleString()} {APP_CURRENCY_SYMBOL}
               </p>
             </div>
             <div className="p-3 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
@@ -192,7 +193,7 @@ const InvestorRentalPayments = () => {
                 {t("investor.delayed")}
               </p>
               <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                {stats.totalDelayed.toLocaleString()} ₺
+                {stats.totalDelayed.toLocaleString()} {APP_CURRENCY_SYMBOL}
               </p>
             </div>
             <div className="p-3 bg-red-100 dark:bg-red-900/20 rounded-lg">
@@ -208,7 +209,7 @@ const InvestorRentalPayments = () => {
                 {t("investor.thisMonth")}
               </p>
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {stats.thisMonth.toLocaleString()} ₺
+                {stats.thisMonth.toLocaleString()} {APP_CURRENCY_SYMBOL}
               </p>
             </div>
             <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
@@ -364,7 +365,8 @@ const InvestorRentalPayments = () => {
                         </td>
                         <td className="px-6 py-4">
                           <span className="font-semibold text-gray-900 dark:text-white">
-                            {payment.amount?.toLocaleString()} ₺
+                            {payment.amount?.toLocaleString()}{" "}
+                            {APP_CURRENCY_SYMBOL}
                           </span>
                         </td>
                         <td className="px-6 py-4">

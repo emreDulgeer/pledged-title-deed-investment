@@ -1,10 +1,12 @@
 // server/utils/dto/Investments/InvestmentDto.js
 
+const { APP_CURRENCY } = require("../../currency");
+
 class InvestmentDto {
   constructor(investment) {
     this.id = investment._id;
     this.amountInvested = investment.amountInvested;
-    this.currency = investment.currency;
+    this.currency = APP_CURRENCY;
     this.status = investment.status;
     this.contractFile = investment.contractFile;
     this.paymentReceipt = investment.paymentReceipt;

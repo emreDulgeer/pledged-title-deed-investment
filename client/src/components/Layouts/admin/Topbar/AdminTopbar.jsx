@@ -15,6 +15,7 @@ const AdminTopbar = ({
   currentLanguage,
   changeLanguage,
   user,
+  onLogout,
 }) => (
   <>
     <button
@@ -44,7 +45,7 @@ const AdminTopbar = ({
         changeLanguage={changeLanguage}
       />
       <NotificationBell />
-      <ProfileButton theme={theme} user={user} />
+      <ProfileButton theme={theme} user={user} onLogout={onLogout} />
     </div>
   </>
 );

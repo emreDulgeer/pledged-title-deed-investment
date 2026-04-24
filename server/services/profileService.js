@@ -2,6 +2,7 @@ const User = require("../models/User");
 const Property = require("../models/Property");
 const Investment = require("../models/Investment");
 const { getPrimaryPropertyImage } = require("../utils/propertyImages");
+const { APP_CURRENCY } = require("../utils/currency");
 
 class ProfileService {
   async getProfileById(userId, viewer = null) {
@@ -112,7 +113,7 @@ class ProfileService {
       fullAddress: isPrivateView ? property.fullAddress || null : null,
       propertyType: property.propertyType || null,
       requestedInvestment: property.requestedInvestment ?? null,
-      currency: property.currency || "EUR",
+      currency: APP_CURRENCY,
       annualYieldPercent: property.annualYieldPercent ?? null,
       rentOffered: property.rentOffered ?? null,
       contractPeriodMonths: property.contractPeriodMonths ?? null,
@@ -126,7 +127,7 @@ class ProfileService {
     return {
       id: String(investment._id),
       amountInvested: investment.amountInvested ?? null,
-      currency: investment.currency || "EUR",
+      currency: APP_CURRENCY,
       status: investment.status,
       createdAt: investment.createdAt || null,
       property: investment.property
@@ -137,7 +138,7 @@ class ProfileService {
             fullAddress: investment.property.fullAddress || null,
             propertyType: investment.property.propertyType || null,
             requestedInvestment: investment.property.requestedInvestment ?? null,
-            currency: investment.property.currency || "EUR",
+            currency: APP_CURRENCY,
             status: investment.property.status || null,
           }
         : null,

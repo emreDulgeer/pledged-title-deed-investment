@@ -1,12 +1,13 @@
 // server/utils/dto/Investments/InvestmentListDto.js
 
 const { getPrimaryPropertyImage } = require("../../propertyImages");
+const { APP_CURRENCY } = require("../../currency");
 
 class InvestmentListDto {
   constructor(investment) {
     this.id = investment._id;
     this.amountInvested = investment.amountInvested;
-    this.currency = investment.currency;
+    this.currency = APP_CURRENCY;
     this.status = investment.status;
     this.createdAt = investment.createdAt;
 
@@ -31,6 +32,12 @@ class InvestmentListDto {
       const paidPayments = investment.rentalPayments.filter(
         (p) => p.status === "paid"
       );
+      const pendingPayments = investment.rentalPayments.filter(
+        (p) => p.status === "pending"
+      );
+      const delayedPayments = investment.rentalPayments.filter(
+        (p) => p.status === "delayed"
+      );
       const totalPaid = paidPayments.reduce(
         (sum, p) => sum + (p.amount || 0),
         0
@@ -39,6 +46,18 @@ class InvestmentListDto {
       this.rentalSummary = {
         totalPayments: investment.rentalPayments.length,
         paidPayments: paidPayments.length,
+        totalPaidAmount: totalPaid,
+        nextPaymentDue: this.getNextPaymentDue(investment.rentalPayments),
+      };
+      this.rentalPaymentsSummary = {
+        total: investment.rentalPayments.length,
+        paid: paidPayments.length,
+        pending: pendingPayments.length,
+        delayed: delayedPayments.length,
+        totalPayments: investment.rentalPayments.length,
+        paidPayments: paidPayments.length,
+        pendingPayments: pendingPayments.length,
+        delayedPayments: delayedPayments.length,
         totalPaidAmount: totalPaid,
         nextPaymentDue: this.getNextPaymentDue(investment.rentalPayments),
       };

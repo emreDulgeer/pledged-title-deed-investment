@@ -86,6 +86,7 @@ const AdminLayout = () => {
           currentLanguage={currentLanguage}
           changeLanguage={changeLanguage}
           user={user}
+          onLogout={() => dispatch(logout())}
         />
       }
     >

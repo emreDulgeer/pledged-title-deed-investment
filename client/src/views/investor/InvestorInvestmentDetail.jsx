@@ -1,30 +1,55 @@
-// src/views/investor/InvestorInvestmentDetail.jsx
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import InvestmentController from "../../controllers/investmentController";
 import { useTranslation } from "react-i18next";
 import PropertySummary from "../../components/property/detail/PropertySummary";
 import DocumentsList from "../../components/property/detail/DocumentsList";
 import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
+import { APP_CURRENCY, APP_CURRENCY_SYMBOL } from "../../utils/currency";
 
-const InvestorInvestmentDetail = () => {
+const getStatusColor = (status) => {
+  const colors = {
+    offer_sent: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    contract_signed:
+      "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+    title_deed_pending:
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+    active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    completed: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
+    refunded:
+      "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
+    defaulted: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  };
+  return colors[status] || "bg-gray-100 text-gray-800";
+};
+
+const getPaymentStatusColor = (status) => {
+  const colors = {
+    pending:
+      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+    paid: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    delayed: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  };
+  return colors[status] || "bg-gray-100 text-gray-800";
+};
+
+export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const isOwnerView = viewerRole === "owner";
+  const backPath = isOwnerView ? "/owner/offers" : "/investor/investments";
+
   const [loading, setLoading] = useState(true);
   const [investment, setInvestment] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [actionLoading, setActionLoading] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [showRejectModal, setShowRejectModal] = useState(false);
 
-  useEffect(() => {
-    if (id) {
-      loadInvestmentDetails();
-      loadDocuments();
-    }
-  }, [id]);
-
-  const loadInvestmentDetails = async () => {
+  const loadInvestmentDetails = useCallback(async () => {
     try {
       setLoading(true);
       const response = await InvestmentController.getInvestmentById(id);
@@ -37,9 +62,9 @@ const InvestorInvestmentDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
     try {
       const response = await InvestmentController.getInvestmentDocuments(id);
 
@@ -49,7 +74,14 @@ const InvestorInvestmentDetail = () => {
     } catch (error) {
       console.error("Dökümanlar yükleme hatası:", error);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadInvestmentDetails();
+      loadDocuments();
+    }
+  }, [id, loadDocuments, loadInvestmentDetails]);
 
   const handleDocumentUpload = async (event, type) => {
     const file = event.target.files[0];
@@ -68,8 +100,10 @@ const InvestorInvestmentDetail = () => {
           id,
           formData,
         );
+      } else if (type === "title_deed") {
+        response = await InvestmentController.uploadTitleDeed(id, formData);
       } else {
-        formData.append("type", type);
+        formData.append("documentType", type);
         response = await InvestmentController.uploadAdditionalDocument(
           id,
           formData,
@@ -108,6 +142,45 @@ const InvestorInvestmentDetail = () => {
     }
   };
 
+  const handleAcceptOffer = async () => {
+    try {
+      setActionLoading("accept");
+      const response = await InvestmentController.acceptOffer(id);
+
+      if (response.success) {
+        await loadInvestmentDetails();
+        alert("Offer accepted successfully");
+      }
+    } catch (error) {
+      console.error("Offer accept error:", error);
+      alert(error.message || "Failed to accept offer");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRejectOffer = async () => {
+    try {
+      setActionLoading("reject");
+      const response = await InvestmentController.rejectOffer(
+        id,
+        rejectReason || "Rejected by owner",
+      );
+
+      if (response.success) {
+        setShowRejectModal(false);
+        setRejectReason("");
+        alert("Offer rejected successfully");
+        navigate("/owner/offers");
+      }
+    } catch (error) {
+      console.error("Offer reject error:", error);
+      alert(error.message || "Failed to reject offer");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleRequestRepresentative = async () => {
     if (!confirm(t("investor.confirmRequestRepresentative"))) return;
 
@@ -123,33 +196,6 @@ const InvestorInvestmentDetail = () => {
       console.error("Temsilci talep hatası:", error);
       alert(error.message || t("investor.representativeRequestFailed"));
     }
-  };
-
-  const getStatusColor = (status) => {
-    const colors = {
-      offer_sent:
-        "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-      contract_signed:
-        "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-      title_deed_pending:
-        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-      active:
-        "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-      completed:
-        "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
-      defaulted: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-    };
-    return colors[status] || "bg-gray-100 text-gray-800";
-  };
-
-  const getPaymentStatusColor = (status) => {
-    const colors = {
-      pending:
-        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-      paid: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-      delayed: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-    };
-    return colors[status] || "bg-gray-100 text-gray-800";
   };
 
   if (loading) {
@@ -173,7 +219,7 @@ const InvestorInvestmentDetail = () => {
             {t("investor.investmentNotFound")}
           </p>
           <button
-            onClick={() => navigate("/investor/investments")}
+            onClick={() => navigate(backPath)}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             {t("investor.backToList")}
@@ -183,20 +229,71 @@ const InvestorInvestmentDetail = () => {
     );
   }
 
+  const counterparty = isOwnerView
+    ? investment.investor
+    : investment.propertyOwner;
+  const counterpartyTitle = isOwnerView
+    ? t("investments.investor_info") || "Investor Information"
+    : "Property Owner";
+  const counterpartyProfileLabel = isOwnerView
+    ? "View investor profile"
+    : "View profile";
+  const title =
+    isOwnerView && investment.status === "offer_sent"
+      ? "Offer Details"
+      : t("investor.investmentDetails");
+
   return (
     <div className="p-6 space-y-6">
+      {showRejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white dark:bg-gray-800 shadow-2xl p-6 space-y-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Reject Offer
+            </h3>
+            <textarea
+              rows={3}
+              value={rejectReason}
+              onChange={(event) => setRejectReason(event.target.value)}
+              placeholder="Reason for rejection (optional)..."
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400/40"
+            />
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRejectModal(false);
+                  setRejectReason("");
+                }}
+                className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading === "reject"}
+                onClick={handleRejectOffer}
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {actionLoading === "reject" ? "Rejecting..." : "Confirm Reject"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <button
-            onClick={() => navigate("/investor/investments")}
+            onClick={() => navigate(backPath)}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
           >
             ← {t("investor.back")}
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {t("investor.investmentDetails")}
+              {title}
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
               {investment.property?.city}, {investment.property?.country}
@@ -246,7 +343,7 @@ const InvestorInvestmentDetail = () => {
                   </p>
                   <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                     {investment.amountInvested?.toLocaleString()}{" "}
-                    {investment.currency}
+                    {APP_CURRENCY}
                   </p>
                 </div>
                 <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
@@ -254,7 +351,8 @@ const InvestorInvestmentDetail = () => {
                     {t("investor.monthlyRent")}
                   </p>
                   <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    {investment.property?.rentOffered?.toLocaleString()} ₺
+                    {investment.property?.rentOffered?.toLocaleString()}{" "}
+                    {APP_CURRENCY_SYMBOL}
                   </p>
                 </div>
                 <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
@@ -263,32 +361,43 @@ const InvestorInvestmentDetail = () => {
                   </p>
                   <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                     {investment.calculations?.totalExpectedIncome?.toLocaleString()}{" "}
-                    ₺
+                    {APP_CURRENCY_SYMBOL}
                   </p>
                 </div>
               </div>
             </div>
 
-            {investment.propertyOwner && (
+            {counterparty && (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      Property Owner
+                      {counterpartyTitle}
                     </h2>
                     <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                      {investment.propertyOwner.fullName || "-"}
+                      {counterparty.fullName || counterparty.email || "-"}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {investment.propertyOwner.country || "-"}
+                      {counterparty.country || counterparty.region || "-"}
                     </p>
+                    {counterparty.email && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {counterparty.email}
+                      </p>
+                    )}
+                    {isOwnerView &&
+                      typeof counterparty.activeInvestmentCount === "number" && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Active investments: {counterparty.activeInvestmentCount}
+                        </p>
+                      )}
                   </div>
-                  {getUserId(investment.propertyOwner) && (
+                  {getUserId(counterparty) && (
                     <Link
-                      to={getUserProfilePath(getUserId(investment.propertyOwner))}
+                      to={getUserProfilePath(getUserId(counterparty))}
                       className="inline-flex items-center justify-center rounded-full border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                     >
-                      View profile
+                      {counterpartyProfileLabel}
                     </Link>
                   )}
                 </div>
@@ -307,20 +416,22 @@ const InvestorInvestmentDetail = () => {
                       <div key={key} className="flex items-center">
                         <div
                           className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                            value.completed
+                            value.completed || value.active
                               ? "bg-green-500"
                               : "bg-gray-300 dark:bg-gray-600"
                           }`}
                         >
-                          {value.completed ? "✓" : "○"}
+                          {value.completed || value.active ? "✓" : "○"}
                         </div>
                         <div className="ml-4 flex-1">
                           <p className="font-medium text-gray-900 dark:text-white">
                             {t(`investor.${key}`)}
                           </p>
-                          {value.date && (
+                          {(value.date || value.startDate) && (
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {new Date(value.date).toLocaleDateString()}
+                              {new Date(
+                                value.date || value.startDate,
+                              ).toLocaleDateString()}
                             </p>
                           )}
                         </div>
@@ -344,7 +455,7 @@ const InvestorInvestmentDetail = () => {
                     </dt>
                     <dd className="text-lg font-semibold text-gray-900 dark:text-white">
                       {investment.calculations.totalPaidAmount?.toLocaleString()}{" "}
-                      ₺
+                      {APP_CURRENCY_SYMBOL}
                     </dd>
                   </div>
                   <div className="border-b dark:border-gray-700 pb-4">
@@ -385,15 +496,38 @@ const InvestorInvestmentDetail = () => {
                 {t("common.actions")}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {isOwnerView && investment.status === "offer_sent" && (
+                  <div className="md:col-span-2 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      disabled={actionLoading === "accept"}
+                      onClick={handleAcceptOffer}
+                      className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                    >
+                      {actionLoading === "accept"
+                        ? "Accepting..."
+                        : "Accept Offer"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={actionLoading === "reject"}
+                      onClick={() => setShowRejectModal(true)}
+                      className="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 disabled:opacity-50 transition-colors"
+                    >
+                      Reject Offer
+                    </button>
+                  </div>
+                )}
+
                 {!investment.contractFile &&
-                  investment.status === "offer_sent" && (
+                  investment.status === "contract_signed" && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         {t("investor.uploadContract")}
                       </label>
                       <input
                         type="file"
-                        accept=".pdf,.doc,.docx"
+                        accept=".pdf"
                         onChange={(e) => handleDocumentUpload(e, "contract")}
                         disabled={uploadingDoc}
                         className="block w-full text-sm text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-700"
@@ -401,7 +535,25 @@ const InvestorInvestmentDetail = () => {
                     </div>
                   )}
 
-                {!investment.paymentReceipt &&
+                {isOwnerView &&
+                  !investment.titleDeedDocument &&
+                  investment.status === "contract_signed" && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Upload Title Deed
+                      </label>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => handleDocumentUpload(e, "title_deed")}
+                        disabled={uploadingDoc}
+                        className="block w-full text-sm text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-700"
+                      />
+                    </div>
+                  )}
+
+                {!isOwnerView &&
+                  !investment.paymentReceipt &&
                   ["contract_signed", "title_deed_pending", "active"].includes(
                     investment.status,
                   ) && (
@@ -475,7 +627,8 @@ const InvestorInvestmentDetail = () => {
                           {payment.month}
                         </td>
                         <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
-                          {payment.amount?.toLocaleString()} ₺
+                          {payment.amount?.toLocaleString()}{" "}
+                          {APP_CURRENCY_SYMBOL}
                         </td>
                         <td className="px-6 py-4">
                           <span
@@ -507,6 +660,7 @@ const InvestorInvestmentDetail = () => {
           <div className="space-y-4">
             <DocumentsList
               documents={documents}
+              t={t}
               onDownload={handleDownloadDocument}
             />
 
@@ -516,7 +670,7 @@ const InvestorInvestmentDetail = () => {
               </h3>
               <input
                 type="file"
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                accept=".pdf,.jpg,.jpeg,.png"
                 onChange={(e) => handleDocumentUpload(e, "other")}
                 disabled={uploadingDoc}
                 className="block w-full text-sm text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-700"
@@ -533,5 +687,9 @@ const InvestorInvestmentDetail = () => {
     </div>
   );
 };
+
+const InvestorInvestmentDetail = () => (
+  <InvestmentDetailPage viewerRole="investor" />
+);
 
 export default InvestorInvestmentDetail;

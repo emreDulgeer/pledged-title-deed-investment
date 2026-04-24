@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import PropTypes from "prop-types";
+import { APP_CURRENCY } from "../../utils/currency";
 
 const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
   const { t } = useTranslation();
@@ -329,11 +330,8 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
                   label="Currency"
                   value={formData.pricing.monthly.currency}
                   onChange={(v) => handleChange("pricing.monthly.currency", v)}
-                  options={[
-                    { value: "EUR", label: "EUR" },
-                    { value: "USD", label: "USD" },
-                    { value: "GBP", label: "GBP" },
-                  ]}
+                  options={[{ value: APP_CURRENCY, label: APP_CURRENCY }]}
+                  disabled
                 />
               </div>
 
@@ -362,11 +360,8 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
                   label="Currency"
                   value={formData.pricing.yearly.currency}
                   onChange={(v) => handleChange("pricing.yearly.currency", v)}
-                  options={[
-                    { value: "EUR", label: "EUR" },
-                    { value: "USD", label: "USD" },
-                    { value: "GBP", label: "GBP" },
-                  ]}
+                  options={[{ value: APP_CURRENCY, label: APP_CURRENCY }]}
+                  disabled
                 />
               </div>
 
@@ -857,7 +852,7 @@ const TextInput = ({ label, value, onChange, placeholder }) => (
   </div>
 );
 
-const Select = ({ label, value, onChange, options }) => (
+const Select = ({ label, value, onChange, options, disabled = false }) => (
   <div>
     <label className="block text-sm font-medium text-day-text dark:text-night-text mb-1">
       {label}
@@ -865,9 +860,10 @@ const Select = ({ label, value, onChange, options }) => (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
       className="w-full px-3 py-2 border border-day-border dark:border-night-border rounded-lg 
         focus:ring-2 focus:ring-day-primary dark:focus:ring-night-primary 
-        bg-day-background dark:bg-night-background text-day-text dark:text-night-text"
+        bg-day-background dark:bg-night-background text-day-text dark:text-night-text disabled:opacity-70 disabled:cursor-not-allowed"
     >
       {options.map((opt) => (
         <option key={opt.value} value={opt.value}>

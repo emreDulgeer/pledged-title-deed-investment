@@ -5,6 +5,22 @@ export const getUserProfilePath = (userId) =>
 
 export const getProfileSettingsPath = () => "/profile/settings";
 
+export const getAppSettingsPath = (role) => {
+  if (role === "admin") {
+    return "/admin/settings";
+  }
+
+  if (role === "investor") {
+    return "/investor/settings";
+  }
+
+  if (role === "property_owner") {
+    return "/owner/settings";
+  }
+
+  return "/profile/settings";
+};
+
 export const getPropertyDetailPath = (viewerRole, propertyId) => {
   if (!propertyId) {
     return null;
@@ -28,6 +44,10 @@ export const getInvestmentDetailPath = (viewerRole, investmentId) => {
 
   if (viewerRole === "admin") {
     return `/admin/investments/${investmentId}`;
+  }
+
+  if (viewerRole === "property_owner") {
+    return `/owner/investments/${investmentId}`;
   }
 
   if (viewerRole === "investor") {
