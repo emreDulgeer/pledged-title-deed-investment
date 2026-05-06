@@ -106,6 +106,17 @@ function baseLoginHistory(ip, success = true) {
   ];
 }
 
+function registerSeedAccount(seedAccounts, group, label, user, password) {
+  seedAccounts.push({
+    group,
+    label,
+    email: user.email,
+    password,
+  });
+
+  return user;
+}
+
 function buildPropertyImageEntry(fileMetadata, options = {}) {
   const width = fileMetadata.metadata?.dimensions?.width;
   const height = fileMetadata.metadata?.dimensions?.height;
@@ -497,17 +508,22 @@ async function createMembershipPlans() {
 }
 
 async function createUsers() {
+  const seedAccounts = [];
   const passwordHashes = {
     emre: await hashPassword("Test123!@#"),
     lara: await hashPassword("Lara123!@#"),
     selin: await hashPassword("Selin123!@#"),
     ayse: await hashPassword("Owner123!@#"),
     mehmet: await hashPassword("Mehmet123!@#"),
-    john: await hashPassword("Rep123!@#"),
+    representative: await hashPassword("Rep123!@#"),
     admin: await hashPassword("Admin123!@#"),
   };
 
-  const investorEmre = await Investor.create({
+  const investorEmre = registerSeedAccount(
+    seedAccounts,
+    "investor",
+    "Investor - Emre Yilmaz",
+    await Investor.create({
     email: "emre@investor.com",
     password: passwordHashes.emre,
     firstName: "Emre",
@@ -581,9 +597,15 @@ async function createUsers() {
       endDate: monthsFromNow(3),
       autoRenew: true,
     },
-  });
+    }),
+    "Test123!@#",
+  );
 
-  const investorLara = await Investor.create({
+  const investorLara = registerSeedAccount(
+    seedAccounts,
+    "investor",
+    "Investor - Lara Costa",
+    await Investor.create({
     email: "lara@investor.com",
     password: passwordHashes.lara,
     firstName: "Lara",
@@ -625,9 +647,15 @@ async function createUsers() {
       endDate: monthsFromNow(1),
       autoRenew: true,
     },
-  });
+    }),
+    "Lara123!@#",
+  );
 
-  const investorSelin = await Investor.create({
+  const investorSelin = registerSeedAccount(
+    seedAccounts,
+    "investor",
+    "Investor - Selin Arslan",
+    await Investor.create({
     email: "selin@investor.com",
     password: passwordHashes.selin,
     firstName: "Selin",
@@ -660,9 +688,15 @@ async function createUsers() {
       currentPlan: "Basic",
       autoRenew: false,
     },
-  });
+    }),
+    "Selin123!@#",
+  );
 
-  const ownerAyse = await PropertyOwner.create({
+  const ownerAyse = registerSeedAccount(
+    seedAccounts,
+    "property_owner",
+    "Owner - Ayse Demir",
+    await PropertyOwner.create({
     email: "ayse@owner.com",
     password: passwordHashes.ayse,
     firstName: "Ayse",
@@ -708,9 +742,15 @@ async function createUsers() {
     ongoingContracts: 2,
     totalProperties: 4,
     ownerTrustScore: 91,
-  });
+    }),
+    "Owner123!@#",
+  );
 
-  const ownerMehmet = await PropertyOwner.create({
+  const ownerMehmet = registerSeedAccount(
+    seedAccounts,
+    "property_owner",
+    "Owner - Mehmet Kaya",
+    await PropertyOwner.create({
     email: "mehmet@owner.com",
     password: passwordHashes.mehmet,
     firstName: "Mehmet",
@@ -747,66 +787,452 @@ async function createUsers() {
     ongoingContracts: 2,
     totalProperties: 4,
     ownerTrustScore: 84,
-  });
+    }),
+    "Mehmet123!@#",
+  );
 
-  const localRepJohn = await LocalRepresentative.create({
-    email: "john@rep.com",
-    password: passwordHashes.john,
-    firstName: "John",
-    lastName: "Pereira",
-    fullName: "John Pereira",
-    role: "local_representative",
-    phoneNumber: "+35699223311",
-    country: "Malta",
-    region: "Portugal & Malta",
-    emailVerified: true,
-    emailVerifiedAt: daysAgo(260),
-    phoneVerified: true,
-    phoneVerifiedAt: daysAgo(255),
-    accountStatus: "active",
-    membershipPlan: "enterprise",
-    membershipStatus: "active",
-    membershipActivatedAt: daysAgo(200),
-    membershipExpiresAt: monthsFromNow(6),
-    lastLoginAt: daysAgo(1),
-    lastLoginIP: "91.198.77.44",
-    registrationIP: "91.198.77.44",
-    trustedIPs: baseTrustedIp("91.198.77.44", "Field Tablet"),
-    consents: baseConsents(false),
-    kycStatus: "Approved",
-    is2FAEnabled: true,
-    riskScore: 12,
-    trustScore: 97,
-    loginHistory: baseLoginHistory("91.198.77.44"),
-    managedProperties: [],
-    assistedTransactions: [],
-    commissionEarned: {
-      total: 4200,
-      pending: 850,
-      paid: 3350,
-      history: [
-        {
-          amount: 1200,
-          type: "investment",
-          date: daysAgo(30),
-          status: "paid",
-          description: "Valletta property transfer assistance",
-        },
-      ],
+  const localRepresentativeProfiles = [
+    {
+      key: "repJoao",
+      label: "Rep - Portugal / Joao Silva",
+      email: "joao@rep.com",
+      firstName: "Joao",
+      lastName: "Silva",
+      phoneNumber: "+351910111222",
+      country: "Portugal",
+      regions: ["Portugal"],
+      lastLoginIP: "85.240.14.51",
+      trustedIpName: "Lisbon Office",
+      bankAccountInfo: {
+        iban: "PT50000201230000000004561",
+        bankName: "Banco Lisboa Operations",
+        accountHolder: "Joao Silva",
+      },
+      commissionEarned: {
+        total: 1800,
+        pending: 300,
+        paid: 1500,
+        history: [
+          {
+            amount: 900,
+            type: "investment",
+            date: daysAgo(42),
+            status: "paid",
+            description: "Lisbon title deed preparation support",
+          },
+        ],
+      },
+      referralStats: {
+        totalReferred: 1,
+        activeUsers: 1,
+        totalCommissionFromReferrals: 150,
+      },
+      riskScore: 16,
+      trustScore: 95,
     },
-    bankAccountInfo: {
-      iban: "MT84MALT011000012345MTLCAST001S",
-      bankName: "Malta Operations Bank",
-      accountHolder: "John Pereira",
+    {
+      key: "repInes",
+      label: "Rep - Portugal & Spain / Ines Duarte",
+      email: "ines@rep.com",
+      firstName: "Ines",
+      lastName: "Duarte",
+      phoneNumber: "+351910111333",
+      country: "Portugal",
+      regions: ["Portugal", "Spain"],
+      lastLoginIP: "85.240.14.61",
+      trustedIpName: "Iberia Desk",
+      bankAccountInfo: {
+        iban: "PT50000201230000000004562",
+        bankName: "Banco Iberia Desk",
+        accountHolder: "Ines Duarte",
+      },
+      commissionEarned: {
+        total: 950,
+        pending: 250,
+        paid: 700,
+        history: [
+          {
+            amount: 700,
+            type: "service",
+            date: daysAgo(28),
+            status: "paid",
+            description: "Cross-border paperwork support",
+          },
+        ],
+      },
+      referralStats: {
+        totalReferred: 2,
+        activeUsers: 1,
+        totalCommissionFromReferrals: 220,
+      },
+      riskScore: 18,
+      trustScore: 93,
     },
-    referralStats: {
-      totalReferred: 3,
-      activeUsers: 2,
-      totalCommissionFromReferrals: 600,
+    {
+      key: "repCarlos",
+      label: "Rep - Spain / Carlos Mendez",
+      email: "carlos@rep.com",
+      firstName: "Carlos",
+      lastName: "Mendez",
+      phoneNumber: "+34610111222",
+      country: "Spain",
+      regions: ["Spain"],
+      lastLoginIP: "81.44.11.20",
+      trustedIpName: "Barcelona Office",
+      bankAccountInfo: {
+        iban: "ES7921000813610123456789",
+        bankName: "Banco Barcelona Field",
+        accountHolder: "Carlos Mendez",
+      },
+      commissionEarned: {
+        total: 1320,
+        pending: 420,
+        paid: 900,
+        history: [
+          {
+            amount: 900,
+            type: "investment",
+            date: daysAgo(35),
+            status: "paid",
+            description: "Barcelona in-contract representative support",
+          },
+        ],
+      },
+      referralStats: {
+        totalReferred: 1,
+        activeUsers: 1,
+        totalCommissionFromReferrals: 90,
+      },
+      riskScore: 17,
+      trustScore: 94,
     },
-  });
+    {
+      key: "repMaris",
+      label: "Rep - Latvia / Maris Ozols",
+      email: "maris@rep.com",
+      firstName: "Maris",
+      lastName: "Ozols",
+      phoneNumber: "+37120001122",
+      country: "Latvia",
+      regions: ["Latvia"],
+      lastLoginIP: "83.99.14.10",
+      trustedIpName: "Riga Desk",
+      bankAccountInfo: {
+        iban: "LV80HABA0551036512301",
+        bankName: "Riga Advisory Bank",
+        accountHolder: "Maris Ozols",
+      },
+      commissionEarned: {
+        total: 640,
+        pending: 140,
+        paid: 500,
+        history: [
+          {
+            amount: 500,
+            type: "service",
+            date: daysAgo(52),
+            status: "paid",
+            description: "Rejected file remediation assistance",
+          },
+        ],
+      },
+      referralStats: {
+        totalReferred: 0,
+        activeUsers: 0,
+        totalCommissionFromReferrals: 0,
+      },
+      riskScore: 19,
+      trustScore: 91,
+    },
+    {
+      key: "repKristjan",
+      label: "Rep - Estonia / Kristjan Saar",
+      email: "kristjan@rep.com",
+      firstName: "Kristjan",
+      lastName: "Saar",
+      phoneNumber: "+3725123456",
+      country: "Estonia",
+      regions: ["Estonia"],
+      lastLoginIP: "85.253.91.14",
+      trustedIpName: "Tallinn Desk",
+      bankAccountInfo: {
+        iban: "EE471000001020145685",
+        bankName: "Tallinn Capital Bank",
+        accountHolder: "Kristjan Saar",
+      },
+      commissionEarned: {
+        total: 2100,
+        pending: 0,
+        paid: 2100,
+        history: [
+          {
+            amount: 1100,
+            type: "investment",
+            date: daysAgo(150),
+            status: "paid",
+            description: "Tallinn completed transfer support",
+          },
+        ],
+      },
+      referralStats: {
+        totalReferred: 1,
+        activeUsers: 1,
+        totalCommissionFromReferrals: 180,
+      },
+      riskScore: 12,
+      trustScore: 97,
+    },
+    {
+      key: "repJohn",
+      label: "Rep - Malta / John Pereira",
+      email: "john@rep.com",
+      firstName: "John",
+      lastName: "Pereira",
+      phoneNumber: "+35699223311",
+      country: "Malta",
+      regions: ["Malta"],
+      lastLoginIP: "91.198.77.44",
+      trustedIpName: "Valletta Field Tablet",
+      bankAccountInfo: {
+        iban: "MT84MALT011000012345MTLCAST001S",
+        bankName: "Malta Operations Bank",
+        accountHolder: "John Pereira",
+      },
+      commissionEarned: {
+        total: 4200,
+        pending: 850,
+        paid: 3350,
+        history: [
+          {
+            amount: 1200,
+            type: "investment",
+            date: daysAgo(30),
+            status: "paid",
+            description: "Valletta property transfer assistance",
+          },
+        ],
+      },
+      referralStats: {
+        totalReferred: 3,
+        activeUsers: 2,
+        totalCommissionFromReferrals: 600,
+      },
+      riskScore: 12,
+      trustScore: 97,
+    },
+    {
+      key: "repLuca",
+      label: "Rep - Malta & Montenegro / Luca Novak",
+      email: "luca@rep.com",
+      firstName: "Luca",
+      lastName: "Novak",
+      phoneNumber: "+38267000111",
+      country: "Montenegro",
+      regions: ["Malta", "Montenegro"],
+      lastLoginIP: "178.175.44.13",
+      trustedIpName: "Adriatic Desk",
+      bankAccountInfo: {
+        iban: "ME25505000012345678951",
+        bankName: "Adriatic Operations Bank",
+        accountHolder: "Luca Novak",
+      },
+      commissionEarned: {
+        total: 770,
+        pending: 270,
+        paid: 500,
+        history: [
+          {
+            amount: 500,
+            type: "service",
+            date: daysAgo(46),
+            status: "paid",
+            description: "Cross-border handover coordination",
+          },
+        ],
+      },
+      referralStats: {
+        totalReferred: 1,
+        activeUsers: 0,
+        totalCommissionFromReferrals: 75,
+      },
+      riskScore: 21,
+      trustScore: 90,
+    },
+    {
+      key: "repMila",
+      label: "Rep - Montenegro / Mila Petrovic",
+      email: "mila@rep.com",
+      firstName: "Mila",
+      lastName: "Petrovic",
+      phoneNumber: "+38268000222",
+      country: "Montenegro",
+      regions: ["Montenegro"],
+      lastLoginIP: "178.175.44.21",
+      trustedIpName: "Podgorica Desk",
+      bankAccountInfo: {
+        iban: "ME25505000012345678952",
+        bankName: "Podgorica Field Bank",
+        accountHolder: "Mila Petrovic",
+      },
+      commissionEarned: {
+        total: 430,
+        pending: 130,
+        paid: 300,
+        history: [
+          {
+            amount: 300,
+            type: "service",
+            date: daysAgo(63),
+            status: "paid",
+            description: "Document review standby support",
+          },
+        ],
+      },
+      referralStats: {
+        totalReferred: 0,
+        activeUsers: 0,
+        totalCommissionFromReferrals: 0,
+      },
+      riskScore: 22,
+      trustScore: 89,
+    },
+    {
+      key: "repNino",
+      label: "Rep - Georgia / Nino Beridze",
+      email: "nino@rep.com",
+      firstName: "Nino",
+      lastName: "Beridze",
+      phoneNumber: "+995555001122",
+      country: "Georgia",
+      regions: ["Georgia"],
+      lastLoginIP: "176.221.15.41",
+      trustedIpName: "Batumi Field Office",
+      bankAccountInfo: {
+        iban: "GE29NB0000000101904921",
+        bankName: "Batumi Capital Bank",
+        accountHolder: "Nino Beridze",
+      },
+      commissionEarned: {
+        total: 1680,
+        pending: 420,
+        paid: 1260,
+        history: [
+          {
+            amount: 1260,
+            type: "investment",
+            date: daysAgo(18),
+            status: "paid",
+            description: "Batumi title deed workflow support",
+          },
+        ],
+      },
+      referralStats: {
+        totalReferred: 2,
+        activeUsers: 1,
+        totalCommissionFromReferrals: 240,
+      },
+      riskScore: 13,
+      trustScore: 96,
+    },
+    {
+      key: "repGiorgi",
+      label: "Rep - Georgia / Giorgi Lomidze",
+      email: "giorgi@rep.com",
+      firstName: "Giorgi",
+      lastName: "Lomidze",
+      phoneNumber: "+995555003344",
+      country: "Georgia",
+      regions: ["Georgia"],
+      lastLoginIP: "176.221.15.51",
+      trustedIpName: "Tbilisi Desk",
+      bankAccountInfo: {
+        iban: "GE29NB0000000101904922",
+        bankName: "Tbilisi Advisory Bank",
+        accountHolder: "Giorgi Lomidze",
+      },
+      commissionEarned: {
+        total: 910,
+        pending: 310,
+        paid: 600,
+        history: [
+          {
+            amount: 600,
+            type: "service",
+            date: daysAgo(26),
+            status: "paid",
+            description: "Tbilisi contract preparation support",
+          },
+        ],
+      },
+      referralStats: {
+        totalReferred: 1,
+        activeUsers: 1,
+        totalCommissionFromReferrals: 120,
+      },
+      riskScore: 15,
+      trustScore: 94,
+    },
+  ];
 
-  const adminUser = await Admin.create({
+  const localRepresentativesByKey = {};
+
+  for (const [index, profile] of localRepresentativeProfiles.entries()) {
+    const representative = await LocalRepresentative.create({
+      email: profile.email,
+      password: passwordHashes.representative,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      fullName: `${profile.firstName} ${profile.lastName}`,
+      role: "local_representative",
+      phoneNumber: profile.phoneNumber,
+      country: profile.country,
+      region: profile.regions[0],
+      regions: profile.regions,
+      emailVerified: true,
+      emailVerifiedAt: daysAgo(260 - index * 6),
+      phoneVerified: true,
+      phoneVerifiedAt: daysAgo(255 - index * 6),
+      accountStatus: "active",
+      membershipPlan: "enterprise",
+      membershipStatus: "active",
+      membershipActivatedAt: daysAgo(200 - index * 4),
+      membershipExpiresAt: monthsFromNow(6),
+      lastLoginAt: daysAgo((index % 3) + 1),
+      lastLoginIP: profile.lastLoginIP,
+      registrationIP: profile.lastLoginIP,
+      trustedIPs: baseTrustedIp(profile.lastLoginIP, profile.trustedIpName),
+      consents: baseConsents(false),
+      kycStatus: "Approved",
+      is2FAEnabled: true,
+      riskScore: profile.riskScore,
+      trustScore: profile.trustScore,
+      loginHistory: baseLoginHistory(profile.lastLoginIP),
+      requestStats: {
+        claimed: 0,
+        activeAssignments: 0,
+        completedAssignments: 0,
+      },
+      managedProperties: [],
+      assistedTransactions: [],
+      commissionEarned: profile.commissionEarned,
+      bankAccountInfo: profile.bankAccountInfo,
+      referralStats: profile.referralStats,
+    });
+
+    localRepresentativesByKey[profile.key] = registerSeedAccount(
+      seedAccounts,
+      "local_representative",
+      profile.label,
+      representative,
+      "Rep123!@#",
+    );
+  }
+
+  const adminUser = registerSeedAccount(
+    seedAccounts,
+    "admin",
+    "Admin - Platform Super Admin",
+    await Admin.create({
     email: "admin@admin.com",
     password: passwordHashes.admin,
     firstName: "Admin",
@@ -835,7 +1261,9 @@ async function createUsers() {
     trustScore: 100,
     loginHistory: baseLoginHistory("10.0.0.10"),
     accessLevel: "Global",
-  });
+    }),
+    "Admin123!@#",
+  );
 
   return {
     investorEmre,
@@ -843,8 +1271,10 @@ async function createUsers() {
     investorSelin,
     ownerAyse,
     ownerMehmet,
-    localRepJohn,
     adminUser,
+    ...localRepresentativesByKey,
+    localRepresentatives: Object.values(localRepresentativesByKey),
+    seedAccounts,
   };
 }
 
@@ -875,17 +1305,17 @@ async function createMemberships(plans, users) {
       interval: "monthly",
     },
     {
-      user: users.localRepJohn,
-      plan: plans.enterprise,
-      amount: 1290,
-      interval: "yearly",
-    },
-    {
       user: users.adminUser,
       plan: plans.enterprise,
       amount: 0,
       interval: "yearly",
     },
+    ...users.localRepresentatives.map((representative) => ({
+      user: representative,
+      plan: plans.enterprise,
+      amount: 1290,
+      interval: "yearly",
+    })),
   ];
 
   for (const item of memberships) {
@@ -1151,7 +1581,7 @@ async function createProperties(provider, users) {
     sourcePath: dummyFiles.annotation,
     seedKey: "property-valletta-annotation",
     propertyId: propertyIds.valletta,
-    uploadedBy: users.localRepJohn._id,
+    uploadedBy: users.repJohn._id,
     type: "annotation",
     description: "Representative annotation document",
     verifiedBy: users.adminUser._id,
@@ -1667,6 +2097,7 @@ async function createInvestments(provider, users, properties) {
   const investmentIds = {
     lisbonOffer: createObjectId(),
     barcelonaContract: createObjectId(),
+    tbilisiContractPool: createObjectId(),
     vallettaActive: createObjectId(),
     tallinnCompleted: createObjectId(),
     batumiTitlePending: createObjectId(),
@@ -1721,6 +2152,9 @@ async function createInvestments(provider, users, properties) {
     status: "contract_signed",
     representativeRequestedBy: users.investorEmre._id,
     representativeRequestDate: daysAgo(8),
+    representativeRequestedByRole: "investor",
+    representativeRequestedRegion: "Spain",
+    representativeRequestStatus: "pending",
     contractFile: barcelonaContractFile.embedded,
     paymentReceipt: barcelonaPaymentReceipt.embedded,
     additionalDocuments: [
@@ -1749,6 +2183,50 @@ async function createInvestments(provider, users, properties) {
     ],
   });
 
+  const tbilisiContractFile = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.investmentContract,
+    seedKey: "investment-tbilisi-contract",
+    investmentId: investmentIds.tbilisiContractPool,
+    uploadedBy: users.ownerMehmet._id,
+    documentType: "contract",
+    description: "Tbilisi contract package awaiting representative claim",
+    uploadedAt: daysAgo(9),
+  });
+  const tbilisiPaymentReceipt = await createInvestmentDocument(provider, {
+    sourcePath: dummyFiles.paymentReceipt,
+    seedKey: "investment-tbilisi-payment-receipt",
+    investmentId: investmentIds.tbilisiContractPool,
+    uploadedBy: users.investorLara._id,
+    documentType: "payment_receipt",
+    description: "Tbilisi reservation payment receipt",
+    uploadedAt: daysAgo(8),
+  });
+
+  const tbilisiContractPool = await Investment.create({
+    _id: investmentIds.tbilisiContractPool,
+    property: properties.tbilisi._id,
+    investor: users.investorLara._id,
+    propertyOwner: users.ownerMehmet._id,
+    amountInvested: properties.tbilisi.requestedInvestment,
+    currency: "EUR",
+    status: "contract_signed",
+    representativeRequestedBy: users.ownerMehmet._id,
+    representativeRequestDate: daysAgo(7),
+    representativeRequestedByRole: "property_owner",
+    representativeRequestedRegion: "Georgia",
+    representativeRequestStatus: "pending",
+    contractFile: tbilisiContractFile.embedded,
+    paymentReceipt: tbilisiPaymentReceipt.embedded,
+    rentalPayments: [
+      {
+        month: monthKey(1),
+        amount: properties.tbilisi.rentOffered,
+        status: "pending",
+        dueDate: addDays(startOfMonthOffset(now, 1), 8),
+      },
+    ],
+  });
+
   const batumiContractFile = await createInvestmentDocument(provider, {
     sourcePath: dummyFiles.investmentContract,
     seedKey: "investment-batumi-contract",
@@ -1771,7 +2249,7 @@ async function createInvestments(provider, users, properties) {
     sourcePath: dummyFiles.investmentTitleDeed,
     seedKey: "investment-batumi-title-deed",
     investmentId: investmentIds.batumiTitlePending,
-    uploadedBy: users.localRepJohn._id,
+    uploadedBy: users.repNino._id,
     documentType: "title_deed",
     description: "Submitted title deed awaiting admin approval",
     uploadedAt: daysAgo(16),
@@ -1780,7 +2258,7 @@ async function createInvestments(provider, users, properties) {
     sourcePath: dummyFiles.notaryDocument,
     seedKey: "investment-batumi-notary",
     investmentId: investmentIds.batumiTitlePending,
-    uploadedBy: users.localRepJohn._id,
+    uploadedBy: users.repNino._id,
     documentType: "notary_document",
     description: "Notary reference package",
     uploadedAt: daysAgo(15),
@@ -1791,9 +2269,14 @@ async function createInvestments(provider, users, properties) {
     property: properties.batumi._id,
     investor: users.investorEmre._id,
     propertyOwner: users.ownerMehmet._id,
-    localRepresentative: users.localRepJohn._id,
+    localRepresentative: users.repNino._id,
     representativeRequestedBy: users.investorEmre._id,
     representativeRequestDate: daysAgo(18),
+    representativeRequestedByRole: "investor",
+    representativeRequestedRegion: "Georgia",
+    representativeRequestStatus: "fulfilled",
+    representativeRequestClaimedAt: daysAgo(17),
+    representativeRequestResolvedAt: daysAgo(17),
     amountInvested: properties.batumi.requestedInvestment,
     currency: "EUR",
     status: "title_deed_pending",
@@ -1807,7 +2290,7 @@ async function createInvestments(provider, users, properties) {
         url: batumiNotaryDoc.fileMetadata.url,
         description: "Supporting notary package for approval",
         uploadedAt: daysAgo(15),
-        uploadedBy: users.localRepJohn._id,
+        uploadedBy: users.repNino._id,
       },
     ],
     rentalPayments: [
@@ -1859,7 +2342,7 @@ async function createInvestments(provider, users, properties) {
     sourcePath: dummyFiles.investmentTaxReceipt,
     seedKey: "investment-valletta-tax-receipt",
     investmentId: investmentIds.vallettaActive,
-    uploadedBy: users.localRepJohn._id,
+    uploadedBy: users.repJohn._id,
     documentType: "tax_receipt",
     description: "Tax receipt for post-transfer package",
     uploadedAt: daysAgo(57),
@@ -1923,9 +2406,14 @@ async function createInvestments(provider, users, properties) {
     property: properties.valletta._id,
     investor: users.investorEmre._id,
     propertyOwner: users.ownerAyse._id,
-    localRepresentative: users.localRepJohn._id,
+    localRepresentative: users.repJohn._id,
     representativeRequestedBy: users.ownerAyse._id,
     representativeRequestDate: daysAgo(72),
+    representativeRequestedByRole: "property_owner",
+    representativeRequestedRegion: "Malta",
+    representativeRequestStatus: "fulfilled",
+    representativeRequestClaimedAt: daysAgo(71),
+    representativeRequestResolvedAt: daysAgo(71),
     amountInvested: properties.valletta.requestedInvestment,
     currency: "EUR",
     status: "active",
@@ -1939,7 +2427,7 @@ async function createInvestments(provider, users, properties) {
         url: vallettaTaxReceipt.fileMetadata.url,
         description: "Tax receipt shared with investor",
         uploadedAt: daysAgo(57),
-        uploadedBy: users.localRepJohn._id,
+        uploadedBy: users.repJohn._id,
       },
     ],
     rentalPayments: activePayments,
@@ -1978,7 +2466,7 @@ async function createInvestments(provider, users, properties) {
     sourcePath: dummyFiles.powerOfAttorney,
     seedKey: "investment-tallinn-poa",
     investmentId: investmentIds.tallinnCompleted,
-    uploadedBy: users.localRepJohn._id,
+    uploadedBy: users.repKristjan._id,
     documentType: "power_of_attorney",
     description: "Power of attorney for completed transfer",
     uploadedAt: daysAgo(173),
@@ -2077,9 +2565,14 @@ async function createInvestments(provider, users, properties) {
     property: properties.tallinn._id,
     investor: users.investorEmre._id,
     propertyOwner: users.ownerMehmet._id,
-    localRepresentative: users.localRepJohn._id,
+    localRepresentative: users.repKristjan._id,
     representativeRequestedBy: users.investorEmre._id,
     representativeRequestDate: daysAgo(182),
+    representativeRequestedByRole: "investor",
+    representativeRequestedRegion: "Estonia",
+    representativeRequestStatus: "fulfilled",
+    representativeRequestClaimedAt: daysAgo(181),
+    representativeRequestResolvedAt: daysAgo(181),
     amountInvested: properties.tallinn.requestedInvestment,
     currency: "EUR",
     status: "completed",
@@ -2093,7 +2586,7 @@ async function createInvestments(provider, users, properties) {
         url: tallinnPoa.fileMetadata.url,
         description: "Representative transfer authority",
         uploadedAt: daysAgo(173),
-        uploadedBy: users.localRepJohn._id,
+        uploadedBy: users.repKristjan._id,
       },
     ],
     rentalPayments: completedPayments,
@@ -2133,11 +2626,18 @@ async function createInvestments(provider, users, properties) {
   ];
   await users.investorEmre.save();
 
-  users.investorLara.investments = [lisbonOffer._id];
+  users.investorLara.investments = [lisbonOffer._id, tbilisiContractPool._id];
+  users.investorLara.activeInvestmentCount = 1;
   await users.investorLara.save();
 
-  users.localRepJohn.managedProperties = [properties.valletta._id, properties.batumi._id];
-  users.localRepJohn.assistedTransactions = [
+  properties.tbilisi.investmentOfferCount = 1;
+  await properties.tbilisi.save();
+
+  users.ownerMehmet.ongoingContracts = 3;
+  await users.ownerMehmet.save();
+
+  users.repJohn.managedProperties = [properties.valletta._id];
+  users.repJohn.assistedTransactions = [
     {
       property: properties.valletta._id,
       investor: users.investorEmre._id,
@@ -2145,6 +2645,33 @@ async function createInvestments(provider, users, properties) {
       status: "active",
       commission: 1200,
     },
+  ];
+  users.repJohn.requestStats = {
+    claimed: 1,
+    activeAssignments: 1,
+    completedAssignments: 0,
+  };
+  await users.repJohn.save();
+
+  users.repNino.managedProperties = [properties.batumi._id];
+  users.repNino.assistedTransactions = [
+    {
+      property: properties.batumi._id,
+      investor: users.investorEmre._id,
+      transactionDate: daysAgo(17),
+      status: "active",
+      commission: 1260,
+    },
+  ];
+  users.repNino.requestStats = {
+    claimed: 1,
+    activeAssignments: 1,
+    completedAssignments: 0,
+  };
+  await users.repNino.save();
+
+  users.repKristjan.managedProperties = [properties.tallinn._id];
+  users.repKristjan.assistedTransactions = [
     {
       property: properties.tallinn._id,
       investor: users.investorEmre._id,
@@ -2153,11 +2680,17 @@ async function createInvestments(provider, users, properties) {
       commission: 900,
     },
   ];
-  await users.localRepJohn.save();
+  users.repKristjan.requestStats = {
+    claimed: 1,
+    activeAssignments: 0,
+    completedAssignments: 1,
+  };
+  await users.repKristjan.save();
 
   return {
     lisbonOffer,
     barcelonaContract,
+    tbilisiContractPool,
     vallettaActive,
     tallinnCompleted,
     batumiTitlePending,
@@ -2401,32 +2934,64 @@ async function createActivityLogs(users, properties, investments) {
 }
 
 function printSummary(users, properties, investments) {
+  const groupLabels = {
+    admin: "Admin",
+    investor: "Investors",
+    property_owner: "Property Owners",
+    local_representative: "Local Representatives",
+  };
+  const statusCounts = Object.values(investments).reduce((accumulator, investment) => {
+    accumulator[investment.status] = (accumulator[investment.status] || 0) + 1;
+    return accumulator;
+  }, {});
+  const propertyStatusCounts = Object.values(properties).reduce((accumulator, property) => {
+    accumulator[property.status] = (accumulator[property.status] || 0) + 1;
+    return accumulator;
+  }, {});
+  const representativeRequestCounts = Object.values(investments).reduce(
+    (accumulator, investment) => {
+      const key = investment.representativeRequestStatus || "none";
+      accumulator[key] = (accumulator[key] || 0) + 1;
+      return accumulator;
+    },
+    {},
+  );
+
   console.log("");
   console.log("Seed completed successfully.");
   console.log("");
   console.log("Credentials:");
-  console.log("  admin@admin.com / Admin123!@#");
-  console.log("  emre@investor.com / Test123!@#");
-  console.log("  lara@investor.com / Lara123!@#");
-  console.log("  selin@investor.com / Selin123!@#");
-  console.log("  ayse@owner.com / Owner123!@#");
-  console.log("  mehmet@owner.com / Mehmet123!@#");
-  console.log("  john@rep.com / Rep123!@#");
+  Object.entries(groupLabels).forEach(([groupKey, groupLabel]) => {
+    const accounts = users.seedAccounts.filter((account) => account.group === groupKey);
+    if (!accounts.length) {
+      return;
+    }
+
+    console.log(`  ${groupLabel}:`);
+    accounts.forEach((account) => {
+      console.log(`    ${account.label}: ${account.email} / ${account.password}`);
+    });
+  });
   console.log("");
   console.log("Scenario coverage:");
   console.log(
-    `  properties: published=${[properties.lisbon, properties.tbilisi].length}, draft=1, in_contract=2, active=1, completed=1, rejected=1`,
+    `  properties: published=${propertyStatusCounts.published || 0}, draft=${propertyStatusCounts.draft || 0}, in_contract=${propertyStatusCounts.in_contract || 0}, active=${propertyStatusCounts.active || 0}, completed=${propertyStatusCounts.completed || 0}, rejected=${propertyStatusCounts.rejected || 0}`,
   );
   console.log(
-    `  investments: offer_sent=1, contract_signed=1, title_deed_pending=1, active=1, completed=1`,
+    `  investments: offer_sent=${statusCounts.offer_sent || 0}, contract_signed=${statusCounts.contract_signed || 0}, title_deed_pending=${statusCounts.title_deed_pending || 0}, active=${statusCounts.active || 0}, completed=${statusCounts.completed || 0}`,
   );
   console.log(
     `  pending kyc users: 1 (${users.investorSelin.email})`,
+  );
+  console.log(
+    `  representative requests: pending=${representativeRequestCounts.pending || 0}, fulfilled=${representativeRequestCounts.fulfilled || 0}, none=${representativeRequestCounts.none || 0}`,
   );
   console.log("");
   console.log("High value records:");
   console.log(`  active investment id: ${investments.vallettaActive._id}`);
   console.log(`  title deed pending id: ${investments.batumiTitlePending._id}`);
+  console.log(`  rep pool (Spain) id: ${investments.barcelonaContract._id}`);
+  console.log(`  rep pool (Georgia) id: ${investments.tbilisiContractPool._id}`);
   console.log(`  draft property id: ${properties.portoDraft._id}`);
   console.log(`  published property id: ${properties.lisbon._id}`);
 }
@@ -2460,8 +3025,12 @@ async function seed() {
   }
 }
 
-seed().catch(async (error) => {
-  console.error("Seed failed:", error);
-  await disconnectDatabase();
-  process.exit(1);
-});
+seed()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch(async (error) => {
+    console.error("Seed failed:", error);
+    await disconnectDatabase();
+    process.exit(1);
+  });

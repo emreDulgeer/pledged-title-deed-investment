@@ -244,6 +244,6 @@ router.post(
 
 // ===== DYNAMIC ROUTES - EN SONA =====
 router.get("/:id/files", optionalAuth, propertyFileController.getPropertyFiles);
-router.get("/:id", propertyController.getPropertyById);
+router.get("/:id", optionalAuth, propertyController.getPropertyById);
 
 module.exports = router;

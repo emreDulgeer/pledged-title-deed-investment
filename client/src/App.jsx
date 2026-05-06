@@ -27,7 +27,9 @@ import AdminInvestments from "./views/admin/AdminInvestments";
 import AdminInvestmentDetail from "./views/admin/AdminInvestmentDetail";
 import AdminMembershipPlans from "./views/admin/AdminMembershipPlans";
 import AdminUserDirectory from "./views/admin/AdminUserDirectory";
+import AdminLocalRepresentatives from "./views/admin/AdminLocalRepresentatives";
 import PropertyDetail from "./views/property/PropertyDetail";
+import AccessiblePropertyDetail from "./views/property/AccessiblePropertyDetail";
 import AdminProperties from "./views/admin/AdminProperties";
 import UserProfilePage from "./views/profile/UserProfilePage";
 import ProfileSettingsPage from "./views/profile/ProfileSettingsPage";
@@ -38,6 +40,9 @@ import RoleBasedRoute from "./routes/RoleBasedRoute";
 // Investor imports
 import InvestorLayout from "./views/layouts/InvestorLayout";
 import InvestorDashboard from "./components/Dashboards/InvestorDashboard";
+import InvestorOffers from "./views/investor/InvestorOffers";
+import InvestorProperties from "./views/investor/InvestorProperties";
+import InvestorPropertyDetail from "./views/investor/InvestorPropertyDetail";
 import InvestorInvestmentsList from "./views/investor/InvestorInvestmentsList";
 import InvestorInvestmentDetail from "./views/investor/InvestorInvestmentDetail";
 import InvestorRentalPayments from "./views/investor/InvestorRentalPayments";
@@ -50,6 +55,11 @@ import OwnerInvestmentDetail from "./views/owner/OwnerInvestmentDetail";
 import OwnerProperties from "./views/owner/OwnerProperties";
 import OwnerRentalPayments from "./views/owner/OwnerRentalPayments";
 import OwnerPropertyCreate from "./views/owner/OwnerPropertyCreate";
+import LocalRepresentativeLayout from "./views/layouts/LocalRepresentativeLayout";
+import RepresentativeDashboard from "./views/localRepresentative/RepresentativeDashboard";
+import RepresentativeRequestPool from "./views/localRepresentative/RepresentativeRequestPool";
+import RepresentativeCases from "./views/localRepresentative/RepresentativeCases";
+import RepresentativeInvestmentDetail from "./views/localRepresentative/RepresentativeInvestmentDetail";
 
 import authController from "./controllers/authController";
 import { defaultPathByRole } from "./utils/roleRedirect";
@@ -192,6 +202,14 @@ const AppContent = () => {
           }
         />
         <Route
+          path="/properties/:id"
+          element={
+            <PrivateRoute>
+              <AccessiblePropertyDetail />
+            </PrivateRoute>
+          }
+        />
+        <Route
           path="/admin/settings"
           element={
             <PrivateRoute>
@@ -216,6 +234,16 @@ const AppContent = () => {
           element={
             <PrivateRoute>
               <RoleBasedRoute allowedRoles={["property_owner"]}>
+                <AppSettingsPage />
+              </RoleBasedRoute>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/rep/settings"
+          element={
+            <PrivateRoute>
+              <RoleBasedRoute allowedRoles={["local_representative"]}>
                 <AppSettingsPage />
               </RoleBasedRoute>
             </PrivateRoute>
@@ -254,6 +282,10 @@ const AppContent = () => {
             path="property-owners"
             element={<AdminUserDirectory mode="propertyOwners" />}
           />
+          <Route
+            path="local-representatives"
+            element={<AdminLocalRepresentatives />}
+          />
         </Route>
 
         {/* Investor (nested) */}
@@ -269,6 +301,12 @@ const AppContent = () => {
         >
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<InvestorDashboard />} />
+          <Route path="offers" element={<InvestorOffers />} />
+          <Route path="properties" element={<InvestorProperties />} />
+          <Route
+            path="properties/:id"
+            element={<InvestorPropertyDetail />}
+          />
           <Route path="investments" element={<InvestorInvestmentsList />} />
           <Route
             path="investments/:id"
@@ -297,6 +335,27 @@ const AppContent = () => {
           <Route path="investments/:id" element={<OwnerInvestmentDetail />} />
           {/* <Route path="notifications" element={<OwnerNotifications />} /> */}
           {/* <Route path="settings" element={<OwnerSettings />} /> */}
+        </Route>
+
+        {/* Local Representative (nested) */}
+        <Route
+          path="/rep"
+          element={
+            <PrivateRoute>
+              <RoleBasedRoute allowedRoles={["local_representative"]}>
+                <LocalRepresentativeLayout />
+              </RoleBasedRoute>
+            </PrivateRoute>
+          }
+        >
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<RepresentativeDashboard />} />
+          <Route path="request-pool" element={<RepresentativeRequestPool />} />
+          <Route path="cases" element={<RepresentativeCases />} />
+          <Route
+            path="investments/:id"
+            element={<RepresentativeInvestmentDetail />}
+          />
         </Route>
 
         <Route

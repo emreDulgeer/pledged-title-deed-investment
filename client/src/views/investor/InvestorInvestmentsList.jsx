@@ -1,5 +1,5 @@
 // src/views/investor/InvestorInvestmentsList.jsx
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import InvestmentController from "../../controllers/investmentController";
 import { useTranslation } from "react-i18next";
@@ -27,14 +27,15 @@ const InvestorInvestmentsList = () => {
     limit: 10,
   });
 
-  useEffect(() => {
-    loadInvestments();
-  }, [filters]);
-
-  const loadInvestments = async () => {
+  const loadInvestments = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await InvestmentController.getMyInvestments(filters);
+      const response = await InvestmentController.getMyInvestments({
+        ...filters,
+        status:
+          filters.status ||
+          "contract_signed,title_deed_pending,active,completed,refunded,defaulted",
+      });
 
       if (response.success) {
         setInvestments(response.data);
@@ -47,7 +48,11 @@ const InvestorInvestmentsList = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
+
+  useEffect(() => {
+    loadInvestments();
+  }, [loadInvestments]);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({
@@ -78,6 +83,7 @@ const InvestorInvestmentsList = () => {
         "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
       refunded: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
       defaulted: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+      rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
     };
     return colors[status] || "bg-gray-100 text-gray-800";
   };
@@ -116,7 +122,7 @@ const InvestorInvestmentsList = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate("/properties")}
+          onClick={() => navigate("/investor/properties")}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           + {t("investor.newInvestment")}
@@ -200,7 +206,7 @@ const InvestorInvestmentsList = () => {
               {t("investor.startInvestingToSeeResults")}
             </p>
             <button
-              onClick={() => navigate("/properties")}
+              onClick={() => navigate("/investor/properties")}
               className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               {t("investor.browseProperties")}

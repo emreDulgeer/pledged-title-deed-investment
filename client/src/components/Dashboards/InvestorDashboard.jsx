@@ -1,5 +1,5 @@
 // InvestorDashboard.jsx
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import InvestmentController from "../../controllers/investmentController";
 import PropertyController from "../../controllers/propertyController";
@@ -25,16 +25,14 @@ const InvestorDashboard = () => {
   const [recentInvestments, setRecentInvestments] = useState([]);
   const [upcomingPayments, setUpcomingPayments] = useState([]);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
 
       // Yatırımları getir
       const investmentsRes = await InvestmentController.getMyInvestments({
+        status:
+          "contract_signed,title_deed_pending,active,completed,refunded,defaulted",
         page: 1,
         limit: 5,
         sort: "-createdAt",
@@ -63,7 +61,11 @@ const InvestorDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   const calculateStats = (investments) => {
     const active = investments.filter((inv) => inv.status === "active");
@@ -81,7 +83,8 @@ const InvestorDashboard = () => {
       activeInvestments: active.length,
       totalInvested,
       monthlyIncome: active.reduce(
-        (sum, inv) => sum + (inv.property?.rentOffered || 0),
+        (sum, inv) =>
+          sum + (inv.offerTerms?.desiredMonthlyRent || inv.property?.rentOffered || 0),
         0,
       ),
       totalEarnings,
@@ -124,7 +127,7 @@ const InvestorDashboard = () => {
           </p>
         </div>
         <button
-          onClick={() => navigate("/properties")}
+          onClick={() => navigate("/investor/properties")}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
           {t("investor.browseProperties")}
@@ -190,7 +193,7 @@ const InvestorDashboard = () => {
               {t("investor.noInvestmentsYet")}
             </p>
             <button
-              onClick={() => navigate("/properties")}
+              onClick={() => navigate("/investor/properties")}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               {t("investor.startInvesting")}
@@ -262,8 +265,10 @@ const InvestorDashboard = () => {
                     </td>
                     <td className="px-4 py-4">
                       <p className="text-gray-900 dark:text-white">
-                        {investment.property?.rentOffered?.toLocaleString() ||
-                          0}{" "}
+                        {(investment.offerTerms?.desiredMonthlyRent ||
+                          investment.property?.rentOffered ||
+                          0
+                        ).toLocaleString()}{" "}
                         {APP_CURRENCY_SYMBOL}
                       </p>
                     </td>

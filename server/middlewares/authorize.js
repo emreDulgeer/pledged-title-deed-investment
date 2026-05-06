@@ -1,6 +1,10 @@
 // server/middlewares/authorize.js
 
 const responseWrapper = require("../utils/responseWrapper");
+const {
+  getRepresentativeRegions,
+  representativeHasRegion,
+} = require("../utils/representativeRegions");
 
 /**
  * Role-based authorization middleware
@@ -138,12 +142,14 @@ authorize.checkRegion = () => {
     }
 
     try {
+      const representativeRegions = getRepresentativeRegions(req.userDetails);
+
       // Property'nin bölgesini kontrol et
       if (req.params.id) {
         const Property = require("../models/Property");
         const property = await Property.findById(req.params.id);
 
-        if (property && req.userDetails.region !== property.country) {
+        if (property && !representativeHasRegion(req.userDetails, property.country)) {
           return responseWrapper.forbidden(
             res,
             "Bu bölgedeki mülklere erişim yetkiniz yok"
@@ -152,7 +158,10 @@ authorize.checkRegion = () => {
       }
 
       // Query'den gelen country filtresini kontrol et
-      if (req.query.country && req.query.country !== req.userDetails.region) {
+      if (
+        req.query.country &&
+        !representativeHasRegion(req.userDetails, req.query.country)
+      ) {
         return responseWrapper.forbidden(
           res,
           "Sadece kendi bölgenizdeki mülkleri görüntüleyebilirsiniz"
@@ -160,7 +169,11 @@ authorize.checkRegion = () => {
       }
 
       // Local representative sadece kendi bölgesini görebilir
-      req.query.country = req.userDetails.region;
+      if (representativeRegions.length === 1) {
+        req.query.country = representativeRegions[0];
+      } else if (representativeRegions.length > 1) {
+        req.query.country = representativeRegions.join(",");
+      }
 
       next();
     } catch (error) {

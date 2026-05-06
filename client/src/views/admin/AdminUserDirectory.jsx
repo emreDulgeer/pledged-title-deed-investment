@@ -53,6 +53,10 @@ const roleLabel = (value, t) => {
     return t("navigation.admin_panel");
   }
 
+  if (value === "local_representative") {
+    return "Local Representative";
+  }
+
   return value || "-";
 };
 

@@ -58,6 +58,18 @@ const InvestmentController = {
     return await apiClient.post(`/investments/${id}/request-representative`);
   },
 
+  getRepresentativeRequestPool: async () => {
+    return await apiClient.get("/investments/representative/request-pool");
+  },
+
+  getRepresentativeAssignments: async () => {
+    return await apiClient.get("/investments/representative/my-assignments");
+  },
+
+  claimRepresentativeRequest: async (id) => {
+    return await apiClient.post(`/investments/${id}/claim-representative-request`);
+  },
+
   // ===== PROPERTY OWNER ENDPOINTS =====
 
   // Teklifi kabul et
@@ -68,6 +80,14 @@ const InvestmentController = {
   // Teklifi reddet
   rejectOffer: async (id, reason) => {
     return await apiClient.post(`/investments/${id}/reject`, { reason });
+  },
+
+  preparePrincipalPayment: async (id, data) => {
+    return await apiClient.post(`/investments/${id}/principal-payment/prepare`, data);
+  },
+
+  confirmPrincipalPayment: async (id) => {
+    return await apiClient.post(`/investments/${id}/principal-payment/confirm`);
   },
 
   // Kira ödemesi kaydet

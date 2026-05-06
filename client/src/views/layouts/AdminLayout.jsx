@@ -47,6 +47,11 @@ const AdminLayout = () => {
       icon: <IconUser />,
     },
     {
+      title: "Local Representatives",
+      path: "/admin/local-representatives",
+      icon: <IconGlobe />,
+    },
+    {
       title: t("navigation.users"),
       path: "/admin/users",
       icon: <IconUsers2 />,
@@ -188,6 +193,28 @@ const IconUsers2 = () => (
       strokeLinejoin="round"
       strokeWidth={2}
       d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+    />
+  </svg>
+);
+
+const IconGlobe = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 010 18M12 3a15 15 0 000 18"
     />
   </svg>
 );

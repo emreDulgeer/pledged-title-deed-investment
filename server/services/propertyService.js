@@ -83,6 +83,35 @@ class PropertyService {
     this.officialPropertyDataService = officialPropertyDataService;
   }
 
+  async hasInvestmentLinkedAccess(propertyId, userId, userRole) {
+    if (!propertyId || !userId || !userRole) {
+      return false;
+    }
+
+    if (userRole === "investor") {
+      return Investment.exists({
+        property: propertyId,
+        investor: userId,
+      });
+    }
+
+    if (userRole === "property_owner") {
+      return Investment.exists({
+        property: propertyId,
+        propertyOwner: userId,
+      });
+    }
+
+    if (userRole === "local_representative") {
+      return Investment.exists({
+        property: propertyId,
+        localRepresentative: userId,
+      });
+    }
+
+    return false;
+  }
+
   buildGeocodeInput(fullAddress, city, country, mapSearchAddress = "") {
     const normalizedFullAddress =
       mapSearchAddress?.trim?.() || fullAddress?.trim?.() || "";
@@ -136,7 +165,12 @@ class PropertyService {
 
   // Property detayÄ±nÄ± getir
   // Property detayÄ±nÄ± getir
-  async getPropertyById(propertyId, userId = null, isAdmin = false) {
+  async getPropertyById(
+    propertyId,
+    userId = null,
+    userRole = null,
+    userContext = null,
+  ) {
     const property = await this.propertyRepository.findById(
       propertyId,
       "owner",
@@ -146,31 +180,43 @@ class PropertyService {
       throw new Error("Property not found");
     }
 
-    // PUBLIC endpoint gÃ¼venliÄŸi:
-    // published deÄŸilse ve admin/owner deÄŸilse 404 ver
+    const isAdmin = userRole === "admin";
     const isOwner =
       userId &&
       property.owner &&
-      property.owner.toString() === userId.toString();
+      String(property.owner?._id || property.owner) === String(userId);
+    const hasInvestmentLinkedAccess = await this.hasInvestmentLinkedAccess(
+      propertyId,
+      userId,
+      userRole,
+    );
 
-    if (property.status !== "published" && !isAdmin && !isOwner) {
-      // VarlÄ±ÄŸÄ± gizlemek iÃ§in 404
+    if (
+      property.status !== "published" &&
+      !isAdmin &&
+      !isOwner &&
+      !hasInvestmentLinkedAccess
+    ) {
       throw new Error("Property not found");
     }
 
-    // View count sadece published iÃ§in artsÄ±n
     if (property.status === "published") {
       await this.propertyRepository.incrementViewCount(propertyId);
     }
 
-    // Role/kimlik durumuna gÃ¶re DTO seÃ§imi
     if (isAdmin) {
       return toPropertyAdminViewDto(property);
-    } else if (userId) {
-      return toPropertyInvestorViewDto(property, userId);
-    } else {
-      return toPropertyDetailDto(property);
     }
+
+    if (userRole === "property_owner" && isOwner) {
+      return toPropertyOwnerViewDto(property);
+    }
+
+    if (userId || userContext) {
+      return toPropertyInvestorViewDto(property, userId);
+    }
+
+    return toPropertyDetailDto(property);
   }
 
   // Yeni property oluÅŸtur

@@ -15,8 +15,13 @@ import {
   selectCurrentInvestment,
   selectInvestmentLoading,
 } from "../../store/slices/investmentSlice";
+import InvestmentPropertyPanel from "../../components/investments/InvestmentPropertyPanel";
 import bridge from "../../controllers/bridge";
-import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
+import {
+  getInvestmentPropertyPath,
+  getUserId,
+  getUserProfilePath,
+} from "../../utils/profileRoutes";
 import { APP_CURRENCY } from "../../utils/currency";
 function LineItem({ label, value }) {
   return (
@@ -41,6 +46,7 @@ export default function AdminInvestmentDetail() {
   const [documents, setDocuments] = useState([]);
   const [stats, setStats] = useState(null);
   const [tab, setTab] = useState("overview");
+  const [approvingTitleDeed, setApprovingTitleDeed] = useState(false);
 
   const load = async () => {
     dispatch(fetchInvestmentById(id));
@@ -63,6 +69,20 @@ export default function AdminInvestmentDetail() {
       await bridge.investments.downloadDocument(id, fileId);
     } catch (e) {
       console.error("Download error:", e);
+    }
+  };
+
+  const handleApproveTitleDeed = async () => {
+    try {
+      setApprovingTitleDeed(true);
+      const response = await bridge.investments.approveTitleDeed(id);
+      if (response?.success) {
+        await load();
+      }
+    } catch (error) {
+      console.error("Approve title deed error:", error);
+    } finally {
+      setApprovingTitleDeed(false);
     }
   };
 
@@ -118,6 +138,10 @@ export default function AdminInvestmentDetail() {
   const ownerProfilePath = getUserProfilePath(
     getUserId(investment?.propertyOwner),
   );
+  const propertyPath = getInvestmentPropertyPath(
+    "admin",
+    getUserId(investment?.property),
+  );
 
   const docTypeLabel = (type) => t(`documents.types.${type}`, type);
 
@@ -133,6 +157,16 @@ export default function AdminInvestmentDetail() {
             <ArrowLeft className="w-4 h-4" />
             {t("admin.investments.to_list")}
           </RouterLink>
+          {investment.status === "title_deed_pending" && (
+            <button
+              type="button"
+              onClick={handleApproveTitleDeed}
+              disabled={approvingTitleDeed}
+              className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+            >
+              {approvingTitleDeed ? "Approving..." : "Approve Title Deed"}
+            </button>
+          )}
         </div>
 
         {/* Main card */}
@@ -159,6 +193,10 @@ export default function AdminInvestmentDetail() {
                   {
                     key: "overview",
                     label: t("admin.investments.tab_overview"),
+                  },
+                  {
+                    key: "property",
+                    label: t("investments.property", "Property"),
                   },
                   {
                     key: "payments",
@@ -243,6 +281,24 @@ export default function AdminInvestmentDetail() {
                       label={t("common.created")}
                       value={new Date(investment?.createdAt).toLocaleString()}
                     />
+                    <LineItem
+                      label="Principal payment"
+                      value={
+                        investment?.principalPayment?.status
+                          ? investment.principalPayment.status.replace(/_/g, " ")
+                          : "-"
+                      }
+                    />
+                    <LineItem
+                      label="Contracts fully signed"
+                      value={
+                        investment?.contractWorkflow?.fullySignedAt
+                          ? new Date(
+                              investment.contractWorkflow.fullySignedAt,
+                            ).toLocaleString()
+                          : "Pending"
+                      }
+                    />
                   </div>
                   {stats && (
                     <div className="rounded-xl border border-day-border dark:border-night-border p-4">
@@ -276,6 +332,15 @@ export default function AdminInvestmentDetail() {
                     </div>
                   )}
                 </div>
+              )}
+
+              {tab === "property" && investment?.property && (
+                <InvestmentPropertyPanel
+                  property={investment.property}
+                  owner={investment.propertyOwner || investment.property?.owner}
+                  propertyPath={propertyPath}
+                  t={t}
+                />
               )}
 
               {tab === "payments" && (

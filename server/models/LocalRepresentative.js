@@ -2,11 +2,39 @@
 
 const mongoose = require("mongoose");
 const User = require("./User");
+const {
+  SUPPORTED_PROPERTY_COUNTRY_NAMES,
+} = require("../utils/propertyCountries");
+const {
+  getPrimaryRepresentativeRegion,
+  getRepresentativeRegions,
+} = require("../utils/representativeRegions");
 
 const LocalRepresentativeSchema = new mongoose.Schema({
   region: {
     type: String,
-    required: true, // Hangi ülke/bölgeden sorumlu
+    enum: SUPPORTED_PROPERTY_COUNTRY_NAMES,
+    default: null,
+  },
+  regions: [
+    {
+      type: String,
+      enum: SUPPORTED_PROPERTY_COUNTRY_NAMES,
+    },
+  ],
+  requestStats: {
+    claimed: {
+      type: Number,
+      default: 0,
+    },
+    activeAssignments: {
+      type: Number,
+      default: 0,
+    },
+    completedAssignments: {
+      type: Number,
+      default: 0,
+    },
   },
   managedProperties: [
     {
@@ -54,6 +82,24 @@ const LocalRepresentativeSchema = new mongoose.Schema({
     totalCommissionFromReferrals: { type: Number, default: 0 },
   },
 });
+
+LocalRepresentativeSchema.pre("validate", function normalizeRegions(next) {
+  const normalizedRegions = getRepresentativeRegions(this);
+
+  if (!normalizedRegions.length) {
+    this.invalidate(
+      "regions",
+      "At least one supported region is required for a local representative",
+    );
+    return next();
+  }
+
+  this.regions = normalizedRegions;
+  this.region = getPrimaryRepresentativeRegion(this);
+  return next();
+});
+
+LocalRepresentativeSchema.index({ regions: 1 });
 
 module.exports = User.discriminator(
   "LocalRepresentative",

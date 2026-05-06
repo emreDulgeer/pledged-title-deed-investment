@@ -46,7 +46,12 @@ class InvestmentController {
       if (
         error.message.includes("limit reached") ||
         error.message.includes("not available") ||
-        error.message.includes("already have")
+        error.message.includes("already have") ||
+        error.message.includes("required") ||
+        error.message.includes("greater than zero") ||
+        error.message.includes("percentage") ||
+        error.message.includes("cannot exceed") ||
+        error.message.includes("do not match")
       ) {
         return responseWrapper.badRequest(res, error.message);
       }
@@ -76,7 +81,8 @@ class InvestmentController {
       }
       if (
         error.message.includes("Unauthorized") ||
-        error.message.includes("not in pending")
+        error.message.includes("not in pending") ||
+        error.message.includes("no longer open")
       ) {
         return responseWrapper.forbidden(res, error.message);
       }
@@ -211,6 +217,71 @@ class InvestmentController {
     }
   };
 
+  preparePrincipalPayment = async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const userRole = req.user.role;
+      const investmentId = req.params.id;
+
+      const investment = await this.investmentService.preparePrincipalPayment(
+        investmentId,
+        userId,
+        userRole,
+        req.body
+      );
+
+      return responseWrapper.success(
+        res,
+        investment,
+        "Payment instructions prepared successfully"
+      );
+    } catch (error) {
+      if (error.message === "Investment not found") {
+        return responseWrapper.notFound(res, error.message);
+      }
+      if (
+        error.message.includes("Unauthorized") ||
+        error.message.includes("contract") ||
+        error.message.includes("payment")
+      ) {
+        return responseWrapper.badRequest(res, error.message);
+      }
+      return responseWrapper.error(res, error.message);
+    }
+  };
+
+  confirmPrincipalPayment = async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const userRole = req.user.role;
+      const investmentId = req.params.id;
+
+      const investment = await this.investmentService.confirmPrincipalPayment(
+        investmentId,
+        userId,
+        userRole
+      );
+
+      return responseWrapper.success(
+        res,
+        investment,
+        "Principal payment confirmed successfully"
+      );
+    } catch (error) {
+      if (error.message === "Investment not found") {
+        return responseWrapper.notFound(res, error.message);
+      }
+      if (
+        error.message.includes("Unauthorized") ||
+        error.message.includes("contract") ||
+        error.message.includes("payment")
+      ) {
+        return responseWrapper.badRequest(res, error.message);
+      }
+      return responseWrapper.error(res, error.message);
+    }
+  };
+
   // İade işlemi (Admin veya Property Owner)
   processRefund = async (req, res) => {
     try {
@@ -313,7 +384,8 @@ class InvestmentController {
       const investment = await this.investmentService.getInvestmentById(
         investmentId,
         userId,
-        userRole
+        userRole,
+        req.user,
       );
 
       return responseWrapper.success(
@@ -325,7 +397,10 @@ class InvestmentController {
       if (error.message === "Investment not found") {
         return responseWrapper.notFound(res, "Investment not found");
       }
-      if (error.message.includes("Unauthorized")) {
+      if (
+        error.message.includes("Unauthorized") ||
+        error.message.includes("authorized")
+      ) {
         return responseWrapper.forbidden(res, error.message);
       }
       return responseWrapper.error(res, error.message);
@@ -336,8 +411,12 @@ class InvestmentController {
   getPropertyInvestments = async (req, res) => {
     try {
       const propertyId = req.params.propertyId;
+      const propertyOwnerId =
+        req.user.role === "property_owner" ? req.user.id : null;
       const investments = await this.investmentService.getPropertyInvestments(
-        propertyId
+        propertyId,
+        req.query,
+        propertyOwnerId,
       );
 
       return responseWrapper.success(
@@ -346,6 +425,12 @@ class InvestmentController {
         "Property investments fetched"
       );
     } catch (error) {
+      if (error.message === "Property not found") {
+        return responseWrapper.notFound(res, "Property not found");
+      }
+      if (error.message.includes("Unauthorized")) {
+        return responseWrapper.forbidden(res, error.message);
+      }
       return responseWrapper.error(res, error.message);
     }
   };
@@ -451,7 +536,11 @@ class InvestmentController {
       if (error.message.includes("not found")) {
         return responseWrapper.notFound(res, error.message);
       }
-      if (error.message.includes("not assigned to this")) {
+      if (
+        error.message.includes("not assigned to this") ||
+        error.message.includes("region") ||
+        error.message.includes("not active")
+      ) {
         return responseWrapper.badRequest(res, error.message);
       }
       return responseWrapper.error(res, error.message);
@@ -471,7 +560,11 @@ class InvestmentController {
         userRole
       );
 
-      return responseWrapper.success(res, result, result.message);
+      return responseWrapper.success(
+        res,
+        result,
+        "Local representative requested successfully",
+      );
     } catch (error) {
       if (error.message.includes("not found")) {
         return responseWrapper.notFound(res, error.message);
@@ -482,6 +575,68 @@ class InvestmentController {
       ) {
         return responseWrapper.forbidden(res, error.message);
       }
+      return responseWrapper.error(res, error.message);
+    }
+  };
+
+  getRepresentativeRequestPool = async (req, res) => {
+    try {
+      const result = await this.investmentService.getRepresentativeRequestPool(
+        req.user.id,
+      );
+
+      return responseWrapper.success(
+        res,
+        result,
+        "Representative request pool fetched successfully",
+      );
+    } catch (error) {
+      if (error.message.includes("not found")) {
+        return responseWrapper.notFound(res, error.message);
+      }
+      return responseWrapper.error(res, error.message);
+    }
+  };
+
+  claimRepresentativeRequest = async (req, res) => {
+    try {
+      const result = await this.investmentService.claimRepresentativeRequest(
+        req.params.id,
+        req.user.id,
+      );
+
+      return responseWrapper.success(
+        res,
+        result,
+        "Representative request claimed successfully",
+      );
+    } catch (error) {
+      if (error.message.includes("not found")) {
+        return responseWrapper.notFound(res, error.message);
+      }
+      if (
+        error.message.includes("already") ||
+        error.message.includes("authorized") ||
+        error.message.includes("pending")
+      ) {
+        return responseWrapper.badRequest(res, error.message);
+      }
+      return responseWrapper.error(res, error.message);
+    }
+  };
+
+  getRepresentativeAssignments = async (req, res) => {
+    try {
+      const result = await this.investmentService.getRepresentativeAssignments(
+        req.user.id,
+      );
+
+      return responseWrapper.success(
+        res,
+        result,
+        "Representative assignments fetched successfully",
+      );
+    } catch (error) {
       return responseWrapper.error(res, error.message);
     }
   };

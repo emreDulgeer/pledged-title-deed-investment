@@ -27,7 +27,7 @@ router.post(
       .isLength({ min: 8 })
       .withMessage("Password must be at least 8 characters"),
     body("fullName").notEmpty().trim(),
-    body("role").isIn(["investor", "property_owner", "local_representative"]),
+    body("role").isIn(["investor", "property_owner"]),
     body("acceptedTerms").isBoolean().equals("true"),
     body("acceptedGDPR").isBoolean().equals("true"),
   ],
@@ -459,6 +459,51 @@ router.patch(
         "Rol güncelleme henüz aktif değil"
       );
     })
+);
+
+// Admin: List Local Representatives
+router.get(
+  "/admin/local-representatives",
+  auth,
+  authorize(["admin"]),
+  authController.getLocalRepresentatives
+);
+
+// Admin: Create Local Representative
+router.post(
+  "/admin/local-representatives",
+  auth,
+  authorize(["admin"]),
+  [
+    body("email").isEmail().normalizeEmail(),
+    body("password")
+      .isLength({ min: 8 })
+      .withMessage("Password must be at least 8 characters"),
+    body("fullName").notEmpty().trim(),
+    body("regions").isArray({ min: 1 }),
+  ],
+  validateRequest,
+  authController.createLocalRepresentative
+);
+
+// Admin: Get Local Representative By ID
+router.get(
+  "/admin/local-representatives/:userId",
+  auth,
+  authorize(["admin"]),
+  [param("userId").isMongoId()],
+  validateRequest,
+  authController.getLocalRepresentativeById
+);
+
+// Admin: Update Local Representative Regions
+router.patch(
+  "/admin/local-representatives/:userId/regions",
+  auth,
+  authorize(["admin"]),
+  [param("userId").isMongoId(), body("regions").isArray({ min: 1 })],
+  validateRequest,
+  authController.updateLocalRepresentativeRegions
 );
 
 // Admin: Force Password Reset (Stub implementation)

@@ -10,6 +10,56 @@ export const FileInfoPropTypes = {
   uploadedBy: PropTypes.string,
 };
 
+export const ContractWorkflowPropTypes = {
+  investorSigned: PropTypes.shape(FileInfoPropTypes),
+  ownerSigned: PropTypes.shape(FileInfoPropTypes),
+  fullySignedAt: PropTypes.string,
+};
+
+export const PrincipalPaymentPropTypes = {
+  status: PropTypes.oneOf([
+    "not_started",
+    "instructions_ready",
+    "receipt_uploaded",
+    "confirmed",
+    "failed",
+    "cancelled",
+  ]),
+  providerKey: PropTypes.string,
+  providerLabel: PropTypes.string,
+  method: PropTypes.string,
+  amount: PropTypes.number,
+  currency: PropTypes.string,
+  referenceCode: PropTypes.string,
+  initiatedAt: PropTypes.string,
+  receiptUploadedAt: PropTypes.string,
+  confirmedAt: PropTypes.string,
+  instructions: PropTypes.shape({
+    summary: PropTypes.string,
+    recipientName: PropTypes.string,
+    bankName: PropTypes.string,
+    iban: PropTypes.string,
+    swiftCode: PropTypes.string,
+    accountNumber: PropTypes.string,
+    transferNote: PropTypes.string,
+    steps: PropTypes.arrayOf(PropTypes.string),
+  }),
+};
+
+export const OfferTermsPropTypes = {
+  ownershipPercent: PropTypes.number,
+  desiredMonthlyRent: PropTypes.number,
+  annualYieldPercent: PropTypes.number,
+  message: PropTypes.string,
+};
+
+export const OfferDecisionPropTypes = {
+  acceptedAt: PropTypes.string,
+  rejectedAt: PropTypes.string,
+  rejectionReason: PropTypes.string,
+  decidedBy: PropTypes.string,
+};
+
 export const RentalPaymentPropTypes = {
   _id: PropTypes.string,
   month: PropTypes.string.isRequired,
@@ -80,6 +130,8 @@ export const InvestmentPropTypes = {
 
   // Status
   status: PropTypes.oneOf([
+    "offer_sent",
+    "rejected",
     "draft",
     "pending_payment",
     "payment_received",
@@ -104,7 +156,11 @@ export const InvestmentPropTypes = {
 
   // Documents
   contractFile: PropTypes.shape(FileInfoPropTypes),
+  offerTerms: PropTypes.shape(OfferTermsPropTypes),
+  offerDecision: PropTypes.shape(OfferDecisionPropTypes),
+  contractWorkflow: PropTypes.shape(ContractWorkflowPropTypes),
   paymentReceipt: PropTypes.shape(FileInfoPropTypes),
+  principalPayment: PropTypes.shape(PrincipalPaymentPropTypes),
   titleDeedDocument: PropTypes.shape(FileInfoPropTypes),
   otherDocuments: PropTypes.arrayOf(
     PropTypes.shape({

@@ -18,6 +18,10 @@ export const getAppSettingsPath = (role) => {
     return "/owner/settings";
   }
 
+  if (role === "local_representative") {
+    return "/rep/settings";
+  }
+
   return "/profile/settings";
 };
 
@@ -30,11 +34,31 @@ export const getPropertyDetailPath = (viewerRole, propertyId) => {
     return `/admin/properties/${propertyId}`;
   }
 
+  if (viewerRole === "investor") {
+    return `/investor/properties/${propertyId}`;
+  }
+
   if (viewerRole === "property_owner") {
     return `/owner/properties/${propertyId}`;
   }
 
   return null;
+};
+
+export const getInvestmentPropertyPath = (viewerRole, propertyId) => {
+  if (!propertyId) {
+    return null;
+  }
+
+  if (viewerRole === "admin") {
+    return `/admin/properties/${propertyId}`;
+  }
+
+  if (viewerRole === "owner" || viewerRole === "property_owner") {
+    return `/owner/properties/${propertyId}`;
+  }
+
+  return `/properties/${propertyId}`;
 };
 
 export const getInvestmentDetailPath = (viewerRole, investmentId) => {
@@ -52,6 +76,10 @@ export const getInvestmentDetailPath = (viewerRole, investmentId) => {
 
   if (viewerRole === "investor") {
     return `/investor/investments/${investmentId}`;
+  }
+
+  if (viewerRole === "local_representative") {
+    return `/rep/investments/${investmentId}`;
   }
 
   return null;

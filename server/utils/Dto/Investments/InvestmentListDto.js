@@ -2,6 +2,9 @@
 
 const { getPrimaryPropertyImage } = require("../../propertyImages");
 const { APP_CURRENCY } = require("../../currency");
+const {
+  getRepresentativeRegions,
+} = require("../../representativeRegions");
 
 class InvestmentListDto {
   constructor(investment) {
@@ -10,6 +13,17 @@ class InvestmentListDto {
     this.currency = APP_CURRENCY;
     this.status = investment.status;
     this.createdAt = investment.createdAt;
+    this.offerTerms = {
+      ownershipPercent: investment.offerTerms?.ownershipPercent ?? null,
+      desiredMonthlyRent: investment.offerTerms?.desiredMonthlyRent ?? null,
+      annualYieldPercent: investment.offerTerms?.annualYieldPercent ?? null,
+      message: investment.offerTerms?.message || "",
+    };
+    this.offerDecision = {
+      acceptedAt: investment.offerDecision?.acceptedAt || null,
+      rejectedAt: investment.offerDecision?.rejectedAt || null,
+      rejectionReason: investment.offerDecision?.rejectionReason || null,
+    };
 
     // Property özet bilgileri
     if (investment.property && typeof investment.property === "object") {
@@ -23,8 +37,40 @@ class InvestmentListDto {
 
       // Beklenen toplam gelir
       this.expectedTotalIncome =
-        investment.property.rentOffered *
+        (investment.offerTerms?.desiredMonthlyRent ||
+          investment.property.rentOffered) *
         investment.property.contractPeriodMonths;
+    }
+
+    if (
+      investment.localRepresentative &&
+      typeof investment.localRepresentative === "object"
+    ) {
+      this.localRepresentative = {
+        id: investment.localRepresentative._id,
+        fullName: investment.localRepresentative.fullName,
+        region: investment.localRepresentative.region || null,
+        regions: getRepresentativeRegions(investment.localRepresentative),
+      };
+    }
+
+    if (
+      investment.representativeRequestedBy ||
+      investment.representativeRequestStatus === "pending"
+    ) {
+      this.representativeRequest = {
+        requestedBy:
+          investment.representativeRequestedBy?._id ||
+          investment.representativeRequestedBy ||
+          null,
+        requestedByRole: investment.representativeRequestedByRole || null,
+        requestDate: investment.representativeRequestDate || null,
+        region: investment.representativeRequestedRegion || null,
+        status: investment.representativeRequestStatus || "none",
+        isPending:
+          investment.representativeRequestStatus === "pending" &&
+          !investment.localRepresentative,
+      };
     }
 
     // Kira ödeme özeti
@@ -83,6 +129,7 @@ class InvestmentListDto {
       active: { text: "Active", color: "green" },
       completed: { text: "Completed", color: "gray" },
       defaulted: { text: "Defaulted", color: "red" },
+      rejected: { text: "Rejected", color: "red" },
     };
 
     return statusMap[status] || { text: status, color: "gray" };

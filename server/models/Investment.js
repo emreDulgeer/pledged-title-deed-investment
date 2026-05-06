@@ -1,6 +1,9 @@
 // server/models/Investment.js
 
 const mongoose = require("mongoose");
+const {
+  SUPPORTED_PROPERTY_COUNTRY_NAMES,
+} = require("../utils/propertyCountries");
 
 const InvestmentSchema = new mongoose.Schema(
   {
@@ -30,12 +33,30 @@ const InvestmentSchema = new mongoose.Schema(
       default: null,
     },
     representativeRequestDate: Date,
+    representativeRequestedByRole: {
+      type: String,
+      enum: ["investor", "property_owner"],
+      default: null,
+    },
+    representativeRequestedRegion: {
+      type: String,
+      enum: SUPPORTED_PROPERTY_COUNTRY_NAMES,
+      default: null,
+    },
+    representativeRequestStatus: {
+      type: String,
+      enum: ["none", "pending", "fulfilled", "cancelled"],
+      default: "none",
+    },
+    representativeRequestClaimedAt: Date,
+    representativeRequestResolvedAt: Date,
     amountInvested: Number,
     currency: { type: String, default: "EUR" },
     status: {
       type: String,
       enum: [
         "offer_sent",
+        "rejected",
         "contract_signed",
         "title_deed_pending",
         "active",
@@ -44,6 +65,23 @@ const InvestmentSchema = new mongoose.Schema(
         "defaulted",
       ],
       default: "offer_sent",
+    },
+
+    offerTerms: {
+      ownershipPercent: Number,
+      desiredMonthlyRent: Number,
+      annualYieldPercent: Number,
+      message: String,
+    },
+
+    offerDecision: {
+      acceptedAt: Date,
+      rejectedAt: Date,
+      rejectionReason: String,
+      decidedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
     },
 
     // File references - FileMetadata ile ilişkili
@@ -60,6 +98,34 @@ const InvestmentSchema = new mongoose.Schema(
       },
     },
 
+    contractWorkflow: {
+      investorSigned: {
+        fileId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "FileMetadata",
+        },
+        url: String,
+        uploadedAt: Date,
+        uploadedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+      },
+      ownerSigned: {
+        fileId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "FileMetadata",
+        },
+        url: String,
+        uploadedAt: Date,
+        uploadedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+      },
+      fullySignedAt: Date,
+    },
+
     paymentReceipt: {
       fileId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -71,6 +137,54 @@ const InvestmentSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
+    },
+
+    principalPayment: {
+      status: {
+        type: String,
+        enum: [
+          "not_started",
+          "instructions_ready",
+          "receipt_uploaded",
+          "confirmed",
+          "failed",
+          "cancelled",
+        ],
+        default: "not_started",
+      },
+      providerKey: String,
+      providerLabel: String,
+      method: String,
+      amount: Number,
+      currency: String,
+      referenceCode: String,
+      externalPaymentId: String,
+      instructions: {
+        summary: String,
+        recipientName: String,
+        bankName: String,
+        iban: String,
+        swiftCode: String,
+        accountNumber: String,
+        transferNote: String,
+        steps: [String],
+      },
+      initiatedAt: Date,
+      initiatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      receiptUploadedAt: Date,
+      receiptUploadedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      confirmedAt: Date,
+      confirmedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      lastError: String,
     },
 
     titleDeedDocument: {
@@ -175,5 +289,10 @@ InvestmentSchema.index({ property: 1, status: 1 });
 InvestmentSchema.index({ investor: 1, status: 1 });
 InvestmentSchema.index({ propertyOwner: 1, status: 1 });
 InvestmentSchema.index({ status: 1, createdAt: -1 });
+InvestmentSchema.index({
+  representativeRequestStatus: 1,
+  representativeRequestedRegion: 1,
+  localRepresentative: 1,
+});
 
 module.exports = mongoose.model("Investment", InvestmentSchema);

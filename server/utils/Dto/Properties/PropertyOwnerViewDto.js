@@ -4,12 +4,15 @@ class PropertyOwnerViewDto extends PropertyDto {
   constructor(property) {
     super(property);
     this.documents = property.documents;
+    this.viewCount = property.viewCount || 0;
+    this.favoriteCount = property.favoriteCount || 0;
+    this.investmentOfferCount = property.investmentOfferCount || 0;
 
     // Owner için detaylı istatistikler
     this.statistics = {
-      viewCount: property.viewCount || 0,
-      favoriteCount: property.favoriteCount || 0,
-      investmentOfferCount: property.investmentOfferCount || 0,
+      viewCount: this.viewCount,
+      favoriteCount: this.favoriteCount,
+      investmentOfferCount: this.investmentOfferCount,
       // Günlük ortalama görüntülenme
       viewsPerDay: property.viewCount
         ? (

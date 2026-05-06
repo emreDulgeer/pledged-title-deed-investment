@@ -1,10 +1,15 @@
 // server/utils/dto/Investments/InvestmentDetailDto.js
 
 const InvestmentDto = require("./InvestmentDto");
+const {
+  getRepresentativeRegions,
+} = require("../../representativeRegions");
 
 class InvestmentDetailDto extends InvestmentDto {
   constructor(investment) {
     super(investment);
+    const agreedMonthlyRent =
+      investment.offerTerms?.desiredMonthlyRent || investment.property?.rentOffered || 0;
 
     // Detaylı property bilgileri
     if (investment.property && typeof investment.property === "object") {
@@ -13,6 +18,8 @@ class InvestmentDetailDto extends InvestmentDto {
         country: investment.property.country,
         city: investment.property.city,
         fullAddress: investment.property.fullAddress,
+        mapSearchAddress: investment.property.mapSearchAddress,
+        locationPin: investment.property.locationPin,
         description: investment.property.description,
         propertyType: investment.property.propertyType,
         size: investment.property.size,
@@ -24,6 +31,7 @@ class InvestmentDetailDto extends InvestmentDto {
         contractPeriodMonths: investment.property.contractPeriodMonths,
         images: investment.property.images,
         documents: investment.property.documents,
+        status: investment.property.status,
         trustScore: investment.property.trustScore,
       };
 
@@ -37,6 +45,10 @@ class InvestmentDetailDto extends InvestmentDto {
         email: investment.propertyOwner.email,
         phoneNumber: investment.propertyOwner.phoneNumber,
         country: investment.propertyOwner.country,
+        totalProperties: investment.propertyOwner.totalProperties ?? null,
+        completedContracts: investment.propertyOwner.completedContracts ?? null,
+        ongoingContracts: investment.propertyOwner.ongoingContracts ?? null,
+        verificationStatus: investment.propertyOwner.kycStatus ?? null,
         trustScore:
           investment.propertyOwner.ownerTrustScore ??
           investment.propertyOwner.trustScore ??
@@ -48,6 +60,12 @@ class InvestmentDetailDto extends InvestmentDto {
           id: investment.propertyOwner._id,
           fullName: investment.propertyOwner.fullName,
           email: investment.propertyOwner.email,
+          phone: investment.propertyOwner.phoneNumber,
+          country: investment.propertyOwner.country,
+          totalProperties: investment.propertyOwner.totalProperties ?? null,
+          completedContracts: investment.propertyOwner.completedContracts ?? null,
+          ongoingContracts: investment.propertyOwner.ongoingContracts ?? null,
+          verificationStatus: investment.propertyOwner.kycStatus ?? null,
           trustScore:
             investment.propertyOwner.ownerTrustScore ??
             investment.propertyOwner.trustScore ??
@@ -80,14 +98,22 @@ class InvestmentDetailDto extends InvestmentDto {
         email: investment.localRepresentative.email,
         phone: investment.localRepresentative.phoneNumber,
         region: investment.localRepresentative.region,
+        regions: getRepresentativeRegions(investment.localRepresentative),
       };
     }
 
     // Representative request bilgisi
     if (investment.representativeRequestedBy) {
       this.representativeRequest = {
-        requestedBy: investment.representativeRequestedBy,
+        requestedBy:
+          investment.representativeRequestedBy._id ||
+          investment.representativeRequestedBy,
+        requestedByRole: investment.representativeRequestedByRole || null,
         requestDate: investment.representativeRequestDate,
+        region: investment.representativeRequestedRegion || null,
+        status: investment.representativeRequestStatus || "none",
+        claimedAt: investment.representativeRequestClaimedAt || null,
+        resolvedAt: investment.representativeRequestResolvedAt || null,
         isPending: !investment.localRepresentative,
       };
     }
@@ -96,7 +122,7 @@ class InvestmentDetailDto extends InvestmentDto {
     if (investment.property && typeof investment.property === "object") {
       this.calculations = {
         totalExpectedIncome:
-          investment.property.rentOffered *
+          agreedMonthlyRent *
           investment.property.contractPeriodMonths,
         totalPaidAmount: investment.rentalPayments
           .filter((p) => p.status === "paid")
@@ -120,25 +146,45 @@ class InvestmentDetailDto extends InvestmentDto {
         completed: true,
         date: investment.createdAt,
       },
-      contractSigned: {
-        completed: [
-          "contract_signed",
-          "title_deed_pending",
-          "active",
-          "completed",
-          "refunded",
-        ].includes(investment.status),
-        date: investment.contractFile ? investment.updatedAt : null,
+      contractSigning: {
+        completed: !!investment.contractWorkflow?.fullySignedAt,
+        active:
+          investment.status === "contract_signed" &&
+          !investment.contractWorkflow?.fullySignedAt,
+        date: investment.contractWorkflow?.fullySignedAt || null,
       },
-      titleDeedRegistered: {
+      principalPayment: {
+        completed:
+          investment.principalPayment?.status === "confirmed" ||
+          ["title_deed_pending", "active", "completed", "refunded"].includes(
+            investment.status,
+          ),
+        active:
+          investment.status === "contract_signed" &&
+          !!investment.contractWorkflow?.fullySignedAt &&
+          investment.principalPayment?.status !== "confirmed",
+        date:
+          investment.principalPayment?.confirmedAt ||
+          investment.principalPayment?.receiptUploadedAt ||
+          investment.principalPayment?.initiatedAt ||
+          null,
+      },
+      titleDeedRegistration: {
         completed: ["active", "completed", "refunded"].includes(
           investment.status
         ),
-        date: investment.titleDeedDocument ? investment.updatedAt : null,
+        active: investment.status === "title_deed_pending",
+        date:
+          investment.titleDeedDocument?.verifiedAt ||
+          investment.titleDeedDocument?.uploadedAt ||
+          null,
       },
       rentalPeriod: {
         active: investment.status === "active",
-        startDate: investment.titleDeedDocument ? investment.updatedAt : null,
+        startDate:
+          investment.titleDeedDocument?.verifiedAt ||
+          investment.titleDeedDocument?.uploadedAt ||
+          null,
       },
       completion: {
         completed: ["completed", "refunded"].includes(investment.status),
@@ -152,6 +198,8 @@ class InvestmentDetailDto extends InvestmentDto {
           : null,
       },
     };
+
+    this.nextRequiredAction = this.getNextRequiredAction(investment);
   }
 
   calculatePaymentProgress(rentalPayments) {
@@ -165,6 +213,51 @@ class InvestmentDetailDto extends InvestmentDto {
     const date = new Date(startDate);
     date.setMonth(date.getMonth() + contractMonths);
     return date.toISOString();
+  }
+
+  getNextRequiredAction(investment) {
+    if (investment.status === "offer_sent") {
+      return {
+        actor: "property_owner",
+        key: "review_offer",
+      };
+    }
+
+    if (investment.status === "rejected") {
+      return null;
+    }
+
+    if (investment.status === "contract_signed") {
+      if (!investment.contractWorkflow?.investorSigned?.fileId) {
+        return { actor: "investor", key: "upload_contract" };
+      }
+
+      if (!investment.contractWorkflow?.ownerSigned?.fileId) {
+        return { actor: "property_owner", key: "upload_contract" };
+      }
+
+      if (investment.principalPayment?.status === "receipt_uploaded") {
+        return { actor: "property_owner", key: "confirm_payment" };
+      }
+
+      if (investment.principalPayment?.status !== "confirmed") {
+        return { actor: "investor", key: "prepare_payment" };
+      }
+
+      if (!investment.titleDeedDocument?.fileId) {
+        return { actor: "property_owner", key: "upload_title_deed" };
+      }
+    }
+
+    if (investment.status === "title_deed_pending") {
+      return { actor: "admin", key: "approve_title_deed" };
+    }
+
+    if (investment.status === "active") {
+      return { actor: "property_owner", key: "manage_rental_period" };
+    }
+
+    return null;
   }
 }
 

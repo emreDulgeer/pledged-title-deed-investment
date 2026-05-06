@@ -8,6 +8,49 @@ import { showAlert } from "../../store/slices/uiSlice";
 import { useTheme } from "../../utils/hooks/useTheme";
 import { defaultPathByRole } from "../../utils/roleRedirect";
 
+const demoCredentialGroups = [
+  {
+    title: "Admin",
+    accentClass: "text-day-primary dark:text-night-primary",
+    accounts: [
+      { label: "Platform Super Admin", email: "admin@admin.com", password: "Admin123!@#" },
+    ],
+  },
+  {
+    title: "Investors",
+    accentClass: "text-blue-600 dark:text-blue-400",
+    accounts: [
+      { label: "Emre Yilmaz", email: "emre@investor.com", password: "Test123!@#" },
+      { label: "Lara Costa", email: "lara@investor.com", password: "Lara123!@#" },
+      { label: "Selin Arslan", email: "selin@investor.com", password: "Selin123!@#" },
+    ],
+  },
+  {
+    title: "Property Owners",
+    accentClass: "text-green-600 dark:text-green-400",
+    accounts: [
+      { label: "Ayse Demir", email: "ayse@owner.com", password: "Owner123!@#" },
+      { label: "Mehmet Kaya", email: "mehmet@owner.com", password: "Mehmet123!@#" },
+    ],
+  },
+  {
+    title: "Local Representatives",
+    accentClass: "text-orange-600 dark:text-orange-400",
+    accounts: [
+      { label: "Portugal - Joao Silva", email: "joao@rep.com", password: "Rep123!@#" },
+      { label: "Portugal & Spain - Ines Duarte", email: "ines@rep.com", password: "Rep123!@#" },
+      { label: "Spain - Carlos Mendez", email: "carlos@rep.com", password: "Rep123!@#" },
+      { label: "Latvia - Maris Ozols", email: "maris@rep.com", password: "Rep123!@#" },
+      { label: "Estonia - Kristjan Saar", email: "kristjan@rep.com", password: "Rep123!@#" },
+      { label: "Malta - John Pereira", email: "john@rep.com", password: "Rep123!@#" },
+      { label: "Malta & Montenegro - Luca Novak", email: "luca@rep.com", password: "Rep123!@#" },
+      { label: "Montenegro - Mila Petrovic", email: "mila@rep.com", password: "Rep123!@#" },
+      { label: "Georgia - Nino Beridze", email: "nino@rep.com", password: "Rep123!@#" },
+      { label: "Georgia - Giorgi Lomidze", email: "giorgi@rep.com", password: "Rep123!@#" },
+    ],
+  },
+];
+
 const LoginPage = () => {
   const { t } = useTranslation();
   const dispatch = useDispatch();
@@ -318,38 +361,27 @@ const LoginPage = () => {
             🔐 Demo Credentials
           </p>
 
-          <div className="space-y-3 text-sm text-day-text dark:text-night-text">
-            <div className="p-2 bg-white/50 dark:bg-gray-800/50 rounded">
-              <p className="font-semibold text-purple-600 dark:text-purple-400">
-                👨‍💼 Admin
-              </p>
-              <p className="font-mono text-xs">admin@admin.com</p>
-              <p className="font-mono text-xs">Admin123!@#</p>
-            </div>
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-1 text-sm text-day-text dark:text-night-text">
+            {demoCredentialGroups.map((group) => (
+              <div
+                key={group.title}
+                className="p-2 bg-white/50 dark:bg-gray-800/50 rounded"
+              >
+                <p className={`font-semibold mb-2 ${group.accentClass}`}>
+                  {group.title}
+                </p>
 
-            <div className="p-2 bg-white/50 dark:bg-gray-800/50 rounded">
-              <p className="font-semibold text-blue-600 dark:text-blue-400">
-                💼 Investor
-              </p>
-              <p className="font-mono text-xs">emre@investor.com</p>
-              <p className="font-mono text-xs">Test123!@#</p>
-            </div>
-
-            <div className="p-2 bg-white/50 dark:bg-gray-800/50 rounded">
-              <p className="font-semibold text-green-600 dark:text-green-400">
-                🏠 Property Owner
-              </p>
-              <p className="font-mono text-xs">ayse@owner.com</p>
-              <p className="font-mono text-xs">Owner123!@#</p>
-            </div>
-
-            <div className="p-2 bg-white/50 dark:bg-gray-800/50 rounded">
-              <p className="font-semibold text-orange-600 dark:text-orange-400">
-                🌍 Local Representative
-              </p>
-              <p className="font-mono text-xs">john@rep.com</p>
-              <p className="font-mono text-xs">Rep123!@#</p>
-            </div>
+                <div className="space-y-2">
+                  {group.accounts.map((account) => (
+                    <div key={account.email}>
+                      <p className="text-xs font-medium opacity-80">{account.label}</p>
+                      <p className="font-mono text-xs">{account.email}</p>
+                      <p className="font-mono text-xs">{account.password}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
 
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 italic">

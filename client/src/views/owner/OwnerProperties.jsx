@@ -48,6 +48,16 @@ const INVESTMENT_STATUS_COLORS = {
 const fmt = (num, currency = "") =>
   `${(num ?? 0).toLocaleString("en-US")}${currency ? " " + currency : ""}`;
 
+const getPropertyOfferCount = (property) =>
+  Number(
+    property?.investmentOfferCount ??
+      property?.statistics?.investmentOfferCount ??
+      0,
+  );
+
+const getPropertyViewCount = (property) =>
+  Number(property?.viewCount ?? property?.statistics?.viewCount ?? 0);
+
 const formatDate = (str) =>
   str
     ? new Date(str).toLocaleDateString("en-US", {
@@ -235,6 +245,8 @@ const FilterBar = ({
 const PropertyCard = ({ property, onNavigate, showMyBadge = false }) => {
   const thumbnail = getPrimaryPropertyImage(property);
   const thumbnailUrl = getPropertyImageUrl(thumbnail);
+  const offerCount = getPropertyOfferCount(property);
+  const viewCount = getPropertyViewCount(property);
 
   return (
     <div
@@ -307,14 +319,14 @@ const PropertyCard = ({ property, onNavigate, showMyBadge = false }) => {
         {showMyBadge && (
           <div className="flex items-center gap-2 pt-2 border-t border-day-border dark:border-night-border">
             <span
-              className={`text-xs px-2 py-0.5 rounded-full font-medium ${property.investmentOfferCount > 0 ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"}`}
+              className={`text-xs px-2 py-0.5 rounded-full font-medium ${offerCount > 0 ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"}`}
             >
-              {property.investmentOfferCount || 0} offer
-              {property.investmentOfferCount !== 1 ? "s" : ""}
+              {offerCount} offer
+              {offerCount !== 1 ? "s" : ""}
             </span>
-            {property.viewCount > 0 && (
+            {viewCount > 0 && (
               <span className="text-xs text-day-text/50 dark:text-night-text/50">
-                👁 {property.viewCount}
+                👁 {viewCount}
               </span>
             )}
           </div>
@@ -510,7 +522,7 @@ export const OffersTab = () => {
 
   // Expanded propertyId → investment listesi
   const [expandedId, setExpandedId] = useState(null);
-  const [offersMap, setOffersMap] = useState({}); // { [propertyId]: { loading, data } }
+  const [offersMap, setOffersMap] = useState({}); // { [propertyId]: { loading, data, error } }
 
   // Kabul / ret state
   const [actionLoading, setActionLoading] = useState(null); // investmentId
@@ -530,8 +542,8 @@ export const OffersTab = () => {
         // Sadece offer'ı olan ya da henüz tamamlanmamış yatırım sürecindekiler
         const withOffers = (res.data ?? []).filter(
           (p) =>
-            p.investmentOfferCount > 0 ||
-            ["in_contract", "active"].includes(p.status),
+            getPropertyOfferCount(p) > 0 ||
+            ["in_contract", "active", "completed"].includes(p.status),
         );
         setProperties(withOffers);
         if (res.pagination) setPagination(res.pagination);
@@ -563,21 +575,31 @@ export const OffersTab = () => {
 
     setOffersMap((prev) => ({
       ...prev,
-      [propertyId]: { loading: true, data: [] },
+      [propertyId]: { loading: true, data: [], error: "" },
     }));
     try {
       const res = await bridge.investments.getPropertyInvestments(propertyId, {
-        status: "offer_sent,contract_signed,title_deed_pending",
+        status: "offer_sent,contract_signed,title_deed_pending,active,completed,refunded",
+        sortBy: "createdAt",
+        sortOrder: "desc",
       });
       setOffersMap((prev) => ({
         ...prev,
-        [propertyId]: { loading: false, data: res?.data ?? [] },
+        [propertyId]: {
+          loading: false,
+          data: Array.isArray(res?.data) ? res.data : [],
+          error: "",
+        },
       }));
     } catch (e) {
       console.error("Offers load error:", e);
       setOffersMap((prev) => ({
         ...prev,
-        [propertyId]: { loading: false, data: [] },
+        [propertyId]: {
+          loading: false,
+          data: [],
+          error: e?.message || "Offers could not be loaded.",
+        },
       }));
     }
   };
@@ -691,6 +713,7 @@ export const OffersTab = () => {
             const pid = p.id || p._id;
             const isExpanded = expandedId === pid;
             const offerState = offersMap[pid];
+            const offerCount = getPropertyOfferCount(p);
             const thumbnail = getPrimaryPropertyImage(p);
             const thumbnailUrl = getPropertyImageUrl(thumbnail);
 
@@ -725,8 +748,8 @@ export const OffersTab = () => {
                       </h3>
                       <StatusBadge status={p.status} />
                       <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-                        {p.investmentOfferCount || 0} offer
-                        {p.investmentOfferCount !== 1 ? "s" : ""}
+                        {offerCount} offer
+                        {offerCount !== 1 ? "s" : ""}
                       </span>
                     </div>
                     <p className="text-sm text-day-text/60 dark:text-night-text/60">
@@ -759,6 +782,10 @@ export const OffersTab = () => {
                       <div className="p-6 text-center text-sm text-day-text/60 dark:text-night-text/60 animate-pulse">
                         Loading offers…
                       </div>
+                    ) : offerState?.error ? (
+                      <div className="p-6 text-center text-sm text-red-600 dark:text-red-400">
+                        {offerState.error}
+                      </div>
                     ) : !offerState || offerState.data.length === 0 ? (
                       <div className="p-6 text-center text-sm text-day-text/60 dark:text-night-text/60">
                         No active offers for this property.
@@ -789,6 +816,27 @@ export const OffersTab = () => {
                                   {APP_CURRENCY} ·{" "}
                                   {formatDate(inv.createdAt)}
                                 </p>
+                                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                                  <span className="rounded-full bg-day-surface dark:bg-night-surface px-2 py-1 text-day-text/70 dark:text-night-text/70">
+                                    {inv.offerTerms?.ownershipPercent
+                                      ? `${inv.offerTerms.ownershipPercent}% share`
+                                      : "Share n/a"}
+                                  </span>
+                                  <span className="rounded-full bg-day-surface dark:bg-night-surface px-2 py-1 text-day-text/70 dark:text-night-text/70">
+                                    {fmt(inv.offerTerms?.desiredMonthlyRent)}{" "}
+                                    {APP_CURRENCY} rent
+                                  </span>
+                                  <span className="rounded-full bg-day-surface dark:bg-night-surface px-2 py-1 text-day-text/70 dark:text-night-text/70">
+                                    {inv.offerTerms?.annualYieldPercent
+                                      ? `${inv.offerTerms.annualYieldPercent}% yield`
+                                      : "Yield n/a"}
+                                  </span>
+                                </div>
+                                {inv.offerTerms?.message && (
+                                  <p className="mt-2 text-xs text-day-text/60 dark:text-night-text/60 max-w-2xl">
+                                    {inv.offerTerms.message}
+                                  </p>
+                                )}
                               </div>
 
                               {/* Aksiyon */}

@@ -16,6 +16,11 @@ const validator = require("validator");
 const speakeasy = require("speakeasy");
 const QRCode = require("qrcode");
 const notificationService = require("../services/notificationService");
+const {
+  getPrimaryRepresentativeRegion,
+  getRepresentativeRegions,
+  normalizeRepresentativeRegions,
+} = require("../utils/representativeRegions");
 class AuthController {
   constructor() {
     this.authService = require("../services/authService");
@@ -31,6 +36,16 @@ class AuthController {
     }
 
     return codes;
+  };
+
+  normalizeRepresentativeRegionsOrThrow = (value) => {
+    const regions = normalizeRepresentativeRegions(value);
+
+    if (!regions.length) {
+      throw new Error("At least one supported region is required");
+    }
+
+    return regions;
   };
   /**
    * REGISTER - Kayıt işlemi (üyelik tipi aktifleştirme ayrı)
@@ -70,6 +85,13 @@ class AuthController {
         return responseWrapper.badRequest(
           res,
           "Kullanım koşulları ve KVKK/GDPR onayı zorunludur"
+        );
+      }
+
+      if (role === "local_representative") {
+        return responseWrapper.forbidden(
+          res,
+          "Local representative accounts are created by admin only",
         );
       }
 
@@ -121,11 +143,6 @@ class AuthController {
       } else if (role === "investor") {
         userData.investmentLimit = 1;
         userData.referralCode = this.generateReferralCode();
-      } else if (role === "local_representative") {
-        userData.region = req.body.region;
-        if (!userData.region) {
-          return responseWrapper.badRequest(res, "Bölge bilgisi zorunludur");
-        }
       }
 
       const user = new UserModel(userData);
@@ -2317,10 +2334,12 @@ class AuthController {
       case "local_representative":
         const LocalRepresentative = require("../models/LocalRepresentative");
         const rep = await LocalRepresentative.findById(user._id);
+        const representativeRegions = getRepresentativeRegions(rep);
         return {
           ...baseDetails,
-          region: rep.region,
-          commissionEarned: rep.commissionEarned.total,
+          region: getPrimaryRepresentativeRegion(rep),
+          regions: representativeRegions,
+          commissionEarned: rep?.commissionEarned?.total || 0,
         };
 
       case "admin":
@@ -2702,6 +2721,258 @@ class AuthController {
   };
 
   /**
+   * Get all local representatives (Admin)
+   */
+  getLocalRepresentatives = async (req, res) => {
+    try {
+      const LocalRepresentative = require("../models/LocalRepresentative");
+      const { search = "", region = "", status = "" } = req.query;
+      const filter = { role: "local_representative" };
+
+      if (status) {
+        filter.accountStatus = status;
+      }
+
+      if (region) {
+        const normalizedRegion = this.normalizeRepresentativeRegionsOrThrow(
+          region,
+        )[0];
+        filter.regions = normalizedRegion;
+      }
+
+      if (search) {
+        filter.$or = [
+          { fullName: { $regex: search, $options: "i" } },
+          { email: { $regex: search, $options: "i" } },
+          { regions: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      const representatives = await LocalRepresentative.find(filter)
+        .select("-password")
+        .sort({ createdAt: -1 });
+
+      return responseWrapper.success(
+        res,
+        representatives.map((representative) => ({
+          ...representative.toObject(),
+          region: getPrimaryRepresentativeRegion(representative),
+          regions: getRepresentativeRegions(representative),
+        })),
+      );
+    } catch (error) {
+      console.error("Get local representatives error:", error);
+      return responseWrapper.error(
+        res,
+        error.message || "Local representatives could not be fetched",
+      );
+    }
+  };
+
+  /**
+   * Get local representative by id (Admin)
+   */
+  getLocalRepresentativeById = async (req, res) => {
+    try {
+      const LocalRepresentative = require("../models/LocalRepresentative");
+      const representative = await LocalRepresentative.findById(
+        req.params.userId,
+      ).select("-password");
+
+      if (!representative) {
+        return responseWrapper.notFound(
+          res,
+          "Local representative not found",
+        );
+      }
+
+      return responseWrapper.success(res, {
+        ...representative.toObject(),
+        region: getPrimaryRepresentativeRegion(representative),
+        regions: getRepresentativeRegions(representative),
+      });
+    } catch (error) {
+      console.error("Get local representative by id error:", error);
+      return responseWrapper.error(
+        res,
+        error.message || "Local representative could not be fetched",
+      );
+    }
+  };
+
+  /**
+   * Create local representative (Admin)
+   */
+  createLocalRepresentative = async (req, res) => {
+    try {
+      const { email, password, fullName, phoneNumber, country, regions } =
+        req.body;
+
+      if (!email || !password || !fullName) {
+        return responseWrapper.badRequest(res, "Required fields are missing");
+      }
+
+      if (!validator.isEmail(email)) {
+        return responseWrapper.badRequest(res, "Invalid email format");
+      }
+
+      const passwordStrength = this.checkPasswordStrength(password);
+      if (!passwordStrength.isValid) {
+        return responseWrapper.badRequest(res, passwordStrength.message);
+      }
+
+      const normalizedRegions = this.normalizeRepresentativeRegionsOrThrow(
+        regions,
+      );
+      const primaryRegion = normalizedRegions[0];
+
+      const existingUser = await User.findOne({ email: email.toLowerCase() });
+      if (existingUser) {
+        return responseWrapper.conflict(
+          res,
+          "This email address is already in use",
+        );
+      }
+
+      const LocalRepresentative = require("../models/LocalRepresentative");
+      const hashedPassword = await bcrypt.hash(password, 12);
+      const representative = await LocalRepresentative.create({
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        fullName,
+        phoneNumber,
+        country: country || primaryRegion,
+        role: "local_representative",
+        region: primaryRegion,
+        regions: normalizedRegions,
+        membershipPlan: "Enterprise",
+        membershipStatus: "active",
+        membershipActivatedAt: new Date(),
+        membershipExpiresAt: new Date(
+          Date.now() + 365 * 24 * 60 * 60 * 1000,
+        ),
+        kycStatus: "Approved",
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        phoneVerified: false,
+        phoneVerifiedAt: null,
+        consents: {
+          terms: true,
+          gdpr: true,
+          marketing: false,
+          timestamp: new Date(),
+        },
+        accountStatus: "active",
+        registrationIP: req.ip,
+        passwordChangedAt: new Date(),
+      });
+
+      try {
+        await emailService.sendRepresentativeActivatedEmail(
+          representative.email,
+          {
+            fullName: representative.fullName,
+            region: primaryRegion,
+          },
+        );
+      } catch (emailError) {
+        console.warn(
+          "Representative activation email skipped:",
+          emailError.message,
+        );
+      }
+
+      await ActivityLog.create({
+        user: representative._id,
+        action: "local_representative_created",
+        details: {
+          createdBy: req.user.id,
+          regions: normalizedRegions,
+        },
+        ip: req.ip,
+        performedBy: req.user.id,
+        isAdminAction: true,
+      });
+
+      return responseWrapper.created(
+        res,
+        {
+          ...representative.toObject(),
+          password: undefined,
+          region: primaryRegion,
+          regions: normalizedRegions,
+        },
+        "Local representative created successfully",
+      );
+    } catch (error) {
+      console.error("Create local representative error:", error);
+      return responseWrapper.error(
+        res,
+        error.message || "Local representative could not be created",
+      );
+    }
+  };
+
+  /**
+   * Update local representative regions (Admin)
+   */
+  updateLocalRepresentativeRegions = async (req, res) => {
+    try {
+      const LocalRepresentative = require("../models/LocalRepresentative");
+      const representative = await LocalRepresentative.findById(
+        req.params.userId,
+      );
+
+      if (!representative) {
+        return responseWrapper.notFound(
+          res,
+          "Local representative not found",
+        );
+      }
+
+      const normalizedRegions = this.normalizeRepresentativeRegionsOrThrow(
+        req.body.regions,
+      );
+      representative.regions = normalizedRegions;
+      representative.region = normalizedRegions[0];
+
+      if (!representative.country) {
+        representative.country = representative.region;
+      }
+
+      await representative.save();
+
+      await ActivityLog.create({
+        user: representative._id,
+        action: "local_representative_regions_updated",
+        details: {
+          updatedBy: req.user.id,
+          regions: normalizedRegions,
+        },
+        ip: req.ip,
+        performedBy: req.user.id,
+        isAdminAction: true,
+      });
+
+      return responseWrapper.success(
+        res,
+        {
+          ...representative.toObject(),
+          region: representative.region,
+          regions: normalizedRegions,
+        },
+        "Representative regions updated successfully",
+      );
+    } catch (error) {
+      console.error("Update local representative regions error:", error);
+      return responseWrapper.error(
+        res,
+        error.message || "Representative regions could not be updated",
+      );
+    }
+  };
+
+  /**
    * Get user by ID (Admin)
    */
   getUserById = async (req, res) => {
@@ -2810,10 +3081,84 @@ class AuthController {
    * Activate local representative (Admin)
    */
   activateLocalRepresentative = async (req, res) => {
-    return responseWrapper.notImplemented(
-      res,
-      "Temsilci aktivasyonu henüz aktif değil"
-    );
+    try {
+      const { userId } = req.params;
+      const user = await User.findById(userId);
+
+      if (!user) {
+        return responseWrapper.notFound(res, "Kullanıcı bulunamadı");
+      }
+
+      if (user.role !== "local_representative") {
+        return responseWrapper.badRequest(
+          res,
+          "Bu kullanıcı bir temsilci değil",
+        );
+      }
+
+      user.accountStatus = "active";
+      user.membershipStatus = "active";
+      user.membershipPlan = "Enterprise";
+      user.membershipActivatedAt = new Date();
+      user.membershipExpiresAt = new Date(
+        Date.now() + 365 * 24 * 60 * 60 * 1000,
+      );
+      user.emailVerified = true;
+      user.emailVerifiedAt = user.emailVerifiedAt || new Date();
+      user.kycStatus = "Approved";
+
+      await user.save();
+
+      const primaryRegion =
+        getPrimaryRepresentativeRegion(user) || user.region || "Assigned region";
+
+      try {
+        await emailService.sendRepresentativeActivatedEmail(user.email, {
+          fullName: user.fullName,
+          region: primaryRegion,
+        });
+      } catch (emailError) {
+        console.warn(
+          "Representative activation email skipped:",
+          emailError.message,
+        );
+      }
+
+      await ActivityLog.create({
+        user: userId,
+        action: "account_activated",
+        details: {
+          activatedBy: req.user.id,
+          role: "local_representative",
+          region: primaryRegion,
+        },
+        ip: req.ip,
+        performedBy: req.user.id,
+        isAdminAction: true,
+      });
+
+      return responseWrapper.success(
+        res,
+        {
+          user: {
+            id: user._id,
+            fullName: user.fullName,
+            email: user.email,
+            role: user.role,
+            region: primaryRegion,
+            regions: getRepresentativeRegions(user),
+            accountStatus: user.accountStatus,
+          },
+        },
+        "Temsilci hesabı başarıyla aktifleştirildi",
+      );
+    } catch (error) {
+      console.error("Activate representative error:", error);
+      return responseWrapper.error(
+        res,
+        "Temsilci aktivasyonu sırasında hata oluştu",
+      );
+    }
   };
 
   /**

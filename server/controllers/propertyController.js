@@ -88,12 +88,13 @@ class PropertyController {
   getPropertyById = async (req, res) => {
     try {
       const userId = req.user?.id || null;
-      const isAdmin = req.user?.role === "admin";
+      const userRole = req.user?.role || null;
 
       const property = await this.propertyService.getPropertyById(
         req.params.id,
         userId,
-        isAdmin,
+        userRole,
+        req.user || null,
       );
 
       return responseWrapper.success(res, property, "Property details fetched");

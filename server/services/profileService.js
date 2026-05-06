@@ -3,6 +3,10 @@ const Property = require("../models/Property");
 const Investment = require("../models/Investment");
 const { getPrimaryPropertyImage } = require("../utils/propertyImages");
 const { APP_CURRENCY } = require("../utils/currency");
+const {
+  getPrimaryRepresentativeRegion,
+  getRepresentativeRegions,
+} = require("../utils/representativeRegions");
 
 class ProfileService {
   async getProfileById(userId, viewer = null) {
@@ -23,7 +27,14 @@ class ProfileService {
       fullName: user.fullName,
       role: user.role,
       country: user.country || null,
-      region: user.region || null,
+      region:
+        user.role === "local_representative"
+          ? getPrimaryRepresentativeRegion(user)
+          : user.region || null,
+      regions:
+        user.role === "local_representative"
+          ? getRepresentativeRegions(user)
+          : [],
       memberSince: user.createdAt || null,
       kycStatus: user.kycStatus || null,
       trustScore: this.resolveTrustScore(user),
@@ -83,7 +94,7 @@ class ProfileService {
         "propertyOwner",
         "fullName email phoneNumber country role ownerTrustScore trustScore",
       )
-      .populate("localRepresentative", "fullName email country region role")
+      .populate("localRepresentative", "fullName email country region regions role")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -168,7 +179,14 @@ class ProfileService {
       fullName: user.fullName || "User",
       role: user.role || null,
       country: user.country || null,
-      region: user.region || null,
+      region:
+        user.role === "local_representative"
+          ? getPrimaryRepresentativeRegion(user)
+          : user.region || null,
+      regions:
+        user.role === "local_representative"
+          ? getRepresentativeRegions(user)
+          : [],
       ...(includeEmail ? { email: user.email || null } : {}),
       ...(includePhone ? { phoneNumber: user.phoneNumber || null } : {}),
     };

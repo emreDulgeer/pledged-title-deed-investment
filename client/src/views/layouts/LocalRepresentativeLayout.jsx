@@ -1,68 +1,41 @@
-// src/views/layouts/InvestorLayout.jsx
 import React from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useTranslation } from "react-i18next";
 import { Outlet } from "react-router-dom";
 
 import LayoutShell from "../../components/Layouts/common/LayoutShell";
-import InvestorSidebar from "../../components/Layouts/Investor/Sidebar/InvestorSidebar";
-import InvestorTopbar from "../../components/Layouts/Investor/Topbar/InvestorTopbar";
-
+import RepresentativeSidebar from "../../components/Layouts/Representative/Sidebar/RepresentativeSidebar";
+import OwnerTopbar from "../../components/Layouts/Owner/Topbar/OwnerTopbar";
 import { selectUser, logout } from "../../store/slices/authSlice";
 import { toggleSidebar, selectSidebarOpen } from "../../store/slices/uiSlice";
-
 import { useTheme } from "../../utils/hooks/useTheme";
 import { useLanguage } from "../../utils/hooks/useLanguage";
 
-const InvestorLayout = () => {
-  const { t } = useTranslation();
+const LocalRepresentativeLayout = () => {
   const dispatch = useDispatch();
-
   const user = useSelector(selectUser);
   const sidebarOpen = useSelector(selectSidebarOpen);
-
   const { theme, toggleTheme } = useTheme();
   const { currentLanguage, changeLanguage } = useLanguage();
 
   const menuItems = [
     {
-      title: t("navigation.dashboard"),
-      path: "/investor/dashboard",
+      title: "Dashboard",
+      path: "/rep/dashboard",
       icon: <IconHome />,
     },
     {
-      title: t("navigation.properties"),
-      path: "/investor/properties",
-      icon: <IconBldg />,
+      title: "Request Pool",
+      path: "/rep/request-pool",
+      icon: <IconInbox />,
     },
     {
-      title: "Offers",
-      path: "/investor/offers",
-      icon: <IconOffer />,
+      title: "My Cases",
+      path: "/rep/cases",
+      icon: <IconFolder />,
     },
     {
-      title: t("navigation.investments"),
-      path: "/investor/investments",
-      icon: <IconCoin />,
-    },
-    {
-      title: t("navigation.portfolio") || "Portfolio",
-      path: "/investor/portfolio",
-      icon: <IconChart />,
-    },
-    {
-      title: t("navigation.rental_payments") || "Rental Payments",
-      path: "/investor/rental-payments",
-      icon: <IconReceipt />,
-    },
-    {
-      title: t("navigation.notifications") || "Notifications",
-      path: "/investor/notifications",
-      icon: <IconBell />,
-    },
-    {
-      title: t("navigation.settings"),
-      path: "/investor/settings",
+      title: "Settings",
+      path: "/rep/settings",
       icon: <IconCog />,
     },
   ];
@@ -71,14 +44,14 @@ const InvestorLayout = () => {
     <LayoutShell
       sidebarOpen={sidebarOpen}
       sidebar={
-        <InvestorSidebar
+        <RepresentativeSidebar
           menuItems={menuItems}
           user={user}
           onLogout={() => dispatch(logout())}
         />
       }
       topbar={
-        <InvestorTopbar
+        <OwnerTopbar
           onToggleSidebar={() => dispatch(toggleSidebar())}
           theme={theme}
           toggleTheme={toggleTheme}
@@ -110,7 +83,7 @@ const IconHome = () => (
   </svg>
 );
 
-const IconBldg = () => (
+const IconInbox = () => (
   <svg
     className="w-5 h-5"
     fill="none"
@@ -121,12 +94,12 @@ const IconBldg = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth={2}
-      d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+      d="M20 13V5a2 2 0 00-2-2H6a2 2 0 00-2 2v8m16 0l-2.586 2.586A2 2 0 0114.586 16H9.414a2 2 0 01-1.414-.586L5 13m15 0H5"
     />
   </svg>
 );
 
-const IconCoin = () => (
+const IconFolder = () => (
   <svg
     className="w-5 h-5"
     fill="none"
@@ -137,71 +110,7 @@ const IconCoin = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth={2}
-      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-    />
-  </svg>
-);
-
-const IconOffer = () => (
-  <svg
-    className="w-5 h-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M7 7h10M7 12h7m-7 5h10M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"
-    />
-  </svg>
-);
-
-const IconChart = () => (
-  <svg
-    className="w-5 h-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M11 3v18m4-14v14m4-10v10M5 13v8"
-    />
-  </svg>
-);
-
-const IconReceipt = () => (
-  <svg
-    className="w-5 h-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M9 14h6m-6-4h6M7 21l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1-2-1-2 1v18z"
-    />
-  </svg>
-);
-
-const IconBell = () => (
-  <svg
-    className="w-5 h-5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 01-6 0"
+      d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
     />
   </svg>
 );
@@ -228,4 +137,4 @@ const IconCog = () => (
   </svg>
 );
 
-export default InvestorLayout;
+export default LocalRepresentativeLayout;

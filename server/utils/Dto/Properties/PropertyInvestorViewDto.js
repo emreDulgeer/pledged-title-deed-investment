@@ -1,9 +1,18 @@
-const PropertyListDto = require("./PropertyListDto");
+const PropertyDetailDto = require("./PropertyDetailDto");
+const { getPrimaryPropertyImage } = require("../../propertyImages");
 
-class PropertyInvestorViewDto extends PropertyListDto {
+class PropertyInvestorViewDto extends PropertyDetailDto {
   constructor(property, investorId) {
-    // Temel property bilgilerini al
     super(property);
+
+    this.thumbnail = getPrimaryPropertyImage(property);
+
+    if (property.owner && typeof property.owner === "object") {
+      this.ownerName = property.owner.fullName;
+      this.ownerTrustScore =
+        property.owner.ownerTrustScore || property.owner.trustScore || 50;
+      this.ownerCompletedContracts = property.owner.completedContracts || 0;
+    }
 
     // Yatırımcıya özel bilgiler
     this.isFavorited =

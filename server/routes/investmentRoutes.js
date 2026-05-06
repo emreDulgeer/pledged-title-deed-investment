@@ -50,6 +50,20 @@ router.post(
   investmentController.rejectOffer
 );
 
+router.post(
+  "/:id/principal-payment/prepare",
+  auth,
+  authorize(["investor", "admin"]),
+  investmentController.preparePrincipalPayment
+);
+
+router.post(
+  "/:id/principal-payment/confirm",
+  auth,
+  authorize(["property_owner", "admin"]),
+  investmentController.confirmPrincipalPayment
+);
+
 // Kira ödemesi kaydet
 router.post(
   "/:id/payment",
@@ -138,6 +152,29 @@ router.delete(
   auth,
   authorize(["admin"]),
   investmentFileController.deleteInvestmentDocument
+);
+
+// ===== LOCAL REPRESENTATIVE ROUTES =====
+
+router.get(
+  "/representative/request-pool",
+  auth,
+  authorize(["local_representative"]),
+  investmentController.getRepresentativeRequestPool
+);
+
+router.get(
+  "/representative/my-assignments",
+  auth,
+  authorize(["local_representative"]),
+  investmentController.getRepresentativeAssignments
+);
+
+router.post(
+  "/:id/claim-representative-request",
+  auth,
+  authorize(["local_representative"]),
+  investmentController.claimRepresentativeRequest
 );
 
 // ===== SHARED ROUTES =====

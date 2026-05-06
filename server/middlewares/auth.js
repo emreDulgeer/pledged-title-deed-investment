@@ -7,6 +7,10 @@ const ActivityLog = require("../models/ActivityLog");
 const responseWrapper = require("../utils/responseWrapper");
 const crypto = require("crypto");
 const Token = require("../models/Token");
+const {
+  getPrimaryRepresentativeRegion,
+  getRepresentativeRegions,
+} = require("../utils/representativeRegions");
 const auth = async (req, res, next) => {
   try {
     const token = req.header("Authorization")?.replace("Bearer ", "");
@@ -167,7 +171,9 @@ const auth = async (req, res, next) => {
           "-password"
         );
         req.userDetails = rep;
-        req.user.assignedCountry = rep.assignedCountry;
+        req.user.region = getPrimaryRepresentativeRegion(rep);
+        req.user.regions = getRepresentativeRegions(rep);
+        req.user.assignedCountry = req.user.region;
         break;
 
       case "admin":

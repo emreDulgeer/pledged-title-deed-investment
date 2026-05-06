@@ -192,7 +192,7 @@ class InvestmentFileController {
       const investment = await Investment.findById(investmentId).populate(
         "property",
         "owner"
-      );
+      ).populate("localRepresentative", "_id");
 
       if (!investment) {
         return responseWrapper.notFound(res, "Investment not found");
@@ -201,11 +201,15 @@ class InvestmentFileController {
       // Yetki kontrolü
       const isOwner =
         investment.property.owner.toString() === userId.toString();
+      const isAssignedRepresentative =
+        String(
+          investment.localRepresentative?._id || investment.localRepresentative,
+        ) === String(userId);
 
       if (
         !isOwner &&
         userRole !== "admin" &&
-        userRole !== "local_representative"
+        !isAssignedRepresentative
       ) {
         return responseWrapper.forbidden(
           res,
@@ -631,7 +635,8 @@ class InvestmentFileController {
       // Investment kontrolü
       const investment = await Investment.findById(investmentId)
         .populate("investor", "_id")
-        .populate("property", "owner");
+        .populate("property", "owner")
+        .populate("localRepresentative", "_id");
 
       if (!investment) {
         return responseWrapper.notFound(res, "Investment not found");
@@ -642,12 +647,16 @@ class InvestmentFileController {
         investment.investor._id.toString() === userId.toString();
       const isOwner =
         investment.property.owner.toString() === userId.toString();
+      const isAssignedRepresentative =
+        String(
+          investment.localRepresentative?._id || investment.localRepresentative,
+        ) === String(userId);
 
       if (
         !isInvestor &&
         !isOwner &&
         userRole !== "admin" &&
-        userRole !== "local_representative"
+        !isAssignedRepresentative
       ) {
         return responseWrapper.forbidden(
           res,
@@ -805,7 +814,8 @@ class InvestmentFileController {
       // Investment kontrolü
       const investment = await Investment.findById(investmentId)
         .populate("investor", "_id")
-        .populate("property", "owner");
+        .populate("property", "owner")
+        .populate("localRepresentative", "_id");
 
       if (!investment) {
         return responseWrapper.notFound(res, "Investment not found");
@@ -816,12 +826,16 @@ class InvestmentFileController {
         investment.investor._id.toString() === userId.toString();
       const isOwner =
         investment.property.owner.toString() === userId.toString();
+      const isAssignedRepresentative =
+        String(
+          investment.localRepresentative?._id || investment.localRepresentative,
+        ) === String(userId);
 
       if (
         !isInvestor &&
         !isOwner &&
         userRole !== "admin" &&
-        userRole !== "local_representative"
+        !isAssignedRepresentative
       ) {
         return responseWrapper.forbidden(
           res,

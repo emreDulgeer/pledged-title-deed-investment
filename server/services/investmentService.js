@@ -4,6 +4,7 @@ const InvestmentRepository = require("../repositories/investmentRepository");
 const PropertyRepository = require("../repositories/propertyRepository");
 const InvestorRepository = require("../repositories/investorRepository");
 const notificationService = require("./notificationService");
+const paymentService = require("./payment");
 const FileMetadata = require("../models/FileMetadata");
 const BaseRepository = require("../repositories/baseRepository");
 const {
@@ -17,6 +18,20 @@ const {
   toInvestmentAdminViewDto,
 } = require("../utils/dto/Investments");
 const { APP_CURRENCY } = require("../utils/currency");
+const {
+  normalizeSupportedPropertyCountry,
+} = require("../utils/propertyCountries");
+const {
+  getRepresentativeRegions,
+  representativeHasRegion,
+} = require("../utils/representativeRegions");
+
+const ACTIVE_ASSIGNMENT_STATUSES = [
+  "offer_sent",
+  "contract_signed",
+  "title_deed_pending",
+  "active",
+];
 
 class InvestmentService {
   constructor() {
@@ -24,6 +39,7 @@ class InvestmentService {
     this.propertyRepository = new PropertyRepository();
     this.investorRepository = new InvestorRepository();
     this.notificationService = notificationService;
+    this.paymentService = paymentService;
   }
   async displayNameOf(user) {
     if (!user) return "User";
@@ -32,6 +48,230 @@ class InvestmentService {
     const parts = [user.firstName, user.lastName].filter(Boolean);
     return parts.length ? parts.join(" ") : "User";
   }
+
+  async safeNotify(methodName, ...args) {
+    const notifyFn = this.notificationService?.[methodName];
+    if (typeof notifyFn !== "function") {
+      return null;
+    }
+
+    try {
+      return await notifyFn.call(this.notificationService, ...args);
+    } catch (error) {
+      console.warn(`Notification skipped (${methodName}): ${error.message}`);
+      return null;
+    }
+  }
+
+  loadInvestmentForResponse(investmentId) {
+    return this.investmentRepository.findById(
+      investmentId,
+      "property investor propertyOwner localRepresentative representativeRequestedBy",
+    );
+  }
+
+  enrichInvestmentDto(dto, investment) {
+    if (!dto) return dto;
+
+    dto.paymentProvider = this.paymentService.getProviderInfo();
+    dto.paymentOptions = this.paymentService.getSupportedMethods({
+      investment,
+      property: investment?.property,
+      propertyOwner: investment?.propertyOwner,
+    });
+
+    return dto;
+  }
+
+  toDetailResponse(investment, { adminView = false } = {}) {
+    const dto =
+      adminView && typeof toInvestmentAdminViewDto === "function"
+        ? toInvestmentAdminViewDto(investment)
+        : toInvestmentDetailDto(investment);
+
+    return this.enrichInvestmentDto(dto, investment);
+  }
+
+  getRepresentativeRegionForInvestment(investment) {
+    return normalizeSupportedPropertyCountry(
+      investment?.representativeRequestedRegion || investment?.property?.country,
+    );
+  }
+
+  getUserBrief(user) {
+    if (!user || typeof user !== "object") {
+      return null;
+    }
+
+    return {
+      id: user._id || user.id || null,
+      fullName: user.fullName || null,
+      email: user.email || null,
+      country: user.country || null,
+      role: user.role || null,
+    };
+  }
+
+  getRepresentativeRequestPayload(investment) {
+    return {
+      status: investment.representativeRequestStatus || "none",
+      requestDate: investment.representativeRequestDate || null,
+      requestedBy:
+        this.getUserBrief(investment.representativeRequestedBy) ||
+        investment.representativeRequestedBy ||
+        null,
+      requestedByRole: investment.representativeRequestedByRole || null,
+      region: this.getRepresentativeRegionForInvestment(investment),
+      claimedAt: investment.representativeRequestClaimedAt || null,
+      resolvedAt: investment.representativeRequestResolvedAt || null,
+      isPending:
+        investment.representativeRequestStatus === "pending" &&
+        !investment.localRepresentative,
+    };
+  }
+
+  mapRepresentativeCase(investment) {
+    return {
+      id: investment._id,
+      status: investment.status,
+      amountInvested: investment.amountInvested,
+      currency: investment.currency || APP_CURRENCY,
+      createdAt: investment.createdAt || null,
+      localRepresentative: investment.localRepresentative
+        ? {
+            id:
+              investment.localRepresentative._id || investment.localRepresentative,
+            fullName: investment.localRepresentative.fullName || null,
+            email: investment.localRepresentative.email || null,
+            region: investment.localRepresentative.region || null,
+            regions: getRepresentativeRegions(investment.localRepresentative),
+          }
+        : null,
+      representativeRequest: this.getRepresentativeRequestPayload(investment),
+      property: investment.property
+        ? {
+            id: investment.property._id,
+            city: investment.property.city || null,
+            country: investment.property.country || null,
+            fullAddress: investment.property.fullAddress || null,
+            propertyType: investment.property.propertyType || null,
+          }
+        : null,
+      investor: this.getUserBrief(investment.investor),
+      propertyOwner: this.getUserBrief(investment.propertyOwner),
+    };
+  }
+
+  getContractWorkflow(investment) {
+    if (!investment?.contractWorkflow) {
+      return {};
+    }
+
+    return investment.contractWorkflow.toObject
+      ? investment.contractWorkflow.toObject()
+      : { ...investment.contractWorkflow };
+  }
+
+  getPrincipalPayment(investment) {
+    if (!investment?.principalPayment) {
+      return {};
+    }
+
+    return investment.principalPayment.toObject
+      ? investment.principalPayment.toObject()
+      : { ...investment.principalPayment };
+  }
+
+  normalizeOfferTerms(property, offerData = {}) {
+    const listedAmount = Number(property?.requestedInvestment || 0);
+    const listedMonthlyRent = Number(property?.rentOffered || 0);
+    const rawAmount = offerData?.amountInvested;
+    const rawOwnershipPercent =
+      offerData?.ownershipPercent ?? offerData?.offeredOwnershipPercent;
+    const rawDesiredMonthlyRent =
+      offerData?.desiredMonthlyRent ?? offerData?.requestedMonthlyRent;
+    const hasAmount =
+      rawAmount !== undefined && rawAmount !== null && rawAmount !== "";
+    const hasOwnershipPercent =
+      rawOwnershipPercent !== undefined &&
+      rawOwnershipPercent !== null &&
+      rawOwnershipPercent !== "";
+
+    if (!hasAmount && !hasOwnershipPercent) {
+      throw new Error("Offer amount or ownership percentage is required");
+    }
+
+    let amountInvested = hasAmount ? Number(rawAmount) : null;
+    let ownershipPercent = hasOwnershipPercent
+      ? Number(rawOwnershipPercent)
+      : null;
+
+    if (hasAmount && (!Number.isFinite(amountInvested) || amountInvested <= 0)) {
+      throw new Error("Offer amount must be greater than zero");
+    }
+
+    if (
+      hasOwnershipPercent &&
+      (!Number.isFinite(ownershipPercent) ||
+        ownershipPercent <= 0 ||
+        ownershipPercent > 100)
+    ) {
+      throw new Error("Ownership percentage must be between 0 and 100");
+    }
+
+    if (!hasAmount) {
+      amountInvested = Number(
+        ((listedAmount * ownershipPercent) / 100).toFixed(2),
+      );
+    }
+
+    if (!hasOwnershipPercent) {
+      ownershipPercent = Number(
+        ((amountInvested / listedAmount) * 100).toFixed(2),
+      );
+    }
+
+    const expectedOwnershipPercent = Number(
+      ((amountInvested / listedAmount) * 100).toFixed(2),
+    );
+
+    if (Math.abs(expectedOwnershipPercent - ownershipPercent) > 0.5) {
+      throw new Error("Offer amount and ownership percentage do not match");
+    }
+
+    if (amountInvested > listedAmount) {
+      throw new Error("Offer amount cannot exceed the listed investment amount");
+    }
+
+    const desiredMonthlyRent = Number(
+      rawDesiredMonthlyRent !== undefined &&
+        rawDesiredMonthlyRent !== null &&
+        rawDesiredMonthlyRent !== ""
+        ? rawDesiredMonthlyRent
+        : listedMonthlyRent,
+    );
+
+    if (!Number.isFinite(desiredMonthlyRent) || desiredMonthlyRent <= 0) {
+      throw new Error("Desired monthly rent must be greater than zero");
+    }
+
+    const annualYieldPercent = Number(
+      (((desiredMonthlyRent * 12) / amountInvested) * 100).toFixed(2),
+    );
+    const message =
+      typeof offerData?.message === "string"
+        ? offerData.message.trim().slice(0, 500)
+        : "";
+
+    return {
+      amountInvested,
+      ownershipPercent,
+      desiredMonthlyRent,
+      annualYieldPercent,
+      message,
+    };
+  }
+
   // Yeni yatırım teklifi oluştur
   async createInvestmentOffer(propertyId, investorId, offerData) {
     // Property kontrolü
@@ -71,17 +311,11 @@ class InvestmentService {
       );
     }
 
-    // Tutarın property.requestedInvestment ile bire bir eşleşmesi
-    const { amountInvested } = offerData || {};
-    if (Number(amountInvested) !== Number(property.requestedInvestment)) {
-      throw new Error(
-        "amountInvested must equal property's requestedInvestment",
-      );
-    }
+    const offerTerms = this.normalizeOfferTerms(property, offerData);
 
     // Kira ödeme takvimi oluştur
     const rentalPayments = this.generateRentalPaymentSchedule(
-      property.rentOffered, // aylık kira
+      offerTerms.desiredMonthlyRent, // pazarlık edilen aylık kira
       property.contractPeriodMonths, // sözleşme süresi (ay)
     );
 
@@ -91,8 +325,9 @@ class InvestmentService {
       investor: investorId,
       propertyOwner: property.owner?._id,
       currency: APP_CURRENCY,
-      amountInvested,
+      amountInvested: offerTerms.amountInvested,
       status: "offer_sent",
+      offerTerms,
       rentalPayments,
     });
 
@@ -101,15 +336,11 @@ class InvestmentService {
       $inc: { investmentOfferCount: 1 },
     });
 
-    // Property Owner’a bildirim
-    await this.notificationService.notifyNewInvestmentOffer(
-      property.owner._id,
-      {
-        investmentId: newInvestment._id,
-        investorName: investor.fullName,
-        amount: amountInvested,
-      },
-    );
+    await this.safeNotify("notifyNewInvestmentOffer", property.owner._id, {
+      investmentId: newInvestment._id,
+      investorName: investor.fullName,
+      amount: offerTerms.amountInvested,
+    });
 
     return newInvestment;
   }
@@ -137,34 +368,87 @@ class InvestmentService {
       throw new Error("Unauthorized to accept this offer");
     }
 
+    if (investment.property.status !== "published") {
+      throw new Error("Property is no longer open for offer acceptance");
+    }
+
+    const competingOffers = await this.investmentRepository.findAll(
+      {
+        property: investment.property._id,
+        status: "offer_sent",
+        _id: { $ne: investmentId },
+      },
+      "investor property",
+    );
+
+    const agreedMonthlyRent =
+      investment.offerTerms?.desiredMonthlyRent || investment.property.rentOffered;
+
     // Property durumunu güncelle
     await this.propertyRepository.update(investment.property._id, {
       status: "in_contract",
+      investmentOfferCount: 0,
     });
 
     // Investment durumunu güncelle
-    const updatedInvestment = await this.investmentRepository.update(
-      investmentId,
-      {
-        status: "contract_signed",
+    await this.investmentRepository.update(investmentId, {
+      status: "contract_signed",
+      offerDecision: {
+        acceptedAt: new Date(),
+        decidedBy: propertyOwnerId,
       },
-    );
+      principalPayment: {
+        status: "not_started",
+        amount: investment.amountInvested,
+        currency: investment.currency || APP_CURRENCY,
+      },
+      rentalPayments: this.generateRentalPaymentSchedule(
+        agreedMonthlyRent,
+        investment.property.contractPeriodMonths,
+      ),
+    });
 
-    // Investor'a bildirim gönder
-    await this.notificationService.notifyOfferAccepted(
-      investment.investor._id,
-      {
-        investmentId: investmentId,
-        propertyCity: investment.property.city,
-      },
-    );
+    if (competingOffers.length > 0) {
+      await this.investmentRepository.updateMany(
+        {
+          property: investment.property._id,
+          status: "offer_sent",
+          _id: { $ne: investmentId },
+        },
+        {
+          status: "rejected",
+          offerDecision: {
+            rejectedAt: new Date(),
+            rejectionReason: "Another offer was accepted for this property",
+            decidedBy: propertyOwnerId,
+          },
+        },
+      );
+
+      for (const competingOffer of competingOffers) {
+        await this.safeNotify(
+          "notifyOfferRejected",
+          competingOffer.investor?._id || competingOffer.investor,
+          {
+            investmentId: competingOffer._id,
+            propertyCity: competingOffer.property?.city || investment.property.city,
+          },
+        );
+      }
+    }
+
+    await this.safeNotify("notifyOfferAccepted", investment.investor._id, {
+      investmentId: investmentId,
+      propertyCity: investment.property.city,
+    });
 
     // Investor'ın aktif yatırım sayısını artır
     await this.investorRepository.update(investment.investor._id, {
       $inc: { activeInvestmentCount: 1 },
     });
 
-    return toInvestmentDetailDto(updatedInvestment);
+    const refreshedInvestment = await this.loadInvestmentForResponse(investmentId);
+    return this.toDetailResponse(refreshedInvestment);
   }
 
   // Offer'ı reddet
@@ -190,17 +474,26 @@ class InvestmentService {
       throw new Error("Unauthorized to reject this offer");
     }
 
-    // Investment'ı sil veya iptal et
-    await this.investmentRepository.delete(investmentId);
-
-    // Investor'a bildirim gönder
-    await this.notificationService.notifyOfferRejected(
-      investment.investor._id,
-      {
-        investmentId: investmentId,
-        propertyCity: investment.property.city,
+    // Investment'ı rejected durumuna al
+    await this.investmentRepository.update(investmentId, {
+      status: "rejected",
+      offerDecision: {
+        rejectedAt: new Date(),
+        rejectionReason: "Rejected by property owner",
+        decidedBy: propertyOwnerId,
       },
-    );
+    });
+    await this.propertyRepository.update(investment.property._id, {
+      investmentOfferCount: Math.max(
+        Number(investment.property.investmentOfferCount || 1) - 1,
+        0,
+      ),
+    });
+
+    await this.safeNotify("notifyOfferRejected", investment.investor._id, {
+      investmentId: investmentId,
+      propertyCity: investment.property.city,
+    });
 
     return { message: "Offer rejected successfully" };
   }
@@ -239,32 +532,56 @@ class InvestmentService {
       throw new Error("Contract must be a PDF file");
     }
 
-    // Investment'ı güncelle
+    const contractWorkflow = this.getContractWorkflow(investment);
+    const signatureKey = isInvestor
+      ? "investorSigned"
+      : isOwner
+        ? "ownerSigned"
+        : contractWorkflow.investorSigned?.fileId
+          ? "ownerSigned"
+          : "investorSigned";
+    const uploadedAt = new Date();
+
+    contractWorkflow[signatureKey] = {
+      fileId: fileMetadataId,
+      url: fileMetadata.url,
+      uploadedAt,
+      uploadedBy: userId,
+    };
+
+    if (
+      contractWorkflow.investorSigned?.fileId &&
+      contractWorkflow.ownerSigned?.fileId &&
+      !contractWorkflow.fullySignedAt
+    ) {
+      contractWorkflow.fullySignedAt = uploadedAt;
+    }
+
     const updateData = {
       contractFile: {
         fileId: fileMetadataId,
         url: fileMetadata.url,
-        uploadedAt: new Date(),
+        uploadedAt,
         uploadedBy: userId,
       },
+      contractWorkflow,
     };
 
-    const updatedInvestment = await this.investmentRepository.update(
-      investmentId,
-      updateData,
-    );
+    await this.investmentRepository.update(investmentId, updateData);
 
     // FileMetadata'yı güncelle - Investment ile ilişkilendir
     await FileMetadata.findByIdAndUpdate(fileMetadataId, {
       relatedModel: "Investment",
       relatedId: investmentId,
-      documentType: "contract",
+      documentType:
+        signatureKey === "investorSigned"
+          ? "contract_investor_signed"
+          : "contract_owner_signed",
     });
 
-    // Karşı tarafa bildirim gönder
     if (isInvestor) {
-      // Property Owner'a bildirim
-      await this.notificationService.notifyContractUploaded(
+      await this.safeNotify(
+        "notifyContractUploaded",
         investment.property.owner,
         "property_owner",
         {
@@ -273,8 +590,8 @@ class InvestmentService {
         },
       );
     } else if (isOwner) {
-      // Investor'a bildirim
-      await this.notificationService.notifyContractUploaded(
+      await this.safeNotify(
+        "notifyContractUploaded",
         investment.investor._id,
         "investor",
         {
@@ -284,14 +601,15 @@ class InvestmentService {
       );
     }
 
-    return toInvestmentDetailDto(updatedInvestment);
+    const refreshedInvestment = await this.loadInvestmentForResponse(investmentId);
+    return this.toDetailResponse(refreshedInvestment);
   }
 
   // Tapu kaydı yükle - FileUploadManager ile entegre
   async uploadTitleDeed(investmentId, userId, fileMetadataId, userRole) {
     const investment = await this.investmentRepository.findById(
       investmentId,
-      "property investor",
+      "property investor localRepresentative",
     );
 
     if (!investment) {
@@ -300,17 +618,36 @@ class InvestmentService {
 
     // Yetki kontrolü
     const isOwner = investment.property.owner.toString() === userId.toString();
+    const isAssignedRepresentative =
+      String(
+        investment.localRepresentative?._id || investment.localRepresentative,
+      ) === String(userId);
 
     if (
       !isOwner &&
       userRole !== "admin" &&
-      userRole !== "local_representative"
+      !isAssignedRepresentative
     ) {
       throw new Error("Unauthorized to upload title deed");
     }
 
     if (investment.status !== "contract_signed") {
       throw new Error("Contract must be signed before title deed upload");
+    }
+
+    if (
+      !investment.contractWorkflow?.investorSigned?.fileId ||
+      !investment.contractWorkflow?.ownerSigned?.fileId
+    ) {
+      throw new Error(
+        "Both parties must upload signed contracts before title deed registration",
+      );
+    }
+
+    if (investment.principalPayment?.status !== "confirmed") {
+      throw new Error(
+        "Principal payment must be confirmed before title deed upload",
+      );
     }
 
     // Property Owner KYC kontrolü
@@ -342,10 +679,7 @@ class InvestmentService {
       status: "title_deed_pending", // Admin onayı bekliyor
     };
 
-    const updatedInvestment = await this.investmentRepository.update(
-      investmentId,
-      updateData,
-    );
+    await this.investmentRepository.update(investmentId, updateData);
 
     // FileMetadata'yı güncelle - Investment ile ilişkilendir
     await FileMetadata.findByIdAndUpdate(fileMetadataId, {
@@ -363,7 +697,8 @@ class InvestmentService {
     //   }
     // );
 
-    return toInvestmentDetailDto(updatedInvestment);
+    const refreshedInvestment = await this.loadInvestmentForResponse(investmentId);
+    return this.toDetailResponse(refreshedInvestment);
   }
 
   // Admin tarafından title deed onayı
@@ -392,26 +727,20 @@ class InvestmentService {
       status: "active",
     };
 
-    const updatedInvestment = await this.investmentRepository.update(
-      investmentId,
-      updateData,
-    );
+    await this.investmentRepository.update(investmentId, updateData);
 
     // Property durumunu active yap
     await this.propertyRepository.update(investment.property._id, {
       status: "active",
     });
 
-    // Investor'a bildirim gönder
-    await this.notificationService.notifyTitleDeedRegistered(
-      investment.investor._id,
-      {
-        investmentId: investmentId,
-        propertyCity: investment.property.city,
-      },
-    );
+    await this.safeNotify("notifyTitleDeedRegistered", investment.investor._id, {
+      investmentId: investmentId,
+      propertyCity: investment.property.city,
+    });
 
-    return toInvestmentDetailDto(updatedInvestment);
+    const refreshedInvestment = await this.loadInvestmentForResponse(investmentId);
+    return this.toDetailResponse(refreshedInvestment);
   }
 
   // Payment receipt yükle
@@ -432,13 +761,23 @@ class InvestmentService {
       throw new Error("Unauthorized to upload payment receipt");
     }
 
+    if (investment.status !== "contract_signed") {
+      throw new Error("Payment receipt can only be uploaded during funding stage");
+    }
+
     // FileMetadata kontrolü
     const fileMetadata = await FileMetadata.findById(fileMetadataId);
     if (!fileMetadata) {
       throw new Error("File not found");
     }
 
-    // Investment'ı güncelle
+    const principalPayment = this.getPrincipalPayment(investment);
+    const providerInfo = this.paymentService.getProviderInfo();
+    const supportedMethods = this.paymentService.getSupportedMethods({
+      investment,
+      property: investment.property,
+    });
+
     const updateData = {
       paymentReceipt: {
         fileId: fileMetadataId,
@@ -446,12 +785,20 @@ class InvestmentService {
         uploadedAt: new Date(),
         uploadedBy: userId,
       },
+      principalPayment: {
+        ...principalPayment,
+        status: "receipt_uploaded",
+        providerKey: principalPayment.providerKey || providerInfo.key,
+        providerLabel: principalPayment.providerLabel || providerInfo.name,
+        method: principalPayment.method || supportedMethods[0]?.key,
+        amount: principalPayment.amount || investment.amountInvested,
+        currency: principalPayment.currency || investment.currency || APP_CURRENCY,
+        receiptUploadedAt: new Date(),
+        receiptUploadedBy: userId,
+      },
     };
 
-    const updatedInvestment = await this.investmentRepository.update(
-      investmentId,
-      updateData,
-    );
+    await this.investmentRepository.update(investmentId, updateData);
 
     // FileMetadata'yı güncelle
     await FileMetadata.findByIdAndUpdate(fileMetadataId, {
@@ -460,16 +807,131 @@ class InvestmentService {
       documentType: "payment_receipt",
     });
 
-    // Property Owner'a bildirim
-    await this.notificationService.notifyPaymentReceiptUploaded(
-      investment.property.owner,
-      {
-        investmentId: investmentId,
-        investorName: this.displayNameOf(investment.investor),
-      },
+    await this.safeNotify("notifyPaymentReceiptUploaded", investment.property.owner, {
+      investmentId: investmentId,
+      investorName: this.displayNameOf(investment.investor),
+    });
+
+    const refreshedInvestment = await this.loadInvestmentForResponse(investmentId);
+    return this.toDetailResponse(refreshedInvestment);
+  }
+
+  async preparePrincipalPayment(investmentId, userId, userRole, paymentData = {}) {
+    const investment = await this.investmentRepository.findById(
+      investmentId,
+      "property investor propertyOwner",
     );
 
-    return toInvestmentDetailDto(updatedInvestment);
+    if (!investment) {
+      throw new Error("Investment not found");
+    }
+
+    const isInvestor = String(investment.investor?._id) === String(userId);
+    if (!isInvestor && userRole !== "admin") {
+      throw new Error("Unauthorized to prepare payment");
+    }
+
+    if (investment.status !== "contract_signed") {
+      throw new Error("Payment instructions are only available in contract stage");
+    }
+
+    if (
+      !investment.contractWorkflow?.investorSigned?.fileId ||
+      !investment.contractWorkflow?.ownerSigned?.fileId
+    ) {
+      throw new Error(
+        "Both parties must upload signed contracts before payment instructions are prepared",
+      );
+    }
+
+    const supportedMethods = this.paymentService.getSupportedMethods({
+      investment,
+      property: investment.property,
+      propertyOwner: investment.propertyOwner,
+    });
+    const requestedMethod = paymentData.method || supportedMethods[0]?.key;
+
+    if (!supportedMethods.some((item) => item.key === requestedMethod)) {
+      throw new Error("Unsupported payment method");
+    }
+
+    const paymentSession = await this.paymentService.initializeInvestmentPayment({
+      investment,
+      property: investment.property,
+      propertyOwner: investment.propertyOwner,
+      initiatedBy: userId,
+      method: requestedMethod,
+    });
+
+    const principalPayment = {
+      ...this.getPrincipalPayment(investment),
+      ...paymentSession,
+      status: "instructions_ready",
+      initiatedAt: new Date(),
+      initiatedBy: userId,
+    };
+
+    await this.investmentRepository.update(investmentId, {
+      principalPayment,
+    });
+
+    const refreshedInvestment = await this.loadInvestmentForResponse(investmentId);
+    return this.toDetailResponse(refreshedInvestment);
+  }
+
+  async confirmPrincipalPayment(investmentId, userId, userRole) {
+    const investment = await this.investmentRepository.findById(
+      investmentId,
+      "property investor propertyOwner",
+    );
+
+    if (!investment) {
+      throw new Error("Investment not found");
+    }
+
+    const isOwner =
+      String(investment.propertyOwner?._id || investment.property?.owner) ===
+      String(userId);
+
+    if (!isOwner && userRole !== "admin") {
+      throw new Error("Unauthorized to confirm payment");
+    }
+
+    if (investment.status !== "contract_signed") {
+      throw new Error("Payment confirmation is only available in contract stage");
+    }
+
+    if (
+      !investment.contractWorkflow?.investorSigned?.fileId ||
+      !investment.contractWorkflow?.ownerSigned?.fileId
+    ) {
+      throw new Error(
+        "Both parties must upload signed contracts before payment confirmation",
+      );
+    }
+
+    const currentPayment = this.getPrincipalPayment(investment);
+    if (currentPayment.status === "confirmed") {
+      throw new Error("Principal payment is already confirmed");
+    }
+
+    if (!currentPayment.providerKey && !investment.paymentReceipt?.fileId) {
+      throw new Error("Payment has not been prepared or submitted yet");
+    }
+
+    await this.investmentRepository.update(investmentId, {
+      principalPayment: {
+        ...currentPayment,
+        status: "confirmed",
+        amount: currentPayment.amount || investment.amountInvested,
+        currency: currentPayment.currency || investment.currency || APP_CURRENCY,
+        confirmedAt: new Date(),
+        confirmedBy: userId,
+      },
+    });
+
+    const refreshedInvestment = await this.loadInvestmentForResponse(investmentId);
+    return this.toDetailResponse(refreshedInvestment);
   }
 
   // Investment dökümanlarını listele
@@ -481,6 +943,14 @@ class InvestmentService {
         { path: "investor", select: "_id" },
         {
           path: "contractFile.fileId",
+          select: "originalName filename",
+        },
+        {
+          path: "contractWorkflow.investorSigned.fileId",
+          select: "originalName filename",
+        },
+        {
+          path: "contractWorkflow.ownerSigned.fileId",
           select: "originalName filename",
         },
         {
@@ -507,6 +977,10 @@ class InvestmentService {
           path: "transferOfProperty.transferDocument.fileId",
           select: "originalName filename",
         },
+        {
+          path: "localRepresentative",
+          select: "_id",
+        },
       ],
     );
 
@@ -517,12 +991,16 @@ class InvestmentService {
     // Yetki kontrolü
     const isInvestor = investment.investor._id.toString() === userId.toString();
     const isOwner = investment.property.owner.toString() === userId.toString();
+    const isAssignedRepresentative =
+      String(
+        investment.localRepresentative?._id || investment.localRepresentative,
+      ) === String(userId);
 
     if (
       !isInvestor &&
       !isOwner &&
       userRole !== "admin" &&
-      userRole !== "local_representative"
+      !isAssignedRepresentative
     ) {
       throw new Error("Unauthorized to view investment documents");
     }
@@ -533,8 +1011,35 @@ class InvestmentService {
       documents.push(document);
     };
 
-    // Contract
-    if (investment.contractFile?.fileId) {
+    if (investment.contractWorkflow?.investorSigned?.fileId) {
+      pushDocument({
+        type: "contract_investor_signed",
+        fileId:
+          investment.contractWorkflow.investorSigned.fileId._id ||
+          investment.contractWorkflow.investorSigned.fileId,
+        name:
+          investment.contractWorkflow.investorSigned.fileId.originalName ||
+          investment.contractWorkflow.investorSigned.fileId.filename,
+        url: investment.contractWorkflow.investorSigned.url,
+        uploadedAt: investment.contractWorkflow.investorSigned.uploadedAt,
+        uploadedBy: investment.contractWorkflow.investorSigned.uploadedBy,
+      });
+    }
+
+    if (investment.contractWorkflow?.ownerSigned?.fileId) {
+      pushDocument({
+        type: "contract_owner_signed",
+        fileId:
+          investment.contractWorkflow.ownerSigned.fileId._id ||
+          investment.contractWorkflow.ownerSigned.fileId,
+        name:
+          investment.contractWorkflow.ownerSigned.fileId.originalName ||
+          investment.contractWorkflow.ownerSigned.fileId.filename,
+        url: investment.contractWorkflow.ownerSigned.url,
+        uploadedAt: investment.contractWorkflow.ownerSigned.uploadedAt,
+        uploadedBy: investment.contractWorkflow.ownerSigned.uploadedBy,
+      });
+    } else if (investment.contractFile?.fileId) {
       pushDocument({
         type: "contract",
         fileId:
@@ -689,7 +1194,7 @@ class InvestmentService {
 
     for (const rp of upcoming) {
       // Bildirim içeriğini düzenle
-      await this.notificationService.notifyUpcomingRentalPayment(rp.investor, {
+      await this.safeNotify("notifyUpcomingRentalPayment", rp.investor, {
         rentalPaymentId: rp._id,
         investmentId: rp.investment,
         propertyId: rp.property,
@@ -721,7 +1226,7 @@ class InvestmentService {
         await this.investmentRepository.update(inv._id, {
           $set: { contractEndNotified: true },
         });
-        await this.notificationService.notifyContractEnding(inv.investor, {
+        await this.safeNotify("notifyContractEnding", inv.investor, {
           investmentId: inv._id,
           contractEndDate: end,
         });
@@ -807,14 +1312,11 @@ class InvestmentService {
     );
 
     // 4) Bildirim
-    await this.notificationService.notifyRentalPaymentReceived(
-      investment.investor,
-      {
-        investmentId,
-        propertyId: investment.property?._id,
-        amount: amountPaid,
-      },
-    );
+    await this.safeNotify("notifyRentalPaymentReceived", investment.investor, {
+      investmentId,
+      propertyId: investment.property?._id,
+      amount: amountPaid,
+    });
 
     return { success: true };
   }
@@ -822,7 +1324,7 @@ class InvestmentService {
   // Diğer metodlar
   async getAllInvestments(paginationOptions = {}) {
     const result = await this.investmentRepository.paginate(paginationOptions, {
-      populate: "property investor propertyOwner",
+      populate: "property investor propertyOwner localRepresentative",
       allowedFilters: {
         ...investmentFilters,
         status: "exact",
@@ -836,10 +1338,10 @@ class InvestmentService {
     };
   }
 
-  async getInvestmentById(investmentId, userId, userRole) {
+  async getInvestmentById(investmentId, userId, userRole, userContext = {}) {
     const investment = await this.investmentRepository.findById(
       investmentId,
-      "property investor propertyOwner localRepresentative",
+      "property investor propertyOwner localRepresentative representativeRequestedBy",
     );
     if (!investment) throw new Error("Investment not found");
 
@@ -854,18 +1356,41 @@ class InvestmentService {
     const isLocalRep =
       userRole === "local_representative" &&
       String(investment.localRepresentative?._id) === String(userId);
+    const isRegionalPendingRep =
+      userRole === "local_representative" &&
+      !investment.localRepresentative &&
+      investment.representativeRequestStatus === "pending" &&
+      getRepresentativeRegions(userContext).includes(
+        this.getRepresentativeRegionForInvestment(investment),
+      );
 
-    if (!(isAdmin || isInvestor || isOwner || isLocalRep)) {
+    if (!(isAdmin || isInvestor || isOwner || isLocalRep || isRegionalPendingRep)) {
       throw new Error("Not authorized to view this investment");
     }
 
     // Admin görünümü ayrı
     if (isAdmin && typeof toInvestmentAdminViewDto === "function") {
-      return toInvestmentAdminViewDto(investment);
+      return this.toDetailResponse(investment, { adminView: true });
     }
-    return toInvestmentDetailDto(investment);
+    return this.toDetailResponse(investment);
   }
   async getMyInvestments(investorId, paginationOptions = {}) {
+    const { status, ...queryOptions } = paginationOptions;
+    const filter = { investor: investorId };
+
+    if (status) {
+      const statuses = String(status)
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      if (statuses.length === 1) {
+        filter.status = statuses[0];
+      } else if (statuses.length > 1) {
+        filter.status = { $in: statuses };
+      }
+    }
+
     const options = {
       populate: "property propertyOwner",
       allowedFilters: {
@@ -873,11 +1398,11 @@ class InvestmentService {
         status: "exact",
       },
       allowedSortFields: [...investmentSortFields, "status", "createdAt"],
-      customFilters: { investor: investorId },
+      customFilters: filter,
     };
 
     const result = await this.investmentRepository.paginate(
-      paginationOptions,
+      queryOptions,
       options,
     );
 
@@ -887,22 +1412,77 @@ class InvestmentService {
     };
   }
 
-  async getPropertyInvestments(propertyId, paginationOptions = {}) {
-    const filter = { property: propertyId };
-    const result = await this.investmentRepository.paginate(paginationOptions, {
-      populate: "investor",
-      // Bu endpoint'te dışardan filtre almak istersen:
-      allowedFilters: require("../utils/paginationHelper").investmentFilters,
-      allowedSortFields: require("../utils/paginationHelper")
-        .investmentSortFields,
-      customFilters: filter,
-    });
-    // Controller bu endpoint'te paginated dönmüyor, mevcut davranışı koru:
-    return result.data.map(toInvestmentListDto);
+  async getPropertyInvestments(
+    propertyId,
+    paginationOptions = {},
+    propertyOwnerId = null,
+  ) {
+    const property = await this.propertyRepository.findById(propertyId, "owner");
+
+    if (!property) {
+      throw new Error("Property not found");
+    }
+
+    const propertyOwnerValue = property.owner?._id || property.owner;
+    if (
+      propertyOwnerId &&
+      String(propertyOwnerValue) !== String(propertyOwnerId)
+    ) {
+      throw new Error("Unauthorized to view investments for this property");
+    }
+
+    const { status, sortBy = "createdAt", sortOrder = "desc" } =
+      paginationOptions;
+    const filter = {
+      property: propertyId,
+      ...(propertyOwnerId ? { propertyOwner: propertyOwnerId } : {}),
+    };
+
+    if (status) {
+      const statuses = String(status)
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      if (statuses.length === 1) {
+        filter.status = statuses[0];
+      } else if (statuses.length > 1) {
+        filter.status = { $in: statuses };
+      }
+    }
+
+    const investments = await this.investmentRepository.findAll(
+      filter,
+      "property investor propertyOwner",
+    );
+
+    const safeSortBy = investmentSortFields.includes(sortBy)
+      ? sortBy
+      : "createdAt";
+    const safeSortDirection = sortOrder === "asc" ? 1 : -1;
+
+    return investments
+      .sort((left, right) => {
+        const leftValue = left?.[safeSortBy];
+        const rightValue = right?.[safeSortBy];
+
+        if (leftValue === rightValue) return 0;
+        if (leftValue === undefined || leftValue === null) {
+          return 1 * safeSortDirection;
+        }
+        if (rightValue === undefined || rightValue === null) {
+          return -1 * safeSortDirection;
+        }
+
+        return leftValue > rightValue
+          ? safeSortDirection
+          : -1 * safeSortDirection;
+      })
+      .map((investment) => toInvestmentDto(investment));
   }
 
   // Local representative ata
-  async assignLocalRepresentative(investmentId, representativeId) {
+  async assignLocalRepresentative(investmentId, representativeId, _adminId = null) {
     const investment = await this.investmentRepository.findById(
       investmentId,
       "property investor",
@@ -920,24 +1500,42 @@ class InvestmentService {
       throw new Error("Local representative not found");
     }
 
+    if (representative.accountStatus !== "active") {
+      throw new Error("Local representative account is not active");
+    }
+
+    const investmentRegion = this.getRepresentativeRegionForInvestment(investment);
+    if (!investmentRegion) {
+      throw new Error("This investment does not belong to a supported region");
+    }
+
+    if (!representativeHasRegion(representative, investmentRegion)) {
+      throw new Error(
+        "Local representative is not assigned to this investment region",
+      );
+    }
+
     // Investment'ı güncelle
     investment.localRepresentative = representativeId;
+    if (investment.representativeRequestStatus === "pending") {
+      investment.representativeRequestStatus = "fulfilled";
+      investment.representativeRequestClaimedAt = new Date();
+      investment.representativeRequestResolvedAt = new Date();
+    }
     await investment.save();
 
     // Bildirim gönder
-    await this.notificationService.notifyRepresentativeAssigned(
-      representativeId,
-      {
-        investmentId: investmentId,
-        propertyCity: investment.property.city,
-      },
-    );
+    await this.safeNotify("notifyRepresentativeAssigned", representativeId, {
+      investmentId: investmentId,
+      propertyCity: investment.property.city,
+    });
 
-    return toInvestmentDetailDto(investment);
+    const refreshedInvestment = await this.loadInvestmentForResponse(investmentId);
+    return this.toDetailResponse(refreshedInvestment);
   }
 
   // Local representative talep et
-  async requestLocalRepresentative(investmentId, userId) {
+  async requestLocalRepresentative(investmentId, userId, userRole) {
     const investment = await this.investmentRepository.findById(
       investmentId,
       "property investor",
@@ -955,27 +1553,169 @@ class InvestmentService {
       throw new Error("Unauthorized to request representative");
     }
 
+    if (investment.localRepresentative) {
+      throw new Error("A local representative is already assigned");
+    }
+
+    if (investment.representativeRequestStatus === "pending") {
+      throw new Error("A representative request is already pending");
+    }
+
+    const requestedRegion = this.getRepresentativeRegionForInvestment(investment);
+    if (!requestedRegion) {
+      throw new Error("This investment is not in a supported representative region");
+    }
+
     // Talebi kaydet
     investment.representativeRequestedBy = userId;
     investment.representativeRequestDate = new Date();
+    investment.representativeRequestedByRole = userRole;
+    investment.representativeRequestedRegion = requestedRegion;
+    investment.representativeRequestStatus = "pending";
+    investment.representativeRequestClaimedAt = null;
+    investment.representativeRequestResolvedAt = null;
     await investment.save();
 
     // Admin'e bildirim
-    await this.notificationService.notifyAdminRepresentativeRequested(
-      investmentId,
-      {
-        requestedBy: userId,
-        propertyCity: investment.property.city,
-      },
-    );
+    await this.safeNotify("notifyAdminRepresentativeRequested", investmentId, {
+      requestedBy: userId,
+      propertyCity: investment.property.city,
+    });
 
-    return toInvestmentDetailDto(investment);
+    const refreshedInvestment = await this.loadInvestmentForResponse(investmentId);
+    return this.toDetailResponse(refreshedInvestment);
   }
 
-  async processRefund(investmentId, reason) {
-    const Investment = require("../models/Investment");
+  async getRepresentativeRequestPool(localRepresentativeId) {
+    const LocalRepresentative = require("../models/LocalRepresentative");
+    const representative = await LocalRepresentative.findById(localRepresentativeId);
+
+    if (!representative) {
+      throw new Error("Local representative not found");
+    }
+
+    const regions = getRepresentativeRegions(representative);
+    if (!regions.length) {
+      return {
+        data: [],
+        summary: {
+          total: 0,
+          byRegion: [],
+        },
+      };
+    }
+
+    const investments = await this.investmentRepository.findAll(
+      {
+        representativeRequestStatus: "pending",
+        localRepresentative: null,
+        representativeRequestedRegion: { $in: regions },
+      },
+      "property investor propertyOwner representativeRequestedBy",
+    );
+
+    const data = investments
+      .sort(
+        (left, right) =>
+          new Date(right.representativeRequestDate || right.createdAt) -
+          new Date(left.representativeRequestDate || left.createdAt),
+      )
+      .map((investment) => this.mapRepresentativeCase(investment));
+
+    return {
+      data,
+      summary: {
+        total: data.length,
+        byRegion: regions.map((region) => ({
+          region,
+          count: data.filter(
+            (item) => item.representativeRequest?.region === region,
+          ).length,
+        })),
+      },
+    };
+  }
+
+  async claimRepresentativeRequest(investmentId, localRepresentativeId) {
+    const LocalRepresentative = require("../models/LocalRepresentative");
+    const representative = await LocalRepresentative.findById(localRepresentativeId);
+
+    if (!representative) {
+      throw new Error("Local representative not found");
+    }
+
+    const investment = await this.investmentRepository.findById(
+      investmentId,
+      "property investor propertyOwner localRepresentative representativeRequestedBy",
+    );
+
+    if (!investment) {
+      throw new Error("Investment not found");
+    }
+
+    if (investment.localRepresentative) {
+      throw new Error("This request has already been claimed");
+    }
+
+    if (investment.representativeRequestStatus !== "pending") {
+      throw new Error("There is no pending representative request for this investment");
+    }
+
+    const investmentRegion = this.getRepresentativeRegionForInvestment(investment);
+    if (!investmentRegion || !representativeHasRegion(representative, investmentRegion)) {
+      throw new Error("You are not authorized to claim this request");
+    }
+
+    investment.localRepresentative = representative._id;
+    investment.representativeRequestStatus = "fulfilled";
+    investment.representativeRequestClaimedAt = new Date();
+    investment.representativeRequestResolvedAt = new Date();
+    await investment.save();
+
+    await this.safeNotify("notifyRepresentativeAssigned", representative._id, {
+      investmentId,
+      propertyCity: investment.property?.city,
+    });
+
+    const refreshedInvestment = await this.loadInvestmentForResponse(investmentId);
+    return this.toDetailResponse(refreshedInvestment);
+  }
+
+  async getRepresentativeAssignments(localRepresentativeId) {
+    const investments = await this.investmentRepository.findAll(
+      { localRepresentative: localRepresentativeId },
+      "property investor propertyOwner localRepresentative representativeRequestedBy",
+    );
+
+    const data = investments
+      .sort((left, right) => new Date(right.updatedAt) - new Date(left.updatedAt))
+      .map((investment) => this.mapRepresentativeCase(investment));
+
+    return {
+      data,
+      summary: {
+        total: data.length,
+        active: data.filter((item) => ACTIVE_ASSIGNMENT_STATUSES.includes(item.status))
+          .length,
+        titleDeedPending: data.filter(
+          (item) => item.status === "title_deed_pending",
+        ).length,
+      },
+    };
+  }
+
+  async processRefund(
+    investmentId,
+    refundData = {},
+    _userId = null,
+    _userRole = "admin",
+  ) {
     const Property = require("../models/Property");
     const Investor = require("../models/Investor");
+    const refundReason =
+      typeof refundData === "string"
+        ? refundData
+        : refundData.reason || refundData.note || "Refund processed";
 
     const inv = await this.investmentRepository.findById(
       investmentId,
@@ -987,8 +1727,13 @@ class InvestmentService {
     await this.investmentRepository.update(investmentId, {
       $set: {
         status: "refunded",
-        refundReason: reason,
+        refundReason,
         refundedAt: new Date(),
+        refund: {
+          refunded: true,
+          amount: refundData.amount || inv.amountInvested,
+          refundedAt: new Date(),
+        },
       },
     });
 
@@ -1005,9 +1750,9 @@ class InvestmentService {
     );
 
     // Bildirim
-    await this.notificationService.notifyInvestmentRefunded(inv.investor, {
+    await this.safeNotify("notifyInvestmentRefunded", inv.investor, {
       investmentId,
-      reason,
+      reason: refundReason,
     });
 
     return { success: true };
@@ -1015,10 +1760,11 @@ class InvestmentService {
 
   async transferProperty(
     investmentId,
-    targetOwnerId,
-    performedByRole = "admin",
+    transferData = {},
+    _userId = null,
+    userRole = "admin",
   ) {
-    if (performedByRole !== "admin") {
+    if (userRole !== "admin") {
       throw new Error("Only admin can transfer property");
     }
 
@@ -1031,15 +1777,21 @@ class InvestmentService {
     );
     if (!inv) throw new Error("Investment not found");
 
-    // Mülkiyeti devret (iş akışındaki alanlara göre güncelle)
+    // Transfer kaydını tamamlanmış durumuna taşı.
     await Property.updateOne(
       { _id: inv.property },
-      { $set: { owner: targetOwnerId, status: "completed" } },
+      { $set: { status: "completed" } },
     );
 
-    // Yatırım bitti say
     await this.investmentRepository.update(investmentId, {
-      $set: { status: "completed" },
+      $set: {
+        status: "completed",
+        transferOfProperty: {
+          transferred: true,
+          date: new Date(),
+          method: transferData.method || "manual",
+        },
+      },
     });
 
     // Investor aktif yatırım sayısını azalt
@@ -1049,7 +1801,7 @@ class InvestmentService {
     );
 
     // Bildirim
-    await this.notificationService.notifyPropertyTransferred(inv.investor, {
+    await this.safeNotify("notifyPropertyTransferred", inv.investor, {
       investmentId,
       propertyId: inv.property,
     });

@@ -30,6 +30,7 @@ const UserSchema = new mongoose.Schema(
       type: String,
       enum: [
         "pending_activation",
+        "pending_admin_approval",
         "active",
         "suspended",
         "banned", // YENİ - ban durumu için

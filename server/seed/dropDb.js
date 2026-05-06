@@ -20,8 +20,12 @@ async function dropDB() {
   await disconnectDatabase();
 }
 
-dropDB().catch(async (error) => {
-  console.error("Database reset failed:", error);
-  await disconnectDatabase();
-  process.exit(1);
-});
+dropDB()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch(async (error) => {
+    console.error("Database reset failed:", error);
+    await disconnectDatabase();
+    process.exit(1);
+  });

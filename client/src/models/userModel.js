@@ -52,12 +52,8 @@ export const PropertyOwnerPropTypes = {
 
 export const LocalRepresentativePropTypes = {
   ...UserPropTypes,
-  areas: PropTypes.arrayOf(
-    PropTypes.shape({
-      country: PropTypes.string.isRequired,
-      cities: PropTypes.arrayOf(PropTypes.string),
-    })
-  ),
+  region: PropTypes.string,
+  regions: PropTypes.arrayOf(PropTypes.string),
   totalPropertiesManaged: PropTypes.number,
   activeProperties: PropTypes.number,
   commission: PropTypes.number,

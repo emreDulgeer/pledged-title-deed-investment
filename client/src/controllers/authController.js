@@ -121,6 +121,27 @@ const authController = {
     );
   },
 
+  getLocalRepresentatives: async (params = {}) => {
+    return await apiClient.get("/auth/admin/local-representatives", {
+      params,
+    });
+  },
+
+  getLocalRepresentativeById: async (userId) => {
+    return await apiClient.get(`/auth/admin/local-representatives/${userId}`);
+  },
+
+  createLocalRepresentative: async (data) => {
+    return await apiClient.post("/auth/admin/local-representatives", data);
+  },
+
+  updateLocalRepresentativeRegions: async (userId, regions) => {
+    return await apiClient.patch(
+      `/auth/admin/local-representatives/${userId}/regions`,
+      { regions },
+    );
+  },
+
   // Admin methods for account deletion
   getAccountDeletionRequests: async (params = {}) => {
     return await apiClient.get("/auth/admin/account-deletion-requests", {
