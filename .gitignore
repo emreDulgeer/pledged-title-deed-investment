@@ -12,3 +12,6 @@ db/dumps/
 Thumbs.db
 uploads/
 !uploads/.gitkeep
+
+# local Codex notes
+codex-notes/
