@@ -1,0 +1,12 @@
+stages:
+  - test
+
+runner:smoke:
+  stage: test
+  image: node:20
+  tags:
+    - docker
+  script:
+    - node --version
+    - npm --version
+    - echo "Local GitLab Runner is working!"
