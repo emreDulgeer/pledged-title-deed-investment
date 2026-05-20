@@ -46,7 +46,6 @@ export default function AdminInvestmentDetail() {
   const [documents, setDocuments] = useState([]);
   const [stats, setStats] = useState(null);
   const [tab, setTab] = useState("overview");
-  const [approvingTitleDeed, setApprovingTitleDeed] = useState(false);
 
   const load = async () => {
     dispatch(fetchInvestmentById(id));
@@ -69,20 +68,6 @@ export default function AdminInvestmentDetail() {
       await bridge.investments.downloadDocument(id, fileId);
     } catch (e) {
       console.error("Download error:", e);
-    }
-  };
-
-  const handleApproveTitleDeed = async () => {
-    try {
-      setApprovingTitleDeed(true);
-      const response = await bridge.investments.approveTitleDeed(id);
-      if (response?.success) {
-        await load();
-      }
-    } catch (error) {
-      console.error("Approve title deed error:", error);
-    } finally {
-      setApprovingTitleDeed(false);
     }
   };
 
@@ -142,6 +127,10 @@ export default function AdminInvestmentDetail() {
     "admin",
     getUserId(investment?.property),
   );
+  const showPaymentsTab = (investment?.rentalPayments?.length || 0) > 0;
+  const availableTabs = showPaymentsTab
+    ? ["overview", "property", "payments", "documents"]
+    : ["overview", "property", "documents"];
 
   const docTypeLabel = (type) => t(`documents.types.${type}`, type);
 
@@ -158,14 +147,9 @@ export default function AdminInvestmentDetail() {
             {t("admin.investments.to_list")}
           </RouterLink>
           {investment.status === "title_deed_pending" && (
-            <button
-              type="button"
-              onClick={handleApproveTitleDeed}
-              disabled={approvingTitleDeed}
-              className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
-            >
-              {approvingTitleDeed ? "Approving..." : "Approve Title Deed"}
-            </button>
+            <div className="rounded-full bg-amber-100 px-4 py-2 text-xs font-semibold text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+              Waiting for participant approvals
+            </div>
           )}
         </div>
 
@@ -189,31 +173,23 @@ export default function AdminInvestmentDetail() {
 
               {/* Tabs */}
               <div className="flex gap-2 border-b border-day-border dark:border-night-border">
-                {[
-                  {
-                    key: "overview",
-                    label: t("admin.investments.tab_overview"),
-                  },
-                  {
-                    key: "property",
-                    label: t("investments.property", "Property"),
-                  },
-                  {
-                    key: "payments",
-                    label: t("admin.investments.tab_payments"),
-                  },
-                  { key: "documents", label: t("investments.documents") },
-                ].map((tb) => (
+                {availableTabs.map((tabKey) => (
                   <button
-                    key={tb.key}
-                    onClick={() => setTab(tb.key)}
+                    key={tabKey}
+                    onClick={() => setTab(tabKey)}
                     className={`px-3 py-2 text-sm border-b-2 -mb-px ${
-                      tab === tb.key
+                      tab === tabKey
                         ? "border-night-primary text-day-text dark:text-night-text"
                         : "border-transparent text-day-text/60 dark:text-night-text/60 hover:text-day-text dark:hover:text-night-text"
                     }`}
                   >
-                    {tb.label}
+                    {tabKey === "overview"
+                      ? t("admin.investments.tab_overview")
+                      : tabKey === "property"
+                        ? t("investments.property", "Property")
+                        : tabKey === "payments"
+                          ? t("admin.investments.tab_payments")
+                          : t("investments.documents")}
                   </button>
                 ))}
               </div>
@@ -343,7 +319,7 @@ export default function AdminInvestmentDetail() {
                 />
               )}
 
-              {tab === "payments" && (
+              {tab === "payments" && showPaymentsTab && (
                 <div className="rounded-xl border border-day-border dark:border-night-border overflow-hidden">
                   <table className="w-full">
                     <thead className="bg-day-surface dark:bg-night-surface text-day-text/70 dark:text-night-text/70">

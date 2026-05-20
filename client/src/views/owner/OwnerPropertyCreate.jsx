@@ -676,13 +676,13 @@ const OwnerPropertyCreate = () => {
               ? `Property created, but some files could not be uploaded: ${uploadError.message}`
               : "Property created, but some files could not be uploaded.",
           );
-          navigate(`/owner/properties/${createdId}`);
+          navigate(`/owner/properties/${createdId}`, { replace: true });
           return;
         }
       }
 
       if (createdId) {
-        navigate(`/owner/properties/${createdId}`);
+        navigate(`/owner/properties/${createdId}`, { replace: true });
         return;
       }
 

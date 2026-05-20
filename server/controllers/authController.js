@@ -16,6 +16,7 @@ const validator = require("validator");
 const speakeasy = require("speakeasy");
 const QRCode = require("qrcode");
 const notificationService = require("../services/notificationService");
+const membershipService = require("../services/membershipService");
 const {
   getPrimaryRepresentativeRegion,
   getRepresentativeRegions,
@@ -118,7 +119,7 @@ class AuthController {
         country,
         role,
         membershipPlan: "Basic", // Default plan
-        membershipStatus: "active", // Ödeme yapılana kadar inactive olacak şimdilik active
+        membershipStatus: "inactive",
         kycStatus: "Pending",
         is2FAEnabled: false,
         emailVerified: false,
@@ -1213,6 +1214,10 @@ class AuthController {
       }
 
       await user.save();
+
+      if (user.role === "investor" || user.role === "property_owner") {
+        await membershipService.ensureDefaultMembershipForUser(user._id);
+      }
 
       // Delete token
       await storedToken.deleteOne();
@@ -3004,7 +3009,20 @@ class AuthController {
       user.accountStatus = status;
       await user.save();
 
-      return responseWrapper.success(res, user, "Kullanıcı durumu güncellendi");
+      if (
+        status === "active" &&
+        ["investor", "property_owner"].includes(user.role)
+      ) {
+        await membershipService.ensureDefaultMembershipForUser(user._id);
+      }
+
+      const updatedUser = await User.findById(userId);
+
+      return responseWrapper.success(
+        res,
+        updatedUser,
+        "Kullanıcı durumu güncellendi"
+      );
     } catch (error) {
       console.error("Update user status error:", error);
       return responseWrapper.error(res, "Durum güncellenemedi");

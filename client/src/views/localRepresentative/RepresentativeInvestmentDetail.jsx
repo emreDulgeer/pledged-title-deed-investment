@@ -1,7 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { ArrowLeft, Loader2, UploadCloud } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Download,
+  Loader2,
+  UploadCloud,
+  XCircle,
+} from "lucide-react";
 
 import InvestmentController from "../../controllers/investmentController";
 import InvestmentPropertyPanel from "../../components/investments/InvestmentPropertyPanel";
@@ -26,6 +33,30 @@ const PROCESS_LABELS = {
   completion: "Completion",
 };
 
+const REVIEW_STATUS_STYLES = {
+  not_requested:
+    "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+  pending_review:
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
+  approved:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200",
+  changes_requested:
+    "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200",
+};
+
+const formatReviewLabel = (status) => {
+  switch (status) {
+    case "pending_review":
+      return "Pending review";
+    case "approved":
+      return "Approved";
+    case "changes_requested":
+      return "Re-upload requested";
+    default:
+      return "No review required";
+  }
+};
+
 const RepresentativeInvestmentDetail = () => {
   const { id } = useParams();
   const user = useSelector(selectUser);
@@ -35,6 +66,8 @@ const RepresentativeInvestmentDetail = () => {
   const [investment, setInvestment] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [extraDocumentType, setExtraDocumentType] = useState("notary_document");
+  const [reviewingFileId, setReviewingFileId] = useState(null);
+  const [reviewNotes, setReviewNotes] = useState({});
 
   const isAssignedRepresentative = useMemo(() => {
     return (
@@ -136,6 +169,82 @@ const RepresentativeInvestmentDetail = () => {
     }
   };
 
+  const handleReviewDocument = async (fileId, action) => {
+    const note = String(reviewNotes[fileId] || "").trim();
+
+    if (action === "request_changes" && !note) {
+      window.alert("Please explain what should be corrected before re-upload.");
+      return;
+    }
+
+    try {
+      setReviewingFileId(fileId);
+      const response = await InvestmentController.reviewDocument(id, fileId, {
+        action,
+        notes: note,
+      });
+
+      if (response?.success) {
+        await loadData();
+        setReviewNotes((current) => ({
+          ...current,
+          [fileId]: "",
+        }));
+        window.alert(
+          action === "approve"
+            ? "Document approved successfully."
+            : "Re-upload requested successfully.",
+        );
+      }
+    } catch (error) {
+      console.error("Representative review error:", error);
+      window.alert(error.message || "Failed to update document review.");
+    } finally {
+      setReviewingFileId(null);
+    }
+  };
+
+  const canClaimRequest =
+    !!investment?.representativeRequest?.isPending &&
+    !investment?.localRepresentative;
+  const reviewableDocuments = useMemo(
+    () =>
+      documents
+        .filter((item) => item.canReview)
+        .slice()
+        .sort((left, right) => {
+          const leftPriority = left.reviewStatus === "pending_review" ? 0 : 1;
+          const rightPriority = right.reviewStatus === "pending_review" ? 0 : 1;
+
+          if (leftPriority !== rightPriority) {
+            return leftPriority - rightPriority;
+          }
+
+          return new Date(right.uploadedAt || 0) - new Date(left.uploadedAt || 0);
+        }),
+    [documents],
+  );
+  const pendingReviewCount = useMemo(
+    () =>
+      reviewableDocuments.filter(
+        (item) => item.reviewStatus === "pending_review",
+      ).length,
+    [reviewableDocuments],
+  );
+  const canUploadTitleDeed =
+    isAssignedRepresentative &&
+    investment?.status === "contract_signed" &&
+    !!investment?.contractWorkflow?.fullySignedAt &&
+    investment?.principalPayment?.status === "confirmed";
+  const propertyPath =
+    isAssignedRepresentative && investment?.property
+      ? getInvestmentPropertyPath(
+          "local_representative",
+          getUserId(investment.property),
+        )
+      : null;
+  const processEntries = Object.entries(investment?.processTracking || {});
+
   if (loading) {
     return (
       <div className="grid min-h-[320px] place-items-center rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface">
@@ -163,16 +272,6 @@ const RepresentativeInvestmentDetail = () => {
       </div>
     );
   }
-
-  const canClaimRequest =
-    investment.representativeRequest?.isPending &&
-    !investment.localRepresentative;
-  const canUploadTitleDeed =
-    isAssignedRepresentative && investment.status === "contract_signed";
-  const propertyPath = isAssignedRepresentative
-    ? getInvestmentPropertyPath("local_representative", getUserId(investment.property))
-    : null;
-  const processEntries = Object.entries(investment.processTracking || {});
 
   return (
     <div className="space-y-6">
@@ -239,10 +338,10 @@ const RepresentativeInvestmentDetail = () => {
         </div>
         <div className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-5">
           <p className="text-sm text-day-text/60 dark:text-night-text/60">
-            Requested On
+            Pending Reviews
           </p>
           <p className="mt-2 text-2xl font-bold text-day-text dark:text-night-text">
-            {formatDate(investment.representativeRequest?.requestDate)}
+            {pendingReviewCount}
           </p>
         </div>
       </div>
@@ -357,7 +456,7 @@ const RepresentativeInvestmentDetail = () => {
         </h2>
 
         {isAssignedRepresentative && (
-          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <div className="mt-5 grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
             <div className="rounded-xl border border-day-border dark:border-night-border p-4">
               <p className="text-sm font-medium text-day-text dark:text-night-text">
                 Upload Title Deed
@@ -378,8 +477,8 @@ const RepresentativeInvestmentDetail = () => {
               </label>
               {!canUploadTitleDeed && (
                 <p className="mt-3 text-xs text-amber-600 dark:text-amber-300">
-                  Title deed upload becomes available once the case is claimed and
-                  remains in the contract stage.
+                  Title deed upload becomes available after signed contracts are
+                  approved and the principal payment is confirmed.
                 </p>
               )}
             </div>
@@ -410,6 +509,124 @@ const RepresentativeInvestmentDetail = () => {
                     disabled={uploading || !isAssignedRepresentative}
                   />
                 </label>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-day-border dark:border-night-border p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-day-text dark:text-night-text">
+                    Review Queue
+                  </p>
+                  <p className="mt-1 text-sm text-day-text/60 dark:text-night-text/60">
+                    Download the uploaded files, verify them locally, then approve
+                    or ask for a corrected re-upload.
+                  </p>
+                </div>
+                <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-200">
+                  {pendingReviewCount} pending
+                </span>
+              </div>
+
+              <div className="mt-4 space-y-4">
+                {reviewableDocuments.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-day-border dark:border-night-border px-4 py-5 text-sm text-day-text/60 dark:text-night-text/60">
+                    No reviewable documents have been uploaded yet.
+                  </div>
+                ) : (
+                  reviewableDocuments.map((document) => {
+                    const isReviewing = reviewingFileId === document.fileId;
+                    return (
+                      <article
+                        key={document.fileId}
+                        className="rounded-xl border border-day-border dark:border-night-border p-4"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                              {document.name}
+                            </p>
+                            <p className="mt-1 text-xs text-day-text/55 dark:text-night-text/55">
+                              {document.type.replaceAll("_", " ")} · uploaded{" "}
+                              {formatDate(document.uploadedAt)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDownloadDocument(document.fileId, document.name)
+                            }
+                            className="inline-flex items-center gap-2 rounded-lg border border-day-border dark:border-night-border px-3 py-2 text-xs font-medium text-day-text hover:bg-day-border/10 dark:text-night-text dark:hover:bg-night-border/10"
+                          >
+                            <Download className="h-4 w-4" />
+                            Download
+                          </button>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${REVIEW_STATUS_STYLES[document.reviewStatus] || REVIEW_STATUS_STYLES.not_requested}`}
+                          >
+                            {formatReviewLabel(document.reviewStatus)}
+                          </span>
+                          {document.verified ? (
+                            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
+                              Workflow verified
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {document.reviewNotes ? (
+                          <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/20 dark:text-amber-100">
+                            Latest note: {document.reviewNotes}
+                          </div>
+                        ) : null}
+
+                        <textarea
+                          value={reviewNotes[document.fileId] || ""}
+                          onChange={(event) =>
+                            setReviewNotes((current) => ({
+                              ...current,
+                              [document.fileId]: event.target.value,
+                            }))
+                          }
+                          placeholder="Optional approval note or required re-upload details..."
+                          className="mt-3 min-h-[88px] w-full rounded-xl border border-day-border dark:border-night-border bg-transparent px-4 py-3 text-sm text-day-text dark:text-night-text"
+                        />
+
+                        <div className="mt-3 flex flex-wrap gap-3">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleReviewDocument(document.fileId, "approve")
+                            }
+                            disabled={isReviewing || document.reviewStatus === "approved"}
+                            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                            {document.type === "title_deed"
+                              ? "Approve and start rental period"
+                              : "Approve document"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleReviewDocument(
+                                document.fileId,
+                                "request_changes",
+                              )
+                            }
+                            disabled={isReviewing}
+                            className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+                          >
+                            <XCircle className="h-4 w-4" />
+                            Request re-upload
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>

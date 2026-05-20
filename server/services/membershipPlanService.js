@@ -4,6 +4,7 @@ const membershipPlanRepository = require("../repositories/membershipPlanReposito
 const membershipRepository = require("../repositories/membershipRepository");
 const CustomError = require("../utils/CustomError");
 const { logActivity } = require("../utils/activityLogger");
+const { buildMembershipFeatureSnapshot } = require("../utils/membershipFeatures");
 
 class MembershipPlanService {
   /**
@@ -544,7 +545,7 @@ class MembershipPlanService {
     const Membership = require("../models/Membership");
     await Membership.updateMany(
       { plan: planId, status: "active" },
-      { features: newFeatures }
+      { features: buildMembershipFeatureSnapshot(newFeatures) }
     );
   }
 

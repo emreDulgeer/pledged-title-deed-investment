@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import InvestmentController from "../../controllers/investmentController";
 import { useTranslation } from "react-i18next";
@@ -84,6 +84,8 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("");
+  const [reviewingFileId, setReviewingFileId] = useState(null);
+  const [reviewNotes, setReviewNotes] = useState({});
 
   const loadInvestmentDetails = useCallback(async () => {
     try {
@@ -289,6 +291,99 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
     }
   };
 
+  const handleReviewDocument = async (fileId, action) => {
+    const note = String(reviewNotes[fileId] || "").trim();
+
+    if (action === "request_changes" && !note) {
+      alert("Please explain what should be corrected before re-upload.");
+      return;
+    }
+
+    try {
+      setReviewingFileId(fileId);
+      const response = await InvestmentController.reviewDocument(id, fileId, {
+        action,
+        notes: note,
+      });
+
+      if (response.success) {
+        await loadInvestmentDetails();
+        await loadDocuments();
+        setReviewNotes((current) => ({
+          ...current,
+          [fileId]: "",
+        }));
+        alert(
+          action === "approve"
+            ? "Document approved successfully."
+            : "Re-upload requested successfully.",
+        );
+      }
+    } catch (error) {
+      console.error("Document review error:", error);
+      alert(error.message || "Failed to update document review.");
+    } finally {
+      setReviewingFileId(null);
+    }
+  };
+
+  const backPath = isOwnerView
+    ? "/owner/offers"
+    : ["offer_sent", "rejected"].includes(investment?.status)
+      ? "/investor/offers"
+      : "/investor/investments";
+  const documentsByType = useMemo(() => {
+    const mapped = new Map();
+    documents.forEach((item) => {
+      if (item?.type && !mapped.has(item.type)) {
+        mapped.set(item.type, item);
+      }
+    });
+    return mapped;
+  }, [documents]);
+  const viewerContractDocument = documentsByType.get(
+    isOwnerView ? "contract_owner_signed" : "contract_investor_signed",
+  );
+  const paymentReceiptDocument = documentsByType.get("payment_receipt");
+  const titleDeedDocument = documentsByType.get("title_deed");
+  const viewerContractNeedsReupload =
+    viewerContractDocument?.reviewStatus === "changes_requested";
+  const paymentReceiptNeedsReupload =
+    paymentReceiptDocument?.reviewStatus === "changes_requested";
+  const titleDeedNeedsReupload =
+    titleDeedDocument?.reviewStatus === "changes_requested";
+  const isOfferStage = ["offer_sent", "rejected"].includes(
+    investment?.status,
+  );
+  const reviewableDocuments = useMemo(
+    () =>
+      documents
+        .filter((item) => item.canReview)
+        .slice()
+        .sort((left, right) => {
+          const leftPriority = left.reviewStatus === "pending_review" ? 0 : 1;
+          const rightPriority = right.reviewStatus === "pending_review" ? 0 : 1;
+
+          if (leftPriority !== rightPriority) {
+            return leftPriority - rightPriority;
+          }
+
+          return new Date(right.uploadedAt || 0) - new Date(left.uploadedAt || 0);
+        }),
+    [documents],
+  );
+  const hasRentalPayments = (investment?.rentalPayments?.length || 0) > 0;
+  const showPaymentsTab = hasRentalPayments;
+  const availableTabs = showPaymentsTab
+    ? ["overview", "property", "payments", "documents"]
+    : ["overview", "property", "documents"];
+
+  useEffect(() => {
+    if (!showPaymentsTab && activeTab === "payments") {
+      setActiveTab("overview");
+    }
+  }, [activeTab, showPaymentsTab]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -334,11 +429,6 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
     (!isOwnerView && ["offer_sent", "rejected"].includes(investment.status))
       ? "Offer Details"
       : t("investor.investmentDetails");
-  const backPath = isOwnerView
-    ? "/owner/offers"
-    : ["offer_sent", "rejected"].includes(investment.status)
-      ? "/investor/offers"
-      : "/investor/investments";
   const contractWorkflow = investment.contractWorkflow || {};
   const offerTerms = investment.offerTerms || {};
   const agreedMonthlyRent =
@@ -353,7 +443,8 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
   const contractFullySigned = !!contractWorkflow.fullySignedAt;
   const principalPaymentStatus = principalPayment.status || "not_started";
   const canUploadContract =
-    investment.status === "contract_signed" && !viewerHasSignedContract;
+    investment.status === "contract_signed" &&
+    (!viewerHasSignedContract || viewerContractNeedsReupload);
   const canPreparePayment =
     !isOwnerView &&
     investment.status === "contract_signed" &&
@@ -369,12 +460,15 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
     investment.status === "contract_signed" &&
     contractFullySigned &&
     principalPaymentStatus !== "confirmed" &&
+    !paymentReceiptNeedsReupload &&
+    paymentReceiptDocument?.reviewStatus === "approved" &&
+    !paymentReceiptDocument?.canReview &&
     (paymentInstructions || investment.paymentReceipt?.fileId);
   const canUploadTitleDeed =
     isOwnerView &&
     investment.status === "contract_signed" &&
     principalPaymentStatus === "confirmed" &&
-    !investment.titleDeedDocument?.fileId;
+    (!investment.titleDeedDocument?.fileId || titleDeedNeedsReupload);
   const representativeRequestPending =
     investment.representativeRequest?.isPending || false;
   const canRequestRepresentative =
@@ -387,6 +481,9 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
     isOwnerView ? "owner" : "investor",
     getUserId(investment.property),
   );
+  const paymentReceiptWaitingMessage = isOwnerView
+    ? "Investor receipt is waiting for your verification below."
+    : "Receipt uploaded. Waiting for property owner verification.";
 
   return (
     <div className="p-6 space-y-6">
@@ -455,7 +552,7 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
       {/* Tabs */}
       <div className="border-b border-gray-200 dark:border-gray-700">
         <nav className="-mb-px flex space-x-8">
-          {["overview", "property", "payments", "documents"].map((tab) => (
+          {availableTabs.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -606,7 +703,8 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
               </div>
             )}
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {!isOfferStage && (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   Contract Status
@@ -763,7 +861,8 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
                   </div>
                 )}
               </div>
-            </div>
+              </div>
+            )}
 
             {/* Progress Tracking */}
             {investment.processTracking && (
@@ -804,7 +903,7 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
             )}
 
             {/* Calculations */}
-            {investment.calculations && (
+            {investment.calculations && hasRentalPayments && (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   {t("investor.calculations")}
@@ -897,13 +996,37 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
                   </div>
                 )}
 
+                {viewerContractNeedsReupload && (
+                  <div className="rounded-lg border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 p-4 md:col-span-2">
+                    <p className="text-sm text-rose-900 dark:text-rose-100">
+                      The current signed contract needs to be uploaded again.
+                      {viewerContractDocument?.reviewNotes
+                        ? ` Note from reviewer: ${viewerContractDocument.reviewNotes}`
+                        : ""}
+                    </p>
+                  </div>
+                )}
+
                 {investment.status === "contract_signed" &&
                   viewerHasSignedContract &&
+                  !viewerContractNeedsReupload &&
                   !otherPartyHasSignedContract && (
                     <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 md:col-span-2">
                       <p className="text-sm text-amber-900 dark:text-amber-100">
                         You uploaded your signed contract. Waiting for the other
                         party to upload theirs before the payment step opens.
+                      </p>
+                    </div>
+                  )}
+
+                {investment.status === "contract_signed" &&
+                  viewerHasSignedContract &&
+                  otherPartyHasSignedContract &&
+                  !contractFullySigned && (
+                    <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4 md:col-span-2">
+                      <p className="text-sm text-blue-900 dark:text-blue-100">
+                        Signed contracts were uploaded. Waiting for the required
+                        approvals before the payment step opens.
                       </p>
                     </div>
                   )}
@@ -955,9 +1078,140 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
                     />
                     {investment.paymentReceipt?.fileId && (
                       <p className="mt-2 text-xs text-green-600 dark:text-green-400">
-                        Receipt uploaded. Waiting for owner confirmation.
+                        {paymentReceiptWaitingMessage}
                       </p>
                     )}
+                  </div>
+                )}
+
+                {paymentReceiptNeedsReupload && !isOwnerView && (
+                  <div className="rounded-lg border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 p-4 md:col-span-2">
+                    <p className="text-sm text-rose-900 dark:text-rose-100">
+                      The uploaded payment receipt needs a corrected version.
+                      {paymentReceiptDocument?.reviewNotes
+                        ? ` Note from reviewer: ${paymentReceiptDocument.reviewNotes}`
+                        : ""}
+                    </p>
+                  </div>
+                )}
+
+                {paymentReceiptNeedsReupload && isOwnerView && (
+                  <div className="rounded-lg border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 p-4 md:col-span-2">
+                    <p className="text-sm text-rose-900 dark:text-rose-100">
+                      The investor must upload a corrected payment receipt before
+                      you can confirm the principal payment.
+                      {paymentReceiptDocument?.reviewNotes
+                        ? ` Note from reviewer: ${paymentReceiptDocument.reviewNotes}`
+                        : ""}
+                    </p>
+                  </div>
+                )}
+
+                {reviewableDocuments.length > 0 && (
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/20 p-4 md:col-span-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                          Approval Queue
+                        </h3>
+                        <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                          Review the uploaded documents, then approve them or ask
+                          for a corrected re-upload.
+                        </p>
+                      </div>
+                      <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
+                        {reviewableDocuments.length} pending
+                      </span>
+                    </div>
+
+                    <div className="mt-4 space-y-4">
+                      {reviewableDocuments.map((document) => {
+                        const isReviewing = reviewingFileId === document.fileId;
+                        return (
+                          <div
+                            key={document.fileId}
+                            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800 p-4"
+                          >
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                              <div>
+                                <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                                  {document.name}
+                                </p>
+                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                  {document.type.replaceAll("_", " ")} uploaded{" "}
+                                  {document.uploadedAt
+                                    ? new Date(document.uploadedAt).toLocaleDateString()
+                                    : "-"}
+                                </p>
+                                {document.reviewNotes ? (
+                                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                                    Latest note: {document.reviewNotes}
+                                  </p>
+                                ) : null}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDownloadDocument(
+                                    document.fileId,
+                                    document.name,
+                                  )
+                                }
+                                className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
+                              >
+                                Download
+                              </button>
+                            </div>
+
+                            <textarea
+                              value={reviewNotes[document.fileId] || ""}
+                              onChange={(event) =>
+                                setReviewNotes((current) => ({
+                                  ...current,
+                                  [document.fileId]: event.target.value,
+                                }))
+                              }
+                              placeholder="Optional approval note or required re-upload details..."
+                              className="mt-3 min-h-[88px] w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                            />
+
+                            <div className="mt-3 flex flex-wrap gap-3">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleReviewDocument(document.fileId, "approve")
+                                }
+                                disabled={isReviewing}
+                                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                              >
+                                {isReviewing
+                                  ? "Saving..."
+                                  : isOwnerView &&
+                                      document.type === "payment_receipt"
+                                    ? "Verify Receipt"
+                                    : "Approve Document"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleReviewDocument(
+                                    document.fileId,
+                                    "request_changes",
+                                  )
+                                }
+                                disabled={isReviewing}
+                                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+                              >
+                                {isOwnerView &&
+                                document.type === "payment_receipt"
+                                  ? "Request New Receipt"
+                                  : "Request Re-upload"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
@@ -994,11 +1248,23 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
                   </div>
                 )}
 
+                {titleDeedNeedsReupload && isOwnerView && (
+                  <div className="rounded-lg border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 p-4 md:col-span-2">
+                    <p className="text-sm text-rose-900 dark:text-rose-100">
+                      The uploaded title deed needs a corrected version before
+                      the rental period can start.
+                      {titleDeedDocument?.reviewNotes
+                        ? ` Note from reviewer: ${titleDeedDocument.reviewNotes}`
+                        : ""}
+                    </p>
+                  </div>
+                )}
+
                 {isOwnerView && investment.status === "title_deed_pending" && (
                   <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4 md:col-span-2">
                     <p className="text-sm text-blue-900 dark:text-blue-100">
-                      Title deed document uploaded. Waiting for admin approval
-                      before the rental period starts.
+                      Title deed document uploaded. Waiting for the remaining
+                      participant approvals before the rental period starts.
                     </p>
                   </div>
                 )}
@@ -1034,7 +1300,7 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
         )}
 
         {/* Payments Tab */}
-        {activeTab === "payments" && (
+        {activeTab === "payments" && showPaymentsTab && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
             <div className="p-6">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">

@@ -46,6 +46,7 @@ import InvestorPropertyDetail from "./views/investor/InvestorPropertyDetail";
 import InvestorInvestmentsList from "./views/investor/InvestorInvestmentsList";
 import InvestorInvestmentDetail from "./views/investor/InvestorInvestmentDetail";
 import InvestorRentalPayments from "./views/investor/InvestorRentalPayments";
+import InvestorMembershipPlans from "./views/investor/InvestorMembershipPlans";
 
 // Owner imports
 import OwnerLayout from "./views/layouts/OwnerLayout";
@@ -55,6 +56,7 @@ import OwnerInvestmentDetail from "./views/owner/OwnerInvestmentDetail";
 import OwnerProperties from "./views/owner/OwnerProperties";
 import OwnerRentalPayments from "./views/owner/OwnerRentalPayments";
 import OwnerPropertyCreate from "./views/owner/OwnerPropertyCreate";
+import OwnerMembershipPlans from "./views/owner/OwnerMembershipPlans";
 import LocalRepresentativeLayout from "./views/layouts/LocalRepresentativeLayout";
 import RepresentativeDashboard from "./views/localRepresentative/RepresentativeDashboard";
 import RepresentativeRequestPool from "./views/localRepresentative/RepresentativeRequestPool";
@@ -313,6 +315,10 @@ const AppContent = () => {
             element={<InvestorInvestmentDetail />}
           />
           <Route path="rental-payments" element={<InvestorRentalPayments />} />
+          <Route
+            path="membership-plans"
+            element={<InvestorMembershipPlans />}
+          />
         </Route>
 
         {/* Owner (nested) */}
@@ -332,6 +338,10 @@ const AppContent = () => {
           <Route path="properties" element={<OwnerProperties />} />
           <Route path="properties/new" element={<OwnerPropertyCreate />} />
           <Route path="rental-payments" element={<OwnerRentalPayments />} />
+          <Route
+            path="membership-plans"
+            element={<OwnerMembershipPlans />}
+          />
           <Route path="investments/:id" element={<OwnerInvestmentDetail />} />
           {/* <Route path="notifications" element={<OwnerNotifications />} /> */}
           {/* <Route path="settings" element={<OwnerSettings />} /> */}

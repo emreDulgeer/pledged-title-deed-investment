@@ -147,6 +147,9 @@ class InvestmentFileController {
         relatedId: investmentId,
         documentType: "contract",
         isPublic: false,
+        review: {
+          status: "pending_review",
+        },
       });
 
       await fileMetadata.save();
@@ -297,6 +300,9 @@ class InvestmentFileController {
         documentType: "title_deed",
         isPublic: false,
         virusScanStatus: "pending", // Admin onayı için
+        review: {
+          status: "pending_review",
+        },
       });
 
       await fileMetadata.save();
@@ -321,7 +327,9 @@ class InvestmentFileController {
             needsApproval: true,
           },
         },
-        "Title deed uploaded successfully. Waiting for admin approval."
+        updatedInvestment?.localRepresentative
+          ? "Title deed uploaded successfully. Waiting for representative review."
+          : "Title deed uploaded successfully. Waiting for admin approval."
       );
     } catch (error) {
       console.error("Title deed upload error:", error);
@@ -429,6 +437,9 @@ class InvestmentFileController {
         relatedId: investmentId,
         documentType: "payment_receipt",
         isPublic: false,
+        review: {
+          status: "pending_review",
+        },
       });
 
       await fileMetadata.save();
@@ -733,6 +744,9 @@ class InvestmentFileController {
         relatedId: investmentId,
         documentType: documentType,
         isPublic: false,
+        review: {
+          status: "pending_review",
+        },
       });
 
       await fileMetadata.save();
@@ -796,6 +810,53 @@ class InvestmentFileController {
       }
       if (error.message.includes("Unauthorized")) {
         return responseWrapper.forbidden(res, error.message);
+      }
+      return responseWrapper.error(res, error.message);
+    }
+  };
+
+  /**
+   * Investment dökümanını review et
+   * POST /investments/:investmentId/documents/:fileId/review
+   */
+  reviewInvestmentDocument = async (req, res) => {
+    try {
+      const reviewerId = req.user._id;
+      const reviewerRole = req.user.role;
+      const { investmentId, fileId } = req.params;
+      const { action, notes } = req.body;
+
+      const investment = await this.investmentService.reviewInvestmentDocument(
+        investmentId,
+        fileId,
+        reviewerId,
+        reviewerRole,
+        { action, notes },
+      );
+
+      return responseWrapper.success(
+        res,
+        investment,
+        action === "approve"
+          ? "Document approved successfully"
+          : "New upload requested successfully",
+      );
+    } catch (error) {
+      if (error.message.includes("not found")) {
+        return responseWrapper.notFound(res, error.message);
+      }
+      if (
+        error.message.includes("Unauthorized") ||
+        error.message.includes("cannot be reviewed")
+      ) {
+        return responseWrapper.forbidden(res, error.message);
+      }
+      if (
+        error.message.includes("Invalid") ||
+        error.message.includes("Please add a note") ||
+        error.message.includes("new upload is required")
+      ) {
+        return responseWrapper.badRequest(res, error.message);
       }
       return responseWrapper.error(res, error.message);
     }

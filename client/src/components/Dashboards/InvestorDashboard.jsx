@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import InvestmentController from "../../controllers/investmentController";
-import PropertyController from "../../controllers/propertyController";
 import { useTranslation } from "react-i18next";
 import StatsCard from "../../components/common/SimpleStatsCard";
 import {

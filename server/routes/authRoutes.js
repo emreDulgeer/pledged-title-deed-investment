@@ -14,6 +14,7 @@ const { body, param } = require("express-validator");
 const User = require("../models/User");
 const responseWrapper = require("../utils/responseWrapper");
 const notificationService = require("../services/notificationService");
+const membershipService = require("../services/membershipService");
 
 // ==================== PUBLIC ROUTES ====================
 
@@ -632,6 +633,13 @@ router.post(
       user.kycStatus = "Approved";
       await user.save();
 
+      if (
+        user.accountStatus === "active" &&
+        ["investor", "property_owner"].includes(user.role)
+      ) {
+        await membershipService.ensureDefaultMembershipForUser(user._id);
+      }
+
       // Bildirim gönder - Doğru parametre sırası ile
       await notificationService.createNotification(
         user._id, // recipientId
@@ -646,7 +654,13 @@ router.post(
         }
       );
 
-      return responseWrapper.success(res, user, "KYC onayı başarıyla verildi");
+      const updatedUser = await User.findById(user._id);
+
+      return responseWrapper.success(
+        res,
+        updatedUser,
+        "KYC onayı başarıyla verildi"
+      );
     } catch (err) {
       console.error("KYC approve error:", err);
       return responseWrapper.error(res, "KYC onayı sırasında hata oluştu");

@@ -1,6 +1,10 @@
 // server/models/Membership.js
 
 const mongoose = require("mongoose");
+const {
+  getCommissionDiscount,
+  getMaxActiveInvestments,
+} = require("../utils/membershipFeatures");
 
 const MembershipSchema = new mongoose.Schema(
   {
@@ -237,7 +241,10 @@ MembershipSchema.index({ "usage.currentActiveInvestments": 1 });
 
 // Virtual: Aktif mi?
 MembershipSchema.virtual("isActive").get(function () {
-  return this.status === "active" && this.expiresAt > new Date();
+  return (
+    this.status === "active" &&
+    (!this.expiresAt || this.expiresAt > new Date())
+  );
 });
 
 // Virtual: Yenilenecek mi?
@@ -247,19 +254,22 @@ MembershipSchema.virtual("willRenew").get(function () {
 
 // Methods
 MembershipSchema.methods.canMakeInvestment = function () {
-  if (this.features.investments?.maxActiveInvestments === -1) return true; // Unlimited
-  return (
-    this.usage.currentActiveInvestments <
-    (this.features.investments?.maxActiveInvestments || 1)
-  );
+  const maxActiveInvestments = getMaxActiveInvestments(this.features);
+
+  if (maxActiveInvestments === -1) {
+    return true;
+  }
+
+  return this.usage.currentActiveInvestments < maxActiveInvestments;
 };
 
 MembershipSchema.methods.getRemainingInvestments = function () {
-  const maxInvestments = this.features.investments?.maxActiveInvestments;
+  const maxInvestments = getMaxActiveInvestments(this.features);
+
   if (maxInvestments === -1) return "Unlimited";
   return Math.max(
     0,
-    (maxInvestments || 1) - this.usage.currentActiveInvestments
+    maxInvestments - this.usage.currentActiveInvestments
   );
 };
 
@@ -267,11 +277,7 @@ MembershipSchema.methods.getDiscountedCommission = function (
   baseCommission,
   type = "platform"
 ) {
-  const discountField =
-    type === "rental"
-      ? "rentalCommissionDiscount"
-      : "platformCommissionDiscount";
-  const discount = this.features.commissions?.[discountField] || 0;
+  const discount = getCommissionDiscount(this.features, type);
   return baseCommission * (1 - discount / 100);
 };
 

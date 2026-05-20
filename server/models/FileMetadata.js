@@ -86,6 +86,8 @@ const FileMetadataSchema = new mongoose.Schema(
         "tax_document",
         "floor_plan",
         "contract",
+        "contract_investor_signed",
+        "contract_owner_signed",
         "payment_receipt",
         "notary_document",
         "power_of_attorney",
@@ -236,6 +238,43 @@ const FileMetadataSchema = new mongoose.Schema(
     // Açıklamalar
     description: String,
     notes: String,
+    review: {
+      status: {
+        type: String,
+        enum: ["not_requested", "pending_review", "approved", "changes_requested"],
+        default: "not_requested",
+      },
+      reviewedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      reviewerRole: {
+        type: String,
+        enum: ["admin", "investor", "property_owner", "local_representative", null],
+        default: null,
+      },
+      reviewedAt: Date,
+      notes: String,
+      requiredApprovals: [
+        {
+          reviewerId: {
+            type: mongoose.Schema.Types.ObjectId,
+          },
+          reviewerRole: {
+            type: String,
+            enum: ["investor", "property_owner", "local_representative"],
+            required: true,
+          },
+          status: {
+            type: String,
+            enum: ["pending", "approved", "changes_requested"],
+            default: "pending",
+          },
+          notes: String,
+          reviewedAt: Date,
+        },
+      ],
+    },
   },
   {
     timestamps: true,

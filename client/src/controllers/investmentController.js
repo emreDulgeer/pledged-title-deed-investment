@@ -175,6 +175,13 @@ const InvestmentController = {
     );
   },
 
+  reviewDocument: async (investmentId, fileId, payload) => {
+    return await apiClient.post(
+      `/investments/${investmentId}/documents/${fileId}/review`,
+      payload,
+    );
+  },
+
   // Investment dökümanı sil (Admin)
   deleteDocument: async (investmentId, fileId) => {
     return await apiClient.delete(

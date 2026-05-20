@@ -138,6 +138,13 @@ router.get(
   investmentFileController.getInvestmentDocuments
 );
 
+router.post(
+  "/:investmentId/documents/:fileId/review",
+  auth,
+  authorize(["investor", "property_owner", "local_representative"]),
+  investmentFileController.reviewInvestmentDocument
+);
+
 // Investment dökümanını indir
 router.get(
   "/:investmentId/documents/:fileId/download",

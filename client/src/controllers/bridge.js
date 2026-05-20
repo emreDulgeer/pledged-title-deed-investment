@@ -5,6 +5,7 @@ import investmentController from "./investmentController";
 import userController from "./userController";
 import fileController from "./fileController";
 import membershipPlanController from "./membershipPlanController";
+import membershipController from "./membershipController";
 import notificationController from "./notificationController";
 import geocodingController from "./geocodingController";
 import profileController from "./profileController";
@@ -18,6 +19,7 @@ const bridge = {
   users: userController,
   files: fileController,
   membershipPlans: membershipPlanController,
+  membership: membershipController,
   notifications: notificationController,
   geocoding: geocodingController,
   profiles: profileController,

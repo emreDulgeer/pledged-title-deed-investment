@@ -51,6 +51,11 @@ const InvestorLayout = () => {
       icon: <IconChart />,
     },
     {
+      title: t("navigation.membership_plans") || "Membership Plans",
+      path: "/investor/membership-plans",
+      icon: <IconMembership />,
+    },
+    {
       title: t("navigation.rental_payments") || "Rental Payments",
       path: "/investor/rental-payments",
       icon: <IconReceipt />,
@@ -186,6 +191,22 @@ const IconReceipt = () => (
       strokeLinejoin="round"
       strokeWidth={2}
       d="M9 14h6m-6-4h6M7 21l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1-2-1-2 1v18z"
+    />
+  </svg>
+);
+
+const IconMembership = () => (
+  <svg
+    className="w-5 h-5"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M12 6l1.76 3.568 3.94.573-2.85 2.778.672 3.932L12 14.998l-3.522 1.853.672-3.932-2.85-2.778 3.94-.573L12 6z"
     />
   </svg>
 );

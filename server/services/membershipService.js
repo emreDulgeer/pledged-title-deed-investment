@@ -5,10 +5,238 @@ const MembershipPlan = require("../models/MembershipPlan");
 const User = require("../models/User");
 const ActivityLog = require("../models/ActivityLog");
 const Notification = require("../models/Notification");
-const Property = require("../models/Property");
-const PropertyOwner = require("../models/PropertyOwner");
 const Investor = require("../models/Investor");
+const {
+  buildMembershipFeatureSnapshot,
+  getCommissionDiscount,
+  getMaxActiveInvestments,
+} = require("../utils/membershipFeatures");
+
 class MembershipService {
+  getPlanDisplayName(plan) {
+    return plan?.displayName || plan?.name || "Basic";
+  }
+
+  buildPricingSnapshot(plan, interval = "monthly") {
+    return {
+      amount: plan.pricing?.[interval]?.amount ?? plan.pricing?.monthly?.amount,
+      currency:
+        plan.pricing?.[interval]?.currency ?? plan.pricing?.monthly?.currency,
+      interval,
+    };
+  }
+
+  async getDefaultPlan() {
+    const defaultPlan =
+      (await MembershipPlan.findOne({ isDefault: true, isActive: true })) ||
+      (await MembershipPlan.findOne({ name: "basic", isActive: true }));
+
+    if (!defaultPlan) {
+      throw new Error("Varsayılan ücretsiz plan bulunamadı");
+    }
+
+    return defaultPlan;
+  }
+
+  async findPlanByName(planName) {
+    if (!planName) {
+      return this.getDefaultPlan();
+    }
+
+    const normalizedName = String(planName).trim().toLowerCase();
+
+    return (
+      (await MembershipPlan.findOne({ name: normalizedName, isActive: true })) ||
+      (await MembershipPlan.findOne({
+        displayName: new RegExp(`^${normalizedName}$`, "i"),
+        isActive: true,
+      })) ||
+      this.getDefaultPlan()
+    );
+  }
+
+  async syncInvestorLimit(userId, role, plan) {
+    if (role !== "investor") {
+      return;
+    }
+
+    await Investor.findByIdAndUpdate(userId, {
+      investmentLimit: getMaxActiveInvestments(plan.features),
+    });
+  }
+
+  async syncUserMembershipState(
+    userId,
+    { plan, status = "active", activatedAt = null, expiresAt = null, accountStatus }
+  ) {
+    const updateData = {
+      membershipPlan: this.getPlanDisplayName(plan),
+      membershipStatus: status,
+      membershipActivatedAt: activatedAt,
+      membershipExpiresAt: expiresAt,
+    };
+
+    if (accountStatus) {
+      updateData.accountStatus = accountStatus;
+    }
+
+    return User.findByIdAndUpdate(userId, updateData, { new: true });
+  }
+
+  async ensureDefaultMembershipForUser(userId) {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error("Kullanıcı bulunamadı");
+    }
+
+    let membership = await Membership.findOne({ user: userId }).populate("plan");
+    if (membership) {
+      const plan =
+        membership.plan || (await this.findPlanByName(membership.planName));
+      const isFreePlan =
+        plan?.pricing?.monthly?.amount === 0 || plan?.name === "basic";
+      let shouldSave = false;
+
+      if (
+        membership.features?.maxActiveInvestments === undefined ||
+        membership.features?.supportLevel === undefined
+      ) {
+        membership.features = buildMembershipFeatureSnapshot(plan);
+        shouldSave = true;
+      }
+
+      if (isFreePlan && membership.status !== "active") {
+        membership.status = "active";
+        membership.activatedAt = membership.activatedAt || new Date();
+        membership.expiresAt = null;
+        membership.nextBillingDate = null;
+        shouldSave = true;
+      }
+
+      if (shouldSave) {
+        await membership.save();
+      }
+
+      await this.syncUserMembershipState(userId, {
+        plan,
+        status: membership.status || "active",
+        activatedAt: membership.activatedAt || new Date(),
+        expiresAt: membership.expiresAt || null,
+      });
+      await this.syncInvestorLimit(userId, user.role, plan);
+
+      if (!membership.plan) {
+        await membership.populate("plan");
+      }
+
+      return membership;
+    }
+
+    const defaultPlan = await this.getDefaultPlan();
+    const activatedAt = new Date();
+
+    membership = new Membership({
+      user: userId,
+      plan: defaultPlan._id,
+      planName: defaultPlan.name,
+      status: "active",
+      features: buildMembershipFeatureSnapshot(defaultPlan),
+      pricing: this.buildPricingSnapshot(defaultPlan, "monthly"),
+      activatedAt,
+      expiresAt: null,
+      nextBillingDate: null,
+      metadata: {
+        source: "system",
+      },
+    });
+
+    await membership.save();
+    await membership.populate("plan");
+    await this.syncUserMembershipState(userId, {
+      plan: defaultPlan,
+      status: "active",
+      activatedAt,
+      expiresAt: null,
+    });
+    await this.syncInvestorLimit(userId, user.role, defaultPlan);
+
+    return membership;
+  }
+
+  async downgradeToDefaultPlan(
+    userId,
+    { reason = "system", previousPlanName = null } = {}
+  ) {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new Error("Kullanıcı bulunamadı");
+    }
+
+    const defaultPlan = await this.getDefaultPlan();
+    let membership = await Membership.findOne({ user: userId });
+
+    if (!membership) {
+      membership = new Membership({
+        user: userId,
+      });
+    }
+
+    const activatedAt = membership.activatedAt || new Date();
+
+    membership.plan = defaultPlan._id;
+    membership.planName = defaultPlan.name;
+    membership.status = "active";
+    membership.features = buildMembershipFeatureSnapshot(defaultPlan);
+    membership.pricing = this.buildPricingSnapshot(defaultPlan, "monthly");
+    membership.activatedAt = activatedAt;
+    membership.expiresAt = null;
+    membership.nextBillingDate = null;
+
+    if (membership.subscription) {
+      membership.subscription.currentPeriodEnd = null;
+      membership.subscription.cancelAtPeriodEnd = false;
+      membership.subscription.cancelledAt = null;
+      membership.subscription.cancelReason = null;
+    }
+
+    await membership.save();
+    await this.syncUserMembershipState(userId, {
+      plan: defaultPlan,
+      status: "active",
+      activatedAt,
+      expiresAt: null,
+    });
+    await this.syncInvestorLimit(userId, user.role, defaultPlan);
+
+    const expiredPlanName =
+      previousPlanName || user.membershipPlan || membership.planName;
+
+    if (reason === "membership_expired") {
+      await this.createNotification(userId, user.role, {
+        type: "membership_expired",
+        title: "Ücretli planınız sona erdi",
+        message:
+          "Plan süreniz dolduğu için hesabınız ücretsiz Basic plana geçirildi.",
+        priority: "high",
+      });
+
+      await this.logActivity(userId, "membership_expired", {
+        expiredPlan: expiredPlanName,
+        fallbackPlan: defaultPlan.name,
+      });
+    }
+
+    if (reason === "membership_cancelled") {
+      await this.logActivity(userId, "membership_cancelled", {
+        previousPlan: expiredPlanName,
+      });
+    }
+
+    await membership.populate("plan");
+
+    return membership;
+  }
+
   /**
    * Yeni membership oluştur (ilk kayıt)
    */
@@ -21,46 +249,37 @@ class MembershipService {
       }
 
       // Plan bilgisini getir
-      const plan = await MembershipPlan.findOne({
-        name: planName.toLowerCase(),
-        isActive: true,
-      });
-
-      if (!plan) {
-        throw new Error(`${planName} planı bulunamadı`);
-      }
+      const plan = await this.findPlanByName(planName);
 
       // Basic plan için otomatik aktivasyon
       const isFreePlan = plan.pricing.monthly.amount === 0;
+      const activatedAt = isFreePlan ? new Date() : null;
 
       const membership = new Membership({
         user: userId,
         plan: plan._id,
         planName: plan.name,
-        status: isFreePlan ? "active" : "pending", // Ücretsiz plan direkt aktif
-        features: plan.features,
-        pricing: {
-          amount: plan.pricing.monthly.amount,
-          currency: plan.pricing.monthly.currency,
-          interval: "monthly",
-        },
-        activatedAt: isFreePlan ? new Date() : null,
+        status: isFreePlan ? "active" : "inactive",
+        features: buildMembershipFeatureSnapshot(plan),
+        pricing: this.buildPricingSnapshot(plan, "monthly"),
+        activatedAt,
         expiresAt: null, // Süresiz
       });
 
       await membership.save();
 
       // User modelini güncelle
-      await User.findByIdAndUpdate(userId, {
-        membershipPlan: plan.name,
-        membershipStatus: membership.status,
-        membershipActivatedAt: membership.activatedAt,
-        membershipExpiresAt: membership.expiresAt,
+      const user = await this.syncUserMembershipState(userId, {
+        plan,
+        status: membership.status,
+        activatedAt,
+        expiresAt: membership.expiresAt,
       });
+      await this.syncInvestorLimit(userId, user?.role, plan);
 
       // Activity Log
       await this.logActivity(userId, "membership_activated", {
-        plan: plan.name,
+        plan: this.getPlanDisplayName(plan),
         status: membership.status,
       });
 
@@ -92,59 +311,52 @@ class MembershipService {
     }
 
     // Membership’i güncelle
+    const isFreePlan = plan.pricing?.monthly?.amount === 0;
     membership.plan = plan._id;
     membership.planName = plan.name;
     membership.status = "active";
-    membership.features = plan.features;
-    membership.pricing = {
-      amount: plan.pricing?.[interval]?.amount ?? plan.pricing?.monthly?.amount,
-      currency:
-        plan.pricing?.[interval]?.currency ?? plan.pricing?.monthly?.currency,
-      interval,
-    };
+    membership.features = buildMembershipFeatureSnapshot(plan);
+    membership.pricing = this.buildPricingSnapshot(plan, interval);
     membership.activatedAt = new Date();
 
     // Süre (ör: monthly = 30 gün, yearly = 365 gün)
-    const expiryDate = new Date();
-    const plusDays = interval === "yearly" ? 365 : 30;
-    expiryDate.setDate(expiryDate.getDate() + plusDays);
+    let expiryDate = null;
+    if (!isFreePlan) {
+      expiryDate = new Date();
+      const plusDays = interval === "yearly" ? 365 : 30;
+      expiryDate.setDate(expiryDate.getDate() + plusDays);
+    }
+
     membership.expiresAt = expiryDate;
     membership.nextBillingDate = expiryDate;
 
     await membership.save();
 
     // User modelini güncelle
-    const user = await User.findByIdAndUpdate(
-      userId,
-      {
-        membershipStatus: membership.status,
-        membershipActivatedAt: membership.activatedAt,
-        membershipExpiresAt: membership.expiresAt,
-        accountStatus: "active",
-      },
-      { new: true }
-    );
+    const user = await this.syncUserMembershipState(userId, {
+      plan,
+      status: membership.status,
+      activatedAt: membership.activatedAt,
+      expiresAt: membership.expiresAt,
+      accountStatus: "active",
+    });
 
     // Investor ise limit güncelle
-    if (user?.role === "investor") {
-      await Investor.findByIdAndUpdate(userId, {
-        investmentLimit: plan.features?.investments?.maxActiveInvestments || 1,
-      });
-    }
+    await this.syncInvestorLimit(userId, user?.role, plan);
 
     // Bildirim
     await this.createNotification(userId, user?.role ?? "investor", {
       type: "membership_upgraded",
       title: "Üyeliğiniz Aktifleştirildi",
       message: `${
-        plan.displayName || plan.name
+        this.getPlanDisplayName(plan)
       } üyelik planınız başarıyla aktifleştirildi.`,
       priority: "high",
     });
 
     // Activity Log
     await this.logActivity(userId, "membership_activated", {
-      plan: plan.name,
+      plan: this.getPlanDisplayName(plan),
       activatedBy: adminId ? "admin" : "system",
       adminId,
       promoCode: promoCode || null,
@@ -165,10 +377,13 @@ class MembershipService {
   }) {
     try {
       // 1) Kullanıcının mevcut membership’ini çek
-      const membership = await Membership.findOne({ user: userId }).populate(
+      let membership = await Membership.findOne({ user: userId }).populate(
         "plan"
       );
-      if (!membership) throw new Error("Üyelik bulunamadı");
+      if (!membership) {
+        membership = await this.ensureDefaultMembershipForUser(userId);
+        await membership.populate("plan");
+      }
 
       const oldPlan = membership.plan;
 
@@ -181,111 +396,51 @@ class MembershipService {
       const user = await User.findById(userId);
       if (!user) throw new Error("Kullanıcı bulunamadı");
 
-      // === Downgrade kontrolü (tier bazlı) ===
-      const isDowngrade = (newPlan.tier || 0) < (oldPlan.tier || 0);
-      if (isDowngrade) {
-        // Investor limiti
-        if (user.role === "investor") {
-          const newMaxInv =
-            newPlan.features?.investments?.maxActiveInvestments ?? 1;
-          const currentActive = membership.usage?.currentActiveInvestments ?? 0;
-          // ESKİ: if (newMaxInv !== -1 && currentActive > newMaxInv) {
-          if (newMaxInv !== -1 && currentActive >= newMaxInv) {
-            throw new Error(
-              `Downgrade mümkün değil: Aktif yatırım sayınız (${currentActive}), ` +
-                `yeni plan limitini (${newMaxInv}) aşıyor/dengeye geliyor.`
-            );
-          }
-        }
-
-        // PropertyOwner limiti
-        if (user.role === "property_owner") {
-          const newMaxProps =
-            newPlan.features?.properties?.maxActiveListings ?? 1;
-          const newMaxPublished =
-            newPlan.features?.properties?.maxPublishedProperties ?? 1;
-          const newMaxContracts =
-            newPlan.features?.properties?.maxConcurrentContracts ?? 1;
-
-          // Aktif ilan/mülk sayısı
-          const activeStatuses = ["published", "in_contract", "active"];
-          const activeProps = await Property.countDocuments({
-            owner: userId,
-            status: { $in: activeStatuses },
-          });
-
-          // Ongoing contracts (User -> PropertyOwner discriminator alanı)
-
-          const ownerDoc = await PropertyOwner.findById(
-            userId,
-            "ongoingContracts"
-          );
-          const ongoing = ownerDoc?.ongoingContracts ?? 0;
-
-          if (newMaxProps !== -1 && activeProps >= newMaxProps) {
-            throw new Error(
-              `Downgrade mümkün değil: Aktif mülk sayınız (${activeProps}) ` +
-                `yeni plan limitini (${newMaxProps}) aşıyor/dengeye geliyor.`
-            );
-          }
-          if (newMaxPublished !== -1 && activeProps >= newMaxPublished) {
-            throw new Error(
-              `Downgrade mümkün değil: Yayındaki ilan sayınız (${activeProps}) ` +
-                `yeni plan limitini (${newMaxPublished}) aşıyor/dengeye geliyor.`
-            );
-          }
-          if (newMaxContracts !== -1 && ongoing >= newMaxContracts) {
-            throw new Error(
-              `Downgrade mümkün değil: Aktif kontrat sayınız (${ongoing}) ` +
-                `yeni plan limitini (${newMaxContracts}) aşıyor/dengeye geliyor.`
-            );
-          }
-        }
-      }
-
       // === Plan değişimini uygula (mevcut mantık) ===
+      const isFreePlan = newPlan.pricing?.monthly?.amount === 0;
       membership.plan = newPlan._id;
       membership.planName = newPlan.name;
-      membership.features = newPlan.features;
-      membership.pricing = {
-        amount:
-          newPlan.pricing?.[interval]?.amount ??
-          newPlan.pricing?.monthly?.amount,
-        currency:
-          newPlan.pricing?.[interval]?.currency ??
-          newPlan.pricing?.monthly?.currency,
-        interval,
-      };
+      membership.status = "active";
+      membership.features = buildMembershipFeatureSnapshot(newPlan);
+      membership.pricing = this.buildPricingSnapshot(newPlan, interval);
+      membership.activatedAt = membership.activatedAt || new Date();
+
+      if (isFreePlan) {
+        membership.expiresAt = null;
+        membership.nextBillingDate = null;
+      } else if (!membership.expiresAt || membership.expiresAt <= new Date()) {
+        const expiryDate = new Date();
+        const plusDays = interval === "yearly" ? 365 : 30;
+        expiryDate.setDate(expiryDate.getDate() + plusDays);
+        membership.expiresAt = expiryDate;
+        membership.nextBillingDate = expiryDate;
+      }
 
       await membership.save();
 
       // User side güncellemeler (zaten mevcut)
-      const updatedUser = await User.findByIdAndUpdate(
-        userId,
-        { membershipPlan: newPlan.name },
-        { new: true }
-      );
+      const updatedUser = await this.syncUserMembershipState(userId, {
+        plan: newPlan,
+        status: membership.status,
+        activatedAt: membership.activatedAt,
+        expiresAt: membership.expiresAt,
+      });
 
       // Investor ise limit güncellemesi (zaten vardı)
-      if (updatedUser.role === "investor") {
-        await Investor.findByIdAndUpdate(userId, {
-          investmentLimit:
-            newPlan.features?.investments?.maxActiveInvestments || 1,
-        });
-      }
+      await this.syncInvestorLimit(userId, updatedUser.role, newPlan);
 
       // Bildirim
       await this.createNotification(userId, user.role, {
         type: "membership_upgraded",
         title: "Plan Değiştirildi",
-        message: `Üyeliğiniz ${newPlan.displayName} planına değiştirildi.`,
+        message: `Üyeliğiniz ${this.getPlanDisplayName(newPlan)} planına değiştirildi.`,
         priority: "medium",
       });
 
       // Activity Log
       await this.logActivity(userId, "membership_plan_changed", {
-        oldPlan: oldPlan.name,
-        newPlan: newPlan.name,
+        oldPlan: this.getPlanDisplayName(oldPlan),
+        newPlan: this.getPlanDisplayName(newPlan),
         changedBy: adminId ? "admin" : "user",
         adminId,
       });
@@ -302,41 +457,18 @@ class MembershipService {
    */
   async cancelMembership(userId, reason = null) {
     try {
-      const membership = await Membership.findOne({ user: userId });
+      const membership = await Membership.findOne({ user: userId }).populate(
+        "plan"
+      );
       if (!membership) {
         throw new Error("Üyelik bulunamadı");
       }
+      const previousPlan = membership.plan;
 
-      // Basic plana geç
-      const basicPlan = await MembershipPlan.findOne({
-        name: "basic",
-        isActive: true,
+      return this.downgradeToDefaultPlan(userId, {
+        reason: "membership_cancelled",
+        previousPlanName: this.getPlanDisplayName(previousPlan),
       });
-
-      membership.plan = basicPlan._id;
-      membership.planName = basicPlan.name;
-      membership.status = "active"; // Basic plan her zaman aktif
-      membership.features = basicPlan.features;
-      membership.pricing = {
-        amount: 0,
-        currency: "EUR",
-        interval: "monthly",
-      };
-
-      await membership.save();
-
-      // User modelini güncelle
-      await User.findByIdAndUpdate(userId, {
-        membershipPlan: "basic",
-        membershipStatus: "active",
-      });
-
-      // Activity Log
-      await this.logActivity(userId, "membership_cancelled", {
-        reason,
-      });
-
-      return membership;
     } catch (error) {
       console.error("Cancel membership error:", error);
       throw error;
@@ -346,7 +478,7 @@ class MembershipService {
   /**
    * Üyeliği yenile (süre uzatma)
    */
-  async renewMembership(userId, days = 30) {
+  async renewMembership(userId, days = 30, adminId = null) {
     try {
       const membership = await Membership.findOne({ user: userId });
       if (!membership) {
@@ -365,9 +497,14 @@ class MembershipService {
       await membership.save();
 
       // User modelini güncelle
-      await User.findByIdAndUpdate(userId, {
-        membershipExpiresAt: newExpiry,
-        membershipStatus: "active",
+      const plan =
+        (await MembershipPlan.findById(membership.plan)) ||
+        (await this.findPlanByName(membership.planName));
+      await this.syncUserMembershipState(userId, {
+        plan,
+        status: "active",
+        activatedAt: membership.activatedAt,
+        expiresAt: newExpiry,
       });
 
       // Activity Log
@@ -400,26 +537,9 @@ class MembershipService {
       });
 
       for (const membership of expiredMemberships) {
-        // Basic plana geç
-        const basicPlan = await MembershipPlan.findOne({
-          name: "basic",
-          isActive: true,
-        });
-
-        membership.status = "expired";
-        membership.plan = basicPlan._id;
-        membership.planName = basicPlan.name;
-        membership.features = basicPlan.features;
-        await membership.save();
-
-        await User.findByIdAndUpdate(membership.user, {
-          membershipStatus: "expired",
-          membershipPlan: "basic",
-        });
-
-        // Activity Log
-        await this.logActivity(membership.user, "membership_expired", {
-          expiredPlan: membership.planName,
+        await this.downgradeToDefaultPlan(membership.user, {
+          reason: "membership_expired",
+          previousPlanName: membership.planName,
         });
       }
 
@@ -467,24 +587,15 @@ class MembershipService {
    */
   async getMembershipStatus(userId) {
     try {
-      const membership = await Membership.findOne({ user: userId }).populate(
-        "plan"
-      );
-
-      if (!membership) {
-        return {
-          hasMembership: false,
-          plan: "none",
-          status: "inactive",
-        };
-      }
+      const membership = await this.ensureDefaultMembershipForUser(userId);
+      await membership.populate("plan");
 
       return {
         hasMembership: true,
-        plan: membership.plan.displayName,
+        plan: this.getPlanDisplayName(membership.plan),
         planId: membership.plan._id,
         status: membership.status,
-        isActive: membership.status === "active",
+        isActive: membership.isActive,
         expiresAt: membership.expiresAt,
         features: membership.features,
         usage: membership.usage,
@@ -502,11 +613,10 @@ class MembershipService {
    */
   async canUserMakeInvestment(userId) {
     try {
-      const membership = await Membership.findOne({ user: userId }).populate(
-        "plan"
-      );
+      const membership = await this.ensureDefaultMembershipForUser(userId);
+      await membership.populate("plan");
 
-      if (!membership || membership.status !== "active") {
+      if (!membership || !membership.isActive) {
         return {
           canInvest: false,
           reason: "Aktif üyeliğiniz bulunmamaktadır",
@@ -514,12 +624,13 @@ class MembershipService {
       }
 
       if (!membership.canMakeInvestment()) {
+        const maxActiveInvestments = getMaxActiveInvestments(membership.features);
         return {
           canInvest: false,
-          reason: `${membership.plan.displayName} planınızda maksimum ${
-            membership.features.investments?.maxActiveInvestments || 1
-          } aktif yatırım hakkınız var.`,
-          currentPlan: membership.plan.displayName,
+          reason: `${this.getPlanDisplayName(
+            membership.plan
+          )} planınızda maksimum ${maxActiveInvestments} aktif yatırım hakkınız var.`,
+          currentPlan: this.getPlanDisplayName(membership.plan),
         };
       }
 
@@ -540,18 +651,24 @@ class MembershipService {
     try {
       const membership = await Membership.findOne({ user: userId });
       if (!membership) {
+        await this.ensureDefaultMembershipForUser(userId);
+      }
+
+      const currentMembership =
+        membership || (await Membership.findOne({ user: userId }));
+      if (!currentMembership) {
         throw new Error("Üyelik bulunamadı");
       }
 
-      membership.usage.currentActiveInvestments += increment;
+      currentMembership.usage.currentActiveInvestments += increment;
       if (increment > 0) {
-        membership.usage.totalInvestmentsMade += increment;
+        currentMembership.usage.totalInvestmentsMade += increment;
       }
-      membership.usage.lastActivityAt = new Date();
+      currentMembership.usage.lastActivityAt = new Date();
 
-      await membership.save();
+      await currentMembership.save();
 
-      return membership;
+      return currentMembership;
     } catch (error) {
       console.error("Update investment count error:", error);
       throw error;
@@ -562,16 +679,14 @@ class MembershipService {
    * Komisyon hesapla
    */
   calculateCommission(membership, baseAmount, commissionType = "platform") {
-    if (!membership || membership.status !== "active") {
+    if (!membership || !membership.isActive) {
       return baseAmount; // İndirim yok
     }
 
-    const discountField =
-      commissionType === "rental"
-        ? "rentalCommissionDiscount"
-        : "platformCommissionDiscount";
-
-    const discountRate = membership.features.commissions?.[discountField] || 0;
+    const discountRate = getCommissionDiscount(
+      membership.features,
+      commissionType
+    );
     return baseAmount * (1 - discountRate / 100);
   }
 

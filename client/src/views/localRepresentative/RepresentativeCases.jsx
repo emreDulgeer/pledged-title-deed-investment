@@ -131,6 +131,7 @@ const RepresentativeCases = () => {
                   <th className="px-5 py-4">Investor</th>
                   <th className="px-5 py-4">Owner</th>
                   <th className="px-5 py-4">Status</th>
+                  <th className="px-5 py-4">Next Step</th>
                   <th className="px-5 py-4">Action</th>
                 </tr>
               </thead>
@@ -155,6 +156,9 @@ const RepresentativeCases = () => {
                       <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
                         {item.status}
                       </span>
+                    </td>
+                    <td className="px-5 py-4 text-sm text-day-text/65 dark:text-night-text/65">
+                      {item.nextStep || "-"}
                     </td>
                     <td className="px-5 py-4">
                       <Link

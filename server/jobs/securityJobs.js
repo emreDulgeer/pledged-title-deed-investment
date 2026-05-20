@@ -6,6 +6,7 @@ const Token = require("../models/Token");
 const AccountDeletionRequest = require("../models/AccountDeletionRequest");
 const ActivityLog = require("../models/ActivityLog");
 const authService = require("../services/authService");
+const membershipService = require("../services/membershipService");
 
 class SecurityJobs {
   /**
@@ -124,30 +125,7 @@ class SecurityJobs {
     cron.schedule("0 1 * * *", async () => {
       try {
         console.log("Checking membership expirations...");
-
-        const expiredMemberships = await User.find({
-          membershipStatus: "active",
-          membershipExpiresAt: { $lte: new Date() },
-        });
-
-        for (const user of expiredMemberships) {
-          user.membershipStatus = "expired";
-          user.membershipPlan = "Basic";
-          await user.save();
-
-          // Send expiration notification
-          const notificationService = require("../services/notificationService");
-          await notificationService.createNotification({
-            recipient: user._id,
-            type: "membership_expired",
-            title: "Üyeliğiniz Sona Erdi",
-            message:
-              "Premium üyeliğinizin süresi doldu. Yenileme için ödeme sayfasını ziyaret edin.",
-            priority: "high",
-          });
-        }
-
-        console.log(`Expired ${expiredMemberships.length} memberships`);
+        await membershipService.checkExpiredMemberships();
       } catch (error) {
         console.error("Error expiring memberships:", error);
       }

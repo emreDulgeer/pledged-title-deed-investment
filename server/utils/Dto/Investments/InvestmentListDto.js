@@ -114,11 +114,44 @@ class InvestmentListDto {
   }
 
   getNextPaymentDue(rentalPayments) {
-    const pendingPayments = rentalPayments
-      .filter((p) => p.status === "pending")
-      .sort((a, b) => a.month.localeCompare(b.month));
+    if (!Array.isArray(rentalPayments) || rentalPayments.length === 0) {
+      return null;
+    }
 
-    return pendingPayments.length > 0 ? pendingPayments[0].month : null;
+    const pendingPayments = rentalPayments
+      .filter((payment) => payment?.status === "pending")
+      .slice()
+      .sort((left, right) => {
+        const leftMonth =
+          typeof left?.month === "string" && left.month.trim()
+            ? left.month
+            : null;
+        const rightMonth =
+          typeof right?.month === "string" && right.month.trim()
+            ? right.month
+            : null;
+
+        if (leftMonth && rightMonth) {
+          return leftMonth.localeCompare(rightMonth);
+        }
+
+        if (leftMonth) return -1;
+        if (rightMonth) return 1;
+
+        const leftDueDate = left?.dueDate ? new Date(left.dueDate) : null;
+        const rightDueDate = right?.dueDate ? new Date(right.dueDate) : null;
+
+        if (leftDueDate && rightDueDate) {
+          return leftDueDate - rightDueDate;
+        }
+
+        if (leftDueDate) return -1;
+        if (rightDueDate) return 1;
+
+        return 0;
+      });
+
+    return pendingPayments[0]?.month || null;
   }
 
   getStatusDisplay(status) {

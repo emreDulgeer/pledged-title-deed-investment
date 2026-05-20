@@ -32,6 +32,16 @@ const ACTIVE_ASSIGNMENT_STATUSES = [
   "title_deed_pending",
   "active",
 ];
+const REVIEWABLE_DOCUMENT_TYPES = new Set([
+  "contract_investor_signed",
+  "contract_owner_signed",
+  "payment_receipt",
+  "title_deed",
+  "notary_document",
+  "power_of_attorney",
+  "tax_receipt",
+  "other",
+]);
 
 class InvestmentService {
   constructor() {
@@ -66,7 +76,29 @@ class InvestmentService {
   loadInvestmentForResponse(investmentId) {
     return this.investmentRepository.findById(
       investmentId,
-      "property investor propertyOwner localRepresentative representativeRequestedBy",
+      [
+        { path: "property" },
+        { path: "investor" },
+        { path: "propertyOwner" },
+        { path: "localRepresentative" },
+        { path: "representativeRequestedBy" },
+        {
+          path: "contractWorkflow.investorSigned.fileId",
+          select: "review originalName filename",
+        },
+        {
+          path: "contractWorkflow.ownerSigned.fileId",
+          select: "review originalName filename",
+        },
+        {
+          path: "paymentReceipt.fileId",
+          select: "review originalName filename",
+        },
+        {
+          path: "titleDeedDocument.fileId",
+          select: "review originalName filename",
+        },
+      ],
     );
   }
 
@@ -131,12 +163,23 @@ class InvestmentService {
   }
 
   mapRepresentativeCase(investment) {
+    const nextStep =
+      investment.status === "title_deed_pending"
+        ? "Review uploaded title deed"
+        : investment.status === "contract_signed"
+          ? "Track signed documents and payment proof"
+          : investment.status === "active"
+            ? "Monitor rental cycle"
+            : "Open the case for details";
+
     return {
       id: investment._id,
       status: investment.status,
       amountInvested: investment.amountInvested,
       currency: investment.currency || APP_CURRENCY,
       createdAt: investment.createdAt || null,
+      updatedAt: investment.updatedAt || null,
+      nextStep,
       localRepresentative: investment.localRepresentative
         ? {
             id:
@@ -180,6 +223,387 @@ class InvestmentService {
     return investment.principalPayment.toObject
       ? investment.principalPayment.toObject()
       : { ...investment.principalPayment };
+  }
+
+  isAssignedRepresentative(investment, userId) {
+    return (
+      String(
+        investment?.localRepresentative?._id || investment?.localRepresentative,
+      ) === String(userId)
+    );
+  }
+
+  getReviewerLabel(role) {
+    switch (role) {
+      case "investor":
+        return "Investor";
+      case "property_owner":
+        return "Property owner";
+      case "local_representative":
+        return "Local representative";
+      default:
+        return role;
+    }
+  }
+
+  buildApprovalKey(approval) {
+    return `${approval?.reviewerRole || "unknown"}:${String(
+      approval?.reviewerId || "",
+    )}`;
+  }
+
+  getRequiredApprovalsForDocument(type, investment, uploadedBy) {
+    const uploadedById = String(uploadedBy?._id || uploadedBy || "");
+    const investorId = investment?.investor?._id || investment?.investor;
+    const ownerId =
+      investment?.propertyOwner?._id ||
+      investment?.propertyOwner ||
+      investment?.property?.owner;
+    const representativeId =
+      investment?.localRepresentative?._id || investment?.localRepresentative;
+
+    const approvals = [];
+    const pushApproval = (reviewerId, reviewerRole) => {
+      if (!reviewerId) {
+        return;
+      }
+
+      const normalizedId = String(reviewerId);
+      if (!normalizedId || normalizedId === uploadedById) {
+        return;
+      }
+
+      const alreadyExists = approvals.some(
+        (item) =>
+          item.reviewerRole === reviewerRole &&
+          String(item.reviewerId) === normalizedId,
+      );
+
+      if (!alreadyExists) {
+        approvals.push({
+          reviewerId,
+          reviewerRole,
+          status: "pending",
+          notes: "",
+          reviewedAt: null,
+        });
+      }
+    };
+
+    if (type === "contract_investor_signed") {
+      pushApproval(ownerId, "property_owner");
+      pushApproval(representativeId, "local_representative");
+      return approvals;
+    }
+
+    if (type === "contract_owner_signed") {
+      pushApproval(investorId, "investor");
+      pushApproval(representativeId, "local_representative");
+      return approvals;
+    }
+
+    if (type === "payment_receipt") {
+      pushApproval(ownerId, "property_owner");
+      return approvals;
+    }
+
+    if (
+      type === "title_deed" ||
+      type === "notary_document" ||
+      type === "power_of_attorney" ||
+      type === "tax_receipt" ||
+      type === "other"
+    ) {
+      pushApproval(investorId, "investor");
+      pushApproval(ownerId, "property_owner");
+      pushApproval(representativeId, "local_representative");
+      return approvals;
+    }
+
+    return approvals;
+  }
+
+  buildDocumentReviewWorkflow({
+    type,
+    investment,
+    uploadedBy,
+    existingReview = {},
+  }) {
+    if (!REVIEWABLE_DOCUMENT_TYPES.has(type)) {
+      return {
+        status: "not_requested",
+        reviewedBy: null,
+        reviewerRole: null,
+        reviewedAt: null,
+        notes: "",
+        requiredApprovals: [],
+      };
+    }
+
+    const requiredApprovals = this.getRequiredApprovalsForDocument(
+      type,
+      investment,
+      uploadedBy,
+    );
+    const existingApprovals = Array.isArray(existingReview?.requiredApprovals)
+      ? existingReview.requiredApprovals
+      : [];
+    const existingByKey = new Map(
+      existingApprovals.map((item) => [this.buildApprovalKey(item), item]),
+    );
+
+    const normalizedApprovals = requiredApprovals.map((approval) => {
+      const existing = existingByKey.get(this.buildApprovalKey(approval));
+      return {
+        reviewerId: approval.reviewerId,
+        reviewerRole: approval.reviewerRole,
+        status: existing?.status || approval.status,
+        notes: existing?.notes || "",
+        reviewedAt: existing?.reviewedAt || null,
+      };
+    });
+
+    const hasChangesRequested = normalizedApprovals.some(
+      (item) => item.status === "changes_requested",
+    );
+    const allApproved =
+      normalizedApprovals.length > 0 &&
+      normalizedApprovals.every((item) => item.status === "approved");
+
+    return {
+      status: hasChangesRequested
+        ? "changes_requested"
+        : allApproved
+          ? "approved"
+          : normalizedApprovals.length > 0
+            ? "pending_review"
+            : "approved",
+      reviewedBy: existingReview?.reviewedBy || null,
+      reviewerRole: existingReview?.reviewerRole || null,
+      reviewedAt: existingReview?.reviewedAt || null,
+      notes: existingReview?.notes || "",
+      requiredApprovals: normalizedApprovals,
+    };
+  }
+
+  getReviewState(
+    fileMetadata,
+    { type, investment, uploadedBy, userId, userRole } = {},
+  ) {
+    const workflow = this.buildDocumentReviewWorkflow({
+      type,
+      investment,
+      uploadedBy,
+      existingReview: fileMetadata?.review || {},
+    });
+    const currentApproval = workflow.requiredApprovals.find(
+      (item) =>
+        item.reviewerRole === userRole &&
+        String(item.reviewerId) === String(userId),
+    );
+
+    return {
+      reviewStatus: workflow.status,
+      reviewNotes: workflow.notes || "",
+      reviewedAt: workflow.reviewedAt || null,
+      reviewedBy: workflow.reviewedBy || null,
+      reviewerRole: workflow.reviewerRole || null,
+      approvalStatus: currentApproval?.status || "not_required",
+      pendingApprovalsCount: workflow.requiredApprovals.filter(
+        (item) => item.status === "pending",
+      ).length,
+      requiredApprovals: workflow.requiredApprovals.map((item) => ({
+        reviewerId: item.reviewerId,
+        reviewerRole: item.reviewerRole,
+        reviewerLabel: this.getReviewerLabel(item.reviewerRole),
+        status: item.status,
+        notes: item.notes || "",
+        reviewedAt: item.reviewedAt || null,
+      })),
+      canReview:
+        !!currentApproval &&
+        workflow.status !== "changes_requested" &&
+        currentApproval.status !== "approved",
+    };
+  }
+
+  async initializeDocumentReview(fileMetadataId, type, investment, uploadedBy) {
+    const workflow = this.buildDocumentReviewWorkflow({
+      type,
+      investment,
+      uploadedBy,
+    });
+
+    await FileMetadata.findByIdAndUpdate(fileMetadataId, {
+      relatedModel: "Investment",
+      relatedId: investment?._id || investment?.id || investment,
+      documentType: type,
+      review: workflow,
+    });
+  }
+
+  async getDocumentReviewSnapshot(type, investment, source) {
+    const fileId = source?.fileId?._id || source?.fileId;
+    if (!fileId) {
+      return null;
+    }
+
+    const fileMetadata =
+      source?.fileId && typeof source.fileId === "object" && source.fileId.review
+        ? source.fileId
+        : await FileMetadata.findById(fileId).lean();
+
+    if (!fileMetadata) {
+      return null;
+    }
+
+    return this.buildDocumentReviewWorkflow({
+      type,
+      investment,
+      uploadedBy: source?.uploadedBy,
+      existingReview: fileMetadata.review || {},
+    });
+  }
+
+  async areContractsApproved(investment) {
+    if (
+      !investment?.contractWorkflow?.investorSigned?.fileId ||
+      !investment?.contractWorkflow?.ownerSigned?.fileId
+    ) {
+      return false;
+    }
+
+    const [investorContractReview, ownerContractReview] = await Promise.all([
+      this.getDocumentReviewSnapshot(
+        "contract_investor_signed",
+        investment,
+        investment.contractWorkflow.investorSigned,
+      ),
+      this.getDocumentReviewSnapshot(
+        "contract_owner_signed",
+        investment,
+        investment.contractWorkflow.ownerSigned,
+      ),
+    ]);
+
+    return (
+      investorContractReview?.status === "approved" &&
+      ownerContractReview?.status === "approved"
+    );
+  }
+
+  async activateInvestmentAfterTitleDeedApproval(
+    investment,
+    reviewerId,
+    reviewerRole,
+  ) {
+    const agreedMonthlyRent =
+      investment.offerTerms?.desiredMonthlyRent || investment.property?.rentOffered || 0;
+
+    await this.investmentRepository.update(investment._id, {
+      "titleDeedDocument.verifiedBy": reviewerId,
+      "titleDeedDocument.verifiedAt": new Date(),
+      status: "active",
+      rentalPayments:
+        investment.rentalPayments?.length > 0
+          ? investment.rentalPayments
+          : this.generateRentalPaymentSchedule(
+              agreedMonthlyRent,
+              investment.property.contractPeriodMonths,
+            ),
+    });
+
+    await this.propertyRepository.update(investment.property._id, {
+      status: "active",
+    });
+
+    await this.safeNotify("notifyTitleDeedRegistered", investment.investor._id, {
+      investmentId: investment._id,
+      propertyCity: investment.property.city,
+    });
+
+    const refreshedInvestment = await this.loadInvestmentForResponse(investment._id);
+    return this.toDetailResponse(refreshedInvestment);
+  }
+
+  buildInvestmentDocument(type, source, investment, extra = {}) {
+    const fileRecord = source?.fileId;
+    const fileId = fileRecord?._id || fileRecord;
+
+    if (!fileId) {
+      return null;
+    }
+
+    return {
+      type,
+      fileId,
+      name: fileRecord?.originalName || fileRecord?.filename || extra.name,
+      url: source?.url || extra.url || null,
+      uploadedAt: source?.uploadedAt || extra.uploadedAt || null,
+      uploadedBy: source?.uploadedBy || extra.uploadedBy || null,
+      verified: Boolean(extra.verified),
+      ...this.getReviewState(
+        fileRecord,
+        {
+          type,
+          investment,
+          uploadedBy: source?.uploadedBy || extra.uploadedBy || null,
+          userId: extra.userId,
+          userRole: extra.userRole,
+        },
+      ),
+      ...extra,
+    };
+  }
+
+  getInvestmentDocumentContext(investment, fileId) {
+    const matchesFileId = (candidate) =>
+      String(candidate?._id || candidate || "") === String(fileId);
+
+    if (matchesFileId(investment?.contractWorkflow?.investorSigned?.fileId)) {
+      return {
+        type: "contract_investor_signed",
+        source: investment.contractWorkflow.investorSigned,
+        uploadedBy: investment.contractWorkflow.investorSigned?.uploadedBy,
+      };
+    }
+
+    if (matchesFileId(investment?.contractWorkflow?.ownerSigned?.fileId)) {
+      return {
+        type: "contract_owner_signed",
+        source: investment.contractWorkflow.ownerSigned,
+        uploadedBy: investment.contractWorkflow.ownerSigned?.uploadedBy,
+      };
+    }
+
+    if (matchesFileId(investment?.paymentReceipt?.fileId)) {
+      return {
+        type: "payment_receipt",
+        source: investment.paymentReceipt,
+        uploadedBy: investment.paymentReceipt?.uploadedBy,
+      };
+    }
+
+    if (matchesFileId(investment?.titleDeedDocument?.fileId)) {
+      return {
+        type: "title_deed",
+        source: investment.titleDeedDocument,
+        uploadedBy: investment.titleDeedDocument?.uploadedBy,
+      };
+    }
+
+    const additionalDocument = investment?.additionalDocuments?.find((item) =>
+      matchesFileId(item?.fileId),
+    );
+    if (additionalDocument) {
+      return {
+        type: additionalDocument.type,
+        source: additionalDocument,
+        uploadedBy: additionalDocument?.uploadedBy,
+      };
+    }
+
+    return null;
   }
 
   normalizeOfferTerms(property, offerData = {}) {
@@ -313,12 +737,6 @@ class InvestmentService {
 
     const offerTerms = this.normalizeOfferTerms(property, offerData);
 
-    // Kira ödeme takvimi oluştur
-    const rentalPayments = this.generateRentalPaymentSchedule(
-      offerTerms.desiredMonthlyRent, // pazarlık edilen aylık kira
-      property.contractPeriodMonths, // sözleşme süresi (ay)
-    );
-
     // Yeni Investment oluştur
     const newInvestment = await this.investmentRepository.create({
       property: propertyId,
@@ -328,7 +746,6 @@ class InvestmentService {
       amountInvested: offerTerms.amountInvested,
       status: "offer_sent",
       offerTerms,
-      rentalPayments,
     });
 
     // Teklif sayacı
@@ -381,9 +798,6 @@ class InvestmentService {
       "investor property",
     );
 
-    const agreedMonthlyRent =
-      investment.offerTerms?.desiredMonthlyRent || investment.property.rentOffered;
-
     // Property durumunu güncelle
     await this.propertyRepository.update(investment.property._id, {
       status: "in_contract",
@@ -402,10 +816,6 @@ class InvestmentService {
         amount: investment.amountInvested,
         currency: investment.currency || APP_CURRENCY,
       },
-      rentalPayments: this.generateRentalPaymentSchedule(
-        agreedMonthlyRent,
-        investment.property.contractPeriodMonths,
-      ),
     });
 
     if (competingOffers.length > 0) {
@@ -502,7 +912,7 @@ class InvestmentService {
   async uploadContract(investmentId, userId, fileMetadataId, userRole) {
     const investment = await this.investmentRepository.findById(
       investmentId,
-      "property investor",
+      "property investor propertyOwner localRepresentative",
     );
 
     if (!investment) {
@@ -548,14 +958,7 @@ class InvestmentService {
       uploadedAt,
       uploadedBy: userId,
     };
-
-    if (
-      contractWorkflow.investorSigned?.fileId &&
-      contractWorkflow.ownerSigned?.fileId &&
-      !contractWorkflow.fullySignedAt
-    ) {
-      contractWorkflow.fullySignedAt = uploadedAt;
-    }
+    contractWorkflow.fullySignedAt = null;
 
     const updateData = {
       contractFile: {
@@ -570,14 +973,14 @@ class InvestmentService {
     await this.investmentRepository.update(investmentId, updateData);
 
     // FileMetadata'yı güncelle - Investment ile ilişkilendir
-    await FileMetadata.findByIdAndUpdate(fileMetadataId, {
-      relatedModel: "Investment",
-      relatedId: investmentId,
-      documentType:
-        signatureKey === "investorSigned"
-          ? "contract_investor_signed"
-          : "contract_owner_signed",
-    });
+    await this.initializeDocumentReview(
+      fileMetadataId,
+      signatureKey === "investorSigned"
+        ? "contract_investor_signed"
+        : "contract_owner_signed",
+      investment,
+      userId,
+    );
 
     if (isInvestor) {
       await this.safeNotify(
@@ -609,7 +1012,7 @@ class InvestmentService {
   async uploadTitleDeed(investmentId, userId, fileMetadataId, userRole) {
     const investment = await this.investmentRepository.findById(
       investmentId,
-      "property investor localRepresentative",
+      "property investor propertyOwner localRepresentative",
     );
 
     if (!investment) {
@@ -635,12 +1038,9 @@ class InvestmentService {
       throw new Error("Contract must be signed before title deed upload");
     }
 
-    if (
-      !investment.contractWorkflow?.investorSigned?.fileId ||
-      !investment.contractWorkflow?.ownerSigned?.fileId
-    ) {
+    if (!(await this.areContractsApproved(investment))) {
       throw new Error(
-        "Both parties must upload signed contracts before title deed registration",
+        "All signed contracts must be approved before title deed registration",
       );
     }
 
@@ -675,18 +1075,21 @@ class InvestmentService {
         url: fileMetadata.url,
         uploadedAt: new Date(),
         uploadedBy: userId,
+        verifiedBy: null,
+        verifiedAt: null,
       },
-      status: "title_deed_pending", // Admin onayı bekliyor
+      status: "title_deed_pending",
     };
 
     await this.investmentRepository.update(investmentId, updateData);
 
     // FileMetadata'yı güncelle - Investment ile ilişkilendir
-    await FileMetadata.findByIdAndUpdate(fileMetadataId, {
-      relatedModel: "Investment",
-      relatedId: investmentId,
-      documentType: "title_deed",
-    });
+    await this.initializeDocumentReview(
+      fileMetadataId,
+      "title_deed",
+      investment,
+      userId,
+    );
 
     // Admin'e onay için bildirim gönder
     // await this.notificationService.notifyAdminForTitleDeedApproval(
@@ -701,11 +1104,15 @@ class InvestmentService {
     return this.toDetailResponse(refreshedInvestment);
   }
 
-  // Admin tarafından title deed onayı
-  async approveTitleDeed(investmentId, adminId) {
+  // Yalnızca gerekli onaylar tamamlandıktan sonra title deed aktivasyonu
+  async approveTitleDeed(
+    investmentId,
+    reviewerId,
+    reviewerRole = "admin",
+  ) {
     const investment = await this.investmentRepository.findById(
       investmentId,
-      "property investor",
+      "property investor propertyOwner localRepresentative",
     );
 
     if (!investment) {
@@ -720,24 +1127,182 @@ class InvestmentService {
       throw new Error("No title deed document uploaded");
     }
 
-    // Investment'ı güncelle
-    const updateData = {
-      "titleDeedDocument.verifiedBy": adminId,
-      "titleDeedDocument.verifiedAt": new Date(),
-      status: "active",
+    const titleDeedReview = await this.getDocumentReviewSnapshot(
+      "title_deed",
+      investment,
+      investment.titleDeedDocument,
+    );
+
+    if (titleDeedReview?.status !== "approved") {
+      throw new Error("Title deed approvals are still pending");
+    }
+
+    return this.activateInvestmentAfterTitleDeedApproval(
+      investment,
+      reviewerId,
+      reviewerRole,
+    );
+  }
+
+  async reviewInvestmentDocument(
+    investmentId,
+    fileId,
+    reviewerId,
+    reviewerRole,
+    { action, notes = "" } = {},
+  ) {
+    if (!["approve", "request_changes"].includes(action)) {
+      throw new Error("Invalid review action");
+    }
+
+    const investment = await this.investmentRepository.findById(
+      investmentId,
+      "property investor propertyOwner localRepresentative",
+    );
+
+    if (!investment) {
+      throw new Error("Investment not found");
+    }
+
+    const documentContext = this.getInvestmentDocumentContext(investment, fileId);
+    if (!documentContext) {
+      throw new Error("Document not found on this investment");
+    }
+
+    if (!REVIEWABLE_DOCUMENT_TYPES.has(documentContext.type)) {
+      throw new Error("This document cannot be reviewed");
+    }
+
+    const fileMetadata = await FileMetadata.findById(fileId);
+    if (!fileMetadata || String(fileMetadata.relatedId || "") !== String(investmentId)) {
+      throw new Error("Document not found on this investment");
+    }
+
+    const reviewNotes = String(notes || "").trim();
+    if (action === "request_changes" && !reviewNotes) {
+      throw new Error("Please add a note when requesting a new upload");
+    }
+
+    const currentReview = this.buildDocumentReviewWorkflow({
+      type: documentContext.type,
+      investment,
+      uploadedBy: documentContext.uploadedBy,
+      existingReview: fileMetadata.review || {},
+    });
+
+    if (currentReview.status === "changes_requested") {
+      throw new Error("A new upload is required before this document can be reviewed");
+    }
+
+    const currentApprovalIndex = currentReview.requiredApprovals.findIndex(
+      (item) =>
+        item.reviewerRole === reviewerRole &&
+        String(item.reviewerId) === String(reviewerId),
+    );
+
+    if (currentApprovalIndex === -1) {
+      throw new Error("Unauthorized to review investment documents");
+    }
+
+    currentReview.requiredApprovals[currentApprovalIndex] = {
+      ...currentReview.requiredApprovals[currentApprovalIndex],
+      status: action === "approve" ? "approved" : "changes_requested",
+      notes: reviewNotes,
+      reviewedAt: new Date(),
     };
 
-    await this.investmentRepository.update(investmentId, updateData);
+    const hasChangesRequested = currentReview.requiredApprovals.some(
+      (item) => item.status === "changes_requested",
+    );
+    const allApproved =
+      currentReview.requiredApprovals.length > 0 &&
+      currentReview.requiredApprovals.every(
+        (item) => item.status === "approved",
+      );
 
-    // Property durumunu active yap
-    await this.propertyRepository.update(investment.property._id, {
-      status: "active",
+    const reviewPayload = {
+      ...currentReview,
+      status: hasChangesRequested
+        ? "changes_requested"
+        : allApproved
+          ? "approved"
+          : "pending_review",
+      reviewedBy: reviewerId,
+      reviewerRole,
+      reviewedAt: new Date(),
+      notes: reviewNotes,
+    };
+
+    await FileMetadata.findByIdAndUpdate(fileId, {
+      review: reviewPayload,
     });
 
-    await this.safeNotify("notifyTitleDeedRegistered", investment.investor._id, {
-      investmentId: investmentId,
-      propertyCity: investment.property.city,
-    });
+    if (action === "request_changes" && documentContext.type === "title_deed") {
+      investment.status = "contract_signed";
+      if (investment.titleDeedDocument) {
+        investment.titleDeedDocument.verifiedBy = null;
+        investment.titleDeedDocument.verifiedAt = null;
+      }
+      await investment.save();
+    }
+
+    if (
+      (documentContext.type === "contract_investor_signed" ||
+        documentContext.type === "contract_owner_signed") &&
+      action === "request_changes" &&
+      investment.contractWorkflow
+    ) {
+      investment.contractWorkflow.fullySignedAt = null;
+      await investment.save();
+    }
+
+    if (action === "request_changes" && documentContext.type === "payment_receipt") {
+      const currentPayment = this.getPrincipalPayment(investment);
+      await this.investmentRepository.update(investmentId, {
+        principalPayment: {
+          ...currentPayment,
+          status: currentPayment.instructions ? "instructions_ready" : "not_started",
+          confirmedAt: null,
+          confirmedBy: null,
+        },
+      });
+    }
+
+    if (action === "approve" && reviewPayload.status === "approved") {
+      if (
+        documentContext.type === "contract_investor_signed" ||
+        documentContext.type === "contract_owner_signed"
+      ) {
+        if (await this.areContractsApproved(investment)) {
+          await this.investmentRepository.update(investmentId, {
+            "contractWorkflow.fullySignedAt": new Date(),
+          });
+        }
+      }
+
+      if (documentContext.type === "payment_receipt") {
+        const currentPayment = this.getPrincipalPayment(investment);
+        await this.investmentRepository.update(investmentId, {
+          principalPayment: {
+            ...currentPayment,
+            status: "confirmed",
+            amount: currentPayment.amount || investment.amountInvested,
+            currency:
+              currentPayment.currency || investment.currency || APP_CURRENCY,
+            confirmedAt: new Date(),
+            confirmedBy: reviewerId,
+          },
+        });
+      }
+
+      if (documentContext.type === "title_deed") {
+        return this.activateInvestmentAfterTitleDeedApproval(
+          investment,
+          reviewerId,
+          reviewerRole,
+        );
+      }
+    }
 
     const refreshedInvestment = await this.loadInvestmentForResponse(investmentId);
     return this.toDetailResponse(refreshedInvestment);
@@ -747,7 +1312,7 @@ class InvestmentService {
   async uploadPaymentReceipt(investmentId, userId, fileMetadataId, userRole) {
     const investment = await this.investmentRepository.findById(
       investmentId,
-      "property investor",
+      "property investor propertyOwner localRepresentative",
     );
 
     if (!investment) {
@@ -763,6 +1328,12 @@ class InvestmentService {
 
     if (investment.status !== "contract_signed") {
       throw new Error("Payment receipt can only be uploaded during funding stage");
+    }
+
+    if (!(await this.areContractsApproved(investment))) {
+      throw new Error(
+        "All signed contracts must be approved before payment proof upload",
+      );
     }
 
     // FileMetadata kontrolü
@@ -795,17 +1366,20 @@ class InvestmentService {
         currency: principalPayment.currency || investment.currency || APP_CURRENCY,
         receiptUploadedAt: new Date(),
         receiptUploadedBy: userId,
+        confirmedAt: null,
+        confirmedBy: null,
       },
     };
 
     await this.investmentRepository.update(investmentId, updateData);
 
     // FileMetadata'yı güncelle
-    await FileMetadata.findByIdAndUpdate(fileMetadataId, {
-      relatedModel: "Investment",
-      relatedId: investmentId,
-      documentType: "payment_receipt",
-    });
+    await this.initializeDocumentReview(
+      fileMetadataId,
+      "payment_receipt",
+      investment,
+      userId,
+    );
 
     await this.safeNotify("notifyPaymentReceiptUploaded", investment.property.owner, {
       investmentId: investmentId,
@@ -819,7 +1393,7 @@ class InvestmentService {
   async preparePrincipalPayment(investmentId, userId, userRole, paymentData = {}) {
     const investment = await this.investmentRepository.findById(
       investmentId,
-      "property investor propertyOwner",
+      "property investor propertyOwner localRepresentative",
     );
 
     if (!investment) {
@@ -835,13 +1409,20 @@ class InvestmentService {
       throw new Error("Payment instructions are only available in contract stage");
     }
 
-    if (
-      !investment.contractWorkflow?.investorSigned?.fileId ||
-      !investment.contractWorkflow?.ownerSigned?.fileId
-    ) {
+    const contractsApproved =
+      !!investment.contractWorkflow?.fullySignedAt ||
+      (await this.areContractsApproved(investment));
+
+    if (!contractsApproved) {
       throw new Error(
-        "Both parties must upload signed contracts before payment instructions are prepared",
+        "All signed contracts must be approved before payment instructions are prepared",
       );
+    }
+
+    if (!investment.contractWorkflow?.fullySignedAt) {
+      await this.investmentRepository.update(investmentId, {
+        "contractWorkflow.fullySignedAt": new Date(),
+      });
     }
 
     const supportedMethods = this.paymentService.getSupportedMethods({
@@ -882,7 +1463,7 @@ class InvestmentService {
   async confirmPrincipalPayment(investmentId, userId, userRole) {
     const investment = await this.investmentRepository.findById(
       investmentId,
-      "property investor propertyOwner",
+      "property investor propertyOwner localRepresentative",
     );
 
     if (!investment) {
@@ -901,13 +1482,20 @@ class InvestmentService {
       throw new Error("Payment confirmation is only available in contract stage");
     }
 
-    if (
-      !investment.contractWorkflow?.investorSigned?.fileId ||
-      !investment.contractWorkflow?.ownerSigned?.fileId
-    ) {
+    const contractsApproved =
+      !!investment.contractWorkflow?.fullySignedAt ||
+      (await this.areContractsApproved(investment));
+
+    if (!contractsApproved) {
       throw new Error(
-        "Both parties must upload signed contracts before payment confirmation",
+        "All signed contracts must be approved before payment confirmation",
       );
+    }
+
+    if (!investment.contractWorkflow?.fullySignedAt) {
+      await this.investmentRepository.update(investmentId, {
+        "contractWorkflow.fullySignedAt": new Date(),
+      });
     }
 
     const currentPayment = this.getPrincipalPayment(investment);
@@ -917,6 +1505,18 @@ class InvestmentService {
 
     if (!currentPayment.providerKey && !investment.paymentReceipt?.fileId) {
       throw new Error("Payment has not been prepared or submitted yet");
+    }
+
+    if (investment.paymentReceipt?.fileId) {
+      const paymentReceiptReview = await this.getDocumentReviewSnapshot(
+        "payment_receipt",
+        investment,
+        investment.paymentReceipt,
+      );
+
+      if (paymentReceiptReview?.status !== "approved") {
+        throw new Error("Payment receipt approvals are still pending");
+      }
     }
 
     await this.investmentRepository.update(investmentId, {
@@ -943,39 +1543,39 @@ class InvestmentService {
         { path: "investor", select: "_id" },
         {
           path: "contractFile.fileId",
-          select: "originalName filename",
+          select: "originalName filename review",
         },
         {
           path: "contractWorkflow.investorSigned.fileId",
-          select: "originalName filename",
+          select: "originalName filename review",
         },
         {
           path: "contractWorkflow.ownerSigned.fileId",
-          select: "originalName filename",
+          select: "originalName filename review",
         },
         {
           path: "titleDeedDocument.fileId",
-          select: "originalName filename",
+          select: "originalName filename review",
         },
         {
           path: "paymentReceipt.fileId",
-          select: "originalName filename",
+          select: "originalName filename review",
         },
         {
           path: "additionalDocuments.fileId",
-          select: "originalName filename",
+          select: "originalName filename review",
         },
         {
           path: "rentalPayments.paymentReceipt.fileId",
-          select: "originalName filename",
+          select: "originalName filename review",
         },
         {
           path: "refund.refundReceipt.fileId",
-          select: "originalName filename",
+          select: "originalName filename review",
         },
         {
           path: "transferOfProperty.transferDocument.fileId",
-          select: "originalName filename",
+          select: "originalName filename review",
         },
         {
           path: "localRepresentative",
@@ -1012,92 +1612,74 @@ class InvestmentService {
     };
 
     if (investment.contractWorkflow?.investorSigned?.fileId) {
-      pushDocument({
-        type: "contract_investor_signed",
-        fileId:
-          investment.contractWorkflow.investorSigned.fileId._id ||
-          investment.contractWorkflow.investorSigned.fileId,
-        name:
-          investment.contractWorkflow.investorSigned.fileId.originalName ||
-          investment.contractWorkflow.investorSigned.fileId.filename,
-        url: investment.contractWorkflow.investorSigned.url,
-        uploadedAt: investment.contractWorkflow.investorSigned.uploadedAt,
-        uploadedBy: investment.contractWorkflow.investorSigned.uploadedBy,
-      });
+      pushDocument(
+        this.buildInvestmentDocument(
+          "contract_investor_signed",
+          investment.contractWorkflow.investorSigned,
+          investment,
+          { userId, userRole },
+        ),
+      );
     }
 
     if (investment.contractWorkflow?.ownerSigned?.fileId) {
-      pushDocument({
-        type: "contract_owner_signed",
-        fileId:
-          investment.contractWorkflow.ownerSigned.fileId._id ||
-          investment.contractWorkflow.ownerSigned.fileId,
-        name:
-          investment.contractWorkflow.ownerSigned.fileId.originalName ||
-          investment.contractWorkflow.ownerSigned.fileId.filename,
-        url: investment.contractWorkflow.ownerSigned.url,
-        uploadedAt: investment.contractWorkflow.ownerSigned.uploadedAt,
-        uploadedBy: investment.contractWorkflow.ownerSigned.uploadedBy,
-      });
+      pushDocument(
+        this.buildInvestmentDocument(
+          "contract_owner_signed",
+          investment.contractWorkflow.ownerSigned,
+          investment,
+          { userId, userRole },
+        ),
+      );
     } else if (investment.contractFile?.fileId) {
-      pushDocument({
-        type: "contract",
-        fileId:
-          investment.contractFile.fileId._id || investment.contractFile.fileId,
-        name:
-          investment.contractFile.fileId.originalName ||
-          investment.contractFile.fileId.filename,
-        url: investment.contractFile.url,
-        uploadedAt: investment.contractFile.uploadedAt,
-        uploadedBy: investment.contractFile.uploadedBy,
-      });
+      pushDocument(
+        this.buildInvestmentDocument(
+          "contract",
+          investment.contractFile,
+          investment,
+          { userId, userRole },
+        ),
+      );
     }
 
     // Title Deed
     if (investment.titleDeedDocument?.fileId) {
-      pushDocument({
-        type: "title_deed",
-        fileId:
-          investment.titleDeedDocument.fileId._id ||
-          investment.titleDeedDocument.fileId,
-        name:
-          investment.titleDeedDocument.fileId.originalName ||
-          investment.titleDeedDocument.fileId.filename,
-        url: investment.titleDeedDocument.url,
-        uploadedAt: investment.titleDeedDocument.uploadedAt,
-        uploadedBy: investment.titleDeedDocument.uploadedBy,
-        verified: !!investment.titleDeedDocument.verifiedAt,
-      });
+      pushDocument(
+        this.buildInvestmentDocument(
+          "title_deed",
+          investment.titleDeedDocument,
+          investment,
+          {
+            verified: !!investment.titleDeedDocument.verifiedAt,
+            userId,
+            userRole,
+          },
+        ),
+      );
     }
 
     // Payment Receipt
     if (investment.paymentReceipt?.fileId) {
-      pushDocument({
-        type: "payment_receipt",
-        fileId:
-          investment.paymentReceipt.fileId._id ||
-          investment.paymentReceipt.fileId,
-        name:
-          investment.paymentReceipt.fileId.originalName ||
-          investment.paymentReceipt.fileId.filename,
-        url: investment.paymentReceipt.url,
-        uploadedAt: investment.paymentReceipt.uploadedAt,
-        uploadedBy: investment.paymentReceipt.uploadedBy,
-      });
+      pushDocument(
+        this.buildInvestmentDocument(
+          "payment_receipt",
+          investment.paymentReceipt,
+          investment,
+          { userId, userRole },
+        ),
+      );
     }
 
     // Additional Documents
     if (investment.additionalDocuments?.length > 0) {
       investment.additionalDocuments.forEach((doc) => {
-        pushDocument({
-          type: doc.type,
-          fileId: doc.fileId?._id || doc.fileId,
-          name: doc.fileId?.originalName || doc.fileId?.filename,
-          url: doc.url,
-          description: doc.description,
-          uploadedAt: doc.uploadedAt,
-          uploadedBy: doc.uploadedBy,
-        });
+        pushDocument(
+          this.buildInvestmentDocument(doc.type, doc, investment, {
+            description: doc.description,
+            userId,
+            userRole,
+          }),
+        );
       });
     }
 
@@ -1339,10 +1921,7 @@ class InvestmentService {
   }
 
   async getInvestmentById(investmentId, userId, userRole, userContext = {}) {
-    const investment = await this.investmentRepository.findById(
-      investmentId,
-      "property investor propertyOwner localRepresentative representativeRequestedBy",
-    );
+    let investment = await this.loadInvestmentForResponse(investmentId);
     if (!investment) throw new Error("Investment not found");
 
     // Yetkilendirme
@@ -1366,6 +1945,52 @@ class InvestmentService {
 
     if (!(isAdmin || isInvestor || isOwner || isLocalRep || isRegionalPendingRep)) {
       throw new Error("Not authorized to view this investment");
+    }
+
+    let shouldReloadInvestment = false;
+
+    if (
+      investment.status === "contract_signed" &&
+      !investment.contractWorkflow?.fullySignedAt &&
+      (await this.areContractsApproved(investment))
+    ) {
+      await this.investmentRepository.update(investmentId, {
+        "contractWorkflow.fullySignedAt": new Date(),
+      });
+      shouldReloadInvestment = true;
+    }
+
+    if (
+      investment.status === "contract_signed" &&
+      investment.paymentReceipt?.fileId &&
+      investment.principalPayment?.status !== "confirmed"
+    ) {
+      const paymentReceiptReview = await this.getDocumentReviewSnapshot(
+        "payment_receipt",
+        investment,
+        investment.paymentReceipt,
+      );
+
+      if (paymentReceiptReview?.status === "approved") {
+        const currentPayment = this.getPrincipalPayment(investment);
+        await this.investmentRepository.update(investmentId, {
+          principalPayment: {
+            ...currentPayment,
+            status: "confirmed",
+            amount: currentPayment.amount || investment.amountInvested,
+            currency:
+              currentPayment.currency || investment.currency || APP_CURRENCY,
+            confirmedAt: currentPayment.confirmedAt || new Date(),
+            confirmedBy:
+              currentPayment.confirmedBy || paymentReceiptReview.reviewedBy || null,
+          },
+        });
+        shouldReloadInvestment = true;
+      }
+    }
+
+    if (shouldReloadInvestment) {
+      investment = await this.loadInvestmentForResponse(investmentId);
     }
 
     // Admin görünümü ayrı
@@ -2060,7 +2685,11 @@ class InvestmentService {
         startDate.getMonth() + i + 1,
         1,
       );
+      const month = `${dueDate.getFullYear()}-${String(
+        dueDate.getMonth() + 1,
+      ).padStart(2, "0")}`;
       schedule.push({
+        month,
         dueDate,
         amount: monthlyRent,
         status: "pending",

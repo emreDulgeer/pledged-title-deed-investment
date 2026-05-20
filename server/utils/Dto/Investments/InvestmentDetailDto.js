@@ -5,11 +5,60 @@ const {
   getRepresentativeRegions,
 } = require("../../representativeRegions");
 
+const getReviewStatus = (file) => file?.fileId?.review?.status || "not_requested";
+
+const getPendingApproval = (file) =>
+  file?.fileId?.review?.requiredApprovals?.find(
+    (item) => item.status === "pending",
+  ) || null;
+
+const buildPaymentMonth = (month, dueDate) => {
+  if (typeof month === "string" && month.trim()) {
+    return month;
+  }
+
+  if (!dueDate) {
+    return "";
+  }
+
+  const parsedDate = new Date(dueDate);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "";
+  }
+
+  const year = parsedDate.getFullYear();
+  const monthValue = String(parsedDate.getMonth() + 1).padStart(2, "0");
+  return `${year}-${monthValue}`;
+};
+
 class InvestmentDetailDto extends InvestmentDto {
   constructor(investment) {
     super(investment);
     const agreedMonthlyRent =
       investment.offerTerms?.desiredMonthlyRent || investment.property?.rentOffered || 0;
+    const rentalPayments = Array.isArray(investment.rentalPayments)
+      ? investment.rentalPayments.map((payment) => {
+          const normalizedPayment =
+            typeof payment?.toObject === "function"
+              ? payment.toObject()
+              : { ...payment };
+
+          return {
+            ...normalizedPayment,
+            month: buildPaymentMonth(
+              normalizedPayment?.month,
+              normalizedPayment?.dueDate,
+            ),
+          };
+        })
+      : [];
+    const contractWorkflow = investment.contractWorkflow || {};
+    const contractsApproved =
+      !!contractWorkflow.fullySignedAt ||
+      (contractWorkflow.investorSigned?.fileId &&
+        contractWorkflow.ownerSigned?.fileId &&
+        getReviewStatus(contractWorkflow.investorSigned) === "approved" &&
+        getReviewStatus(contractWorkflow.ownerSigned) === "approved");
 
     // Detaylı property bilgileri
     if (investment.property && typeof investment.property === "object") {
@@ -87,7 +136,7 @@ class InvestmentDetailDto extends InvestmentDto {
     }
 
     // Tüm kira ödemeleri
-    this.rentalPayments = investment.rentalPayments;
+    this.rentalPayments = rentalPayments;
 
     // Local representative bilgisi
     if (investment.localRepresentative) {
@@ -124,17 +173,17 @@ class InvestmentDetailDto extends InvestmentDto {
         totalExpectedIncome:
           agreedMonthlyRent *
           investment.property.contractPeriodMonths,
-        totalPaidAmount: investment.rentalPayments
+        totalPaidAmount: rentalPayments
           .filter((p) => p.status === "paid")
           .reduce((sum, p) => sum + (p.amount || 0), 0),
-        remainingPayments: investment.rentalPayments.filter(
+        remainingPayments: rentalPayments.filter(
           (p) => p.status !== "paid"
         ).length,
         paymentProgress: this.calculatePaymentProgress(
-          investment.rentalPayments
+          rentalPayments
         ),
         contractEndDate: this.calculateContractEndDate(
-          investment.createdAt,
+          investment.titleDeedDocument?.verifiedAt || investment.createdAt,
           investment.property.contractPeriodMonths
         ),
       };
@@ -147,10 +196,10 @@ class InvestmentDetailDto extends InvestmentDto {
         date: investment.createdAt,
       },
       contractSigning: {
-        completed: !!investment.contractWorkflow?.fullySignedAt,
+        completed: contractsApproved,
         active:
           investment.status === "contract_signed" &&
-          !investment.contractWorkflow?.fullySignedAt,
+          !contractsApproved,
         date: investment.contractWorkflow?.fullySignedAt || null,
       },
       principalPayment: {
@@ -161,7 +210,7 @@ class InvestmentDetailDto extends InvestmentDto {
           ),
         active:
           investment.status === "contract_signed" &&
-          !!investment.contractWorkflow?.fullySignedAt &&
+          contractsApproved &&
           investment.principalPayment?.status !== "confirmed",
         date:
           investment.principalPayment?.confirmedAt ||
@@ -216,6 +265,15 @@ class InvestmentDetailDto extends InvestmentDto {
   }
 
   getNextRequiredAction(investment) {
+    const contractsApproved =
+      !!investment.contractWorkflow?.fullySignedAt ||
+      (investment.contractWorkflow?.investorSigned?.fileId &&
+        investment.contractWorkflow?.ownerSigned?.fileId &&
+        getReviewStatus(investment.contractWorkflow?.investorSigned) ===
+          "approved" &&
+        getReviewStatus(investment.contractWorkflow?.ownerSigned) ===
+          "approved");
+
     if (investment.status === "offer_sent") {
       return {
         actor: "property_owner",
@@ -236,8 +294,25 @@ class InvestmentDetailDto extends InvestmentDto {
         return { actor: "property_owner", key: "upload_contract" };
       }
 
+      if (!contractsApproved) {
+        const pendingContractApproval =
+          getPendingApproval(investment.contractWorkflow?.investorSigned) ||
+          getPendingApproval(investment.contractWorkflow?.ownerSigned);
+
+        if (pendingContractApproval?.reviewerRole) {
+          return {
+            actor: pendingContractApproval.reviewerRole,
+            key: "review_contract",
+          };
+        }
+      }
+
       if (investment.principalPayment?.status === "receipt_uploaded") {
-        return { actor: "property_owner", key: "confirm_payment" };
+        const pendingPaymentApproval = getPendingApproval(investment.paymentReceipt);
+        return {
+          actor: pendingPaymentApproval?.reviewerRole || "property_owner",
+          key: "review_payment_receipt",
+        };
       }
 
       if (investment.principalPayment?.status !== "confirmed") {
@@ -250,7 +325,15 @@ class InvestmentDetailDto extends InvestmentDto {
     }
 
     if (investment.status === "title_deed_pending") {
-      return { actor: "admin", key: "approve_title_deed" };
+      const pendingTitleDeedApproval = getPendingApproval(
+        investment.titleDeedDocument,
+      );
+      return {
+        actor:
+          pendingTitleDeedApproval?.reviewerRole ||
+          (investment.localRepresentative ? "local_representative" : "investor"),
+        key: "approve_title_deed",
+      };
     }
 
     if (investment.status === "active") {

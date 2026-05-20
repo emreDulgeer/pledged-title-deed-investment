@@ -7,6 +7,7 @@ const ActivityLog = require("../models/ActivityLog");
 const responseWrapper = require("../utils/responseWrapper");
 const crypto = require("crypto");
 const Token = require("../models/Token");
+const membershipService = require("../services/membershipService");
 const {
   getPrimaryRepresentativeRegion,
   getRepresentativeRegions,
@@ -43,7 +44,7 @@ const auth = async (req, res, next) => {
     }
 
     // Get user from database
-    const user = await User.findById(decoded.userId).select("-password");
+    let user = await User.findById(decoded.userId).select("-password");
 
     if (!user) {
       return responseWrapper.unauthorized(res, "Kullanıcı bulunamadı");
@@ -81,34 +82,29 @@ const auth = async (req, res, next) => {
     }
 
     // Membership kontrolü
-    if (user.role !== "admin") {
-      if (user.membershipStatus === "inactive") {
-        const publicPaths = [
-          "/auth/profile",
-          "/auth/logout",
-          "/auth/membership/activate",
-        ];
+    if (
+      ["investor", "property_owner"].includes(user.role) &&
+      user.accountStatus === "active"
+    ) {
+      const membershipExpired =
+        user.membershipExpiresAt &&
+        user.membershipExpiresAt < new Date() &&
+        String(user.membershipPlan || "").toLowerCase() !== "basic";
 
-        if (!publicPaths.some((path) => req.path.includes(path))) {
-          return responseWrapper.forbidden(
-            res,
-            "Üyeliğiniz aktif değil. Lütfen üyelik planı satın alın."
-          );
-        }
-      }
-
-      if (user.membershipStatus === "expired") {
-        return responseWrapper.forbidden(
-          res,
-          "Üyeliğinizin süresi dolmuş. Lütfen üyeliğinizi yenileyin."
-        );
-      }
-
-      // Üyelik süresi kontrolü
-      if (user.membershipExpiresAt && user.membershipExpiresAt < new Date()) {
-        user.membershipStatus = "expired";
-        await user.save();
-        return responseWrapper.forbidden(res, "Üyeliğinizin süresi dolmuş.");
+      if (membershipExpired || user.membershipStatus === "expired") {
+        await membershipService.downgradeToDefaultPlan(user._id, {
+          reason: "membership_expired",
+          previousPlanName: user.membershipPlan,
+        });
+        user = await User.findById(decoded.userId).select("-password");
+      } else if (user.membershipStatus === "inactive") {
+        await membershipService.downgradeToDefaultPlan(user._id, {
+          previousPlanName: user.membershipPlan,
+        });
+        user = await User.findById(decoded.userId).select("-password");
+      } else if (!user.membershipPlan) {
+        await membershipService.ensureDefaultMembershipForUser(user._id);
+        user = await User.findById(decoded.userId).select("-password");
       }
     }
 

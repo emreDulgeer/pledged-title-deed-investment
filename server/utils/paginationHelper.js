@@ -14,14 +14,33 @@ class PaginationHelper {
   }
 
   static getSortParams(query, allowedFields = []) {
-    const { sortBy = "createdAt", sortOrder = "desc" } = query;
+    const rawSort = query.sort ?? query.sortBy ?? "createdAt";
+    const normalizedSort =
+      typeof rawSort === "string" && rawSort.trim()
+        ? rawSort.trim()
+        : "createdAt";
+
+    const prefixedSort =
+      normalizedSort.startsWith("-") || normalizedSort.startsWith("+")
+        ? normalizedSort
+        : null;
+
+    const requestedField = prefixedSort
+      ? normalizedSort.slice(1)
+      : normalizedSort;
 
     const safeSortBy =
-      allowedFields.length > 0 && !allowedFields.includes(sortBy)
+      allowedFields.length > 0 && !allowedFields.includes(requestedField)
         ? "createdAt"
-        : sortBy;
+        : requestedField;
 
-    const safeSortOrder = sortOrder === "asc" ? 1 : -1;
+    const safeSortOrder = prefixedSort
+      ? normalizedSort.startsWith("-")
+        ? -1
+        : 1
+      : query.sortOrder === "asc"
+        ? 1
+        : -1;
 
     return { [safeSortBy]: safeSortOrder };
   }
