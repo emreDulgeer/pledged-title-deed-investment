@@ -630,18 +630,6 @@ class InvestmentFileController {
       const userId = req.user._id;
       const userRole = req.user.role;
       const investmentId = req.params.id;
-      const { documentType, description } = req.body;
-
-      // Document type kontrolü
-      const validTypes = [
-        "notary_document",
-        "power_of_attorney",
-        "tax_receipt",
-        "other",
-      ];
-      if (!documentType || !validTypes.includes(documentType)) {
-        return responseWrapper.badRequest(res, "Invalid document type");
-      }
 
       // Investment kontrolü
       const investment = await Investment.findById(investmentId)
@@ -681,7 +669,6 @@ class InvestmentFileController {
         metadata: {
           relatedModel: "Investment",
           relatedId: investmentId,
-          documentType: documentType,
           uploadedBy: userId,
         },
         limits: {
@@ -723,6 +710,18 @@ class InvestmentFileController {
       }
 
       const uploadResult = req.uploadResults[0].data;
+      const { documentType, description } = req.body || {};
+
+      // Multipart alanlari upload middleware'den sonra req.body'ye yaziliyor.
+      const validTypes = [
+        "notary_document",
+        "power_of_attorney",
+        "tax_receipt",
+        "other",
+      ];
+      if (!documentType || !validTypes.includes(documentType)) {
+        return responseWrapper.badRequest(res, "Invalid document type");
+      }
 
       const fileMetadata = new FileMetadata({
         filename: uploadResult.filename,

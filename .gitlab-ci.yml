@@ -1,12 +1,77 @@
-stages:
-  - test
+default:
+  interruptible: true
+  variables:
+    NPM_CONFIG_CACHE: $CI_PROJECT_DIR/.npm
+  cache:
+    key:
+      files:
+        - client/package-lock.json
+        - server/package-lock.json
+    paths:
+      - .npm/
 
-runner:smoke:
-  stage: test
-  image: node:20
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+stages:
+  - lint
+  - build
+  - api-test
+  - e2e-smoke
+
+lint:
+  stage: lint
+  image: node:20-bookworm
   tags:
     - docker
   script:
-    - node --version
-    - npm --version
-    - echo "Local GitLab Runner is working!"
+    - cd client
+    - npm ci --prefer-offline
+    - npm run lint
+
+build:
+  stage: build
+  image: node:20-bookworm
+  tags:
+    - docker
+  script:
+    - cd client
+    - npm ci --prefer-offline
+    - npm run build
+  artifacts:
+    paths:
+      - client/dist/
+    expire_in: 1 week
+
+api-test:
+  stage: api-test
+  image: node:20-bookworm
+  tags:
+    - docker
+  script:
+    - cd server
+    - npm ci --prefer-offline
+    - npm test
+
+e2e-smoke:
+  stage: e2e-smoke
+  image: mcr.microsoft.com/playwright:v1.54.2-jammy
+  tags:
+    - docker
+  needs:
+    - job: build
+      artifacts: true
+  script:
+    - cd client
+    - npm ci --prefer-offline
+    - npm run test:e2e:smoke
+  artifacts:
+    when: always
+    paths:
+      - client/playwright-report/
+      - client/test-results/
+    expire_in: 1 week

@@ -555,6 +555,7 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
           {availableTabs.map((tab) => (
             <button
               key={tab}
+              data-testid={`investment-tab-${tab}`}
               onClick={() => setActiveTab(tab)}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === tab
@@ -1124,12 +1125,13 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
                       </span>
                     </div>
 
-                    <div className="mt-4 space-y-4">
+                    <div data-testid="investment-review-queue" className="mt-4 space-y-4">
                       {reviewableDocuments.map((document) => {
                         const isReviewing = reviewingFileId === document.fileId;
                         return (
                           <div
                             key={document.fileId}
+                            data-testid="investment-review-card"
                             className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800 p-4"
                           >
                             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1164,6 +1166,7 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
                             </div>
 
                             <textarea
+                              data-testid={`investment-review-note-${document.fileId}`}
                               value={reviewNotes[document.fileId] || ""}
                               onChange={(event) =>
                                 setReviewNotes((current) => ({
@@ -1178,6 +1181,7 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
                             <div className="mt-3 flex flex-wrap gap-3">
                               <button
                                 type="button"
+                                data-testid={`investment-review-approve-${document.fileId}`}
                                 onClick={() =>
                                   handleReviewDocument(document.fileId, "approve")
                                 }
@@ -1193,6 +1197,7 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
                               </button>
                               <button
                                 type="button"
+                                data-testid={`investment-review-request-${document.fileId}`}
                                 onClick={() =>
                                   handleReviewDocument(
                                     document.fileId,
@@ -1376,6 +1381,7 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
                 {t("investor.uploadAdditionalDocument")}
               </h3>
               <input
+                data-testid="investment-upload-additional-document"
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png"
                 onChange={(e) => handleDocumentUpload(e, "other")}

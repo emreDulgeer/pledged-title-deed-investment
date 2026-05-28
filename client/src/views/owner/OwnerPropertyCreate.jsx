@@ -201,22 +201,16 @@ const syncImageCoverState = (entries, preferredCoverId = null) => {
   }));
 };
 
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 const MapPreview = ({ lat, lng, pinpointMode, onPinpointPick }) => {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
-
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return (
-      <div className="h-72 rounded-2xl border border-dashed border-day-border dark:border-night-border bg-day-background dark:bg-night-background flex items-center justify-center text-center px-6 text-sm text-day-text/55 dark:text-night-text/55">
-        Adres veya koordinat girdikten sonra harita önizlemesi burada görünecek.
-      </div>
-    );
-  }
+  const hasCoordinates = Number.isFinite(lat) && Number.isFinite(lng);
 
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return undefined;
+    if (!hasCoordinates || !containerRef.current || mapRef.current) {
+      return undefined;
+    }
 
     const map = L.map(containerRef.current, {
       center: [lat, lng],
@@ -252,22 +246,30 @@ const MapPreview = ({ lat, lng, pinpointMode, onPinpointPick }) => {
       mapRef.current = null;
       markerRef.current = null;
     };
-  }, [lat, lng, onPinpointPick, pinpointMode]);
+  }, [hasCoordinates, lat, lng, onPinpointPick, pinpointMode]);
 
   useEffect(() => {
-    if (!mapRef.current || !markerRef.current) return;
+    if (!hasCoordinates || !mapRef.current || !markerRef.current) return;
 
     markerRef.current.setLatLng([lat, lng]);
 
     if (!pinpointMode) {
       mapRef.current.setView([lat, lng], Math.max(mapRef.current.getZoom(), 16));
     }
-  }, [lat, lng, pinpointMode]);
+  }, [hasCoordinates, lat, lng, pinpointMode]);
 
   useEffect(() => {
-    if (!mapRef.current || !pinpointMode) return;
+    if (!hasCoordinates || !mapRef.current || !pinpointMode) return;
     mapRef.current.setView([lat, lng], Math.max(mapRef.current.getZoom(), 16));
-  }, [pinpointMode, lat, lng]);
+  }, [hasCoordinates, pinpointMode, lat, lng]);
+
+  if (!hasCoordinates) {
+    return (
+      <div className="h-72 rounded-2xl border border-dashed border-day-border dark:border-night-border bg-day-background dark:bg-night-background flex items-center justify-center text-center px-6 text-sm text-day-text/55 dark:text-night-text/55">
+        Adres veya koordinat girdikten sonra harita önizlemesi burada görünecek.
+      </div>
+    );
+  }
 
   return (
     <div className="relative">
@@ -487,10 +489,11 @@ const OwnerPropertyCreate = () => {
       const requestId = autoGeocodeRequestIdRef.current + 1;
       autoGeocodeRequestIdRef.current = requestId;
       setGeocodeLoading(true);
+      const addressInput = buildGeocodeAddressInput(form);
 
       try {
         const response = await bridge.geocoding.geocode(
-          geocodeAddressInput || addressQuery,
+          addressInput || addressQuery,
         );
         const result = response.data;
 
@@ -520,7 +523,7 @@ const OwnerPropertyCreate = () => {
 
         setHelperMessage("Adres bilgisine göre koordinatlar otomatik dolduruldu.");
         setSubmitError("");
-      } catch (error) {
+      } catch {
         if (requestId !== autoGeocodeRequestIdRef.current) {
           return;
         }
@@ -922,7 +925,7 @@ const OwnerPropertyCreate = () => {
         }
 
         setSuggestions(response.data || []);
-      } catch (error) {
+      } catch {
         if (requestId !== searchRequestIdRef.current) {
           return;
         }
@@ -962,7 +965,11 @@ const OwnerPropertyCreate = () => {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_420px]">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form
+            data-testid="owner-property-create-form"
+            onSubmit={handleSubmit}
+            className="space-y-6"
+          >
             <div className="rounded-3xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
@@ -1615,6 +1622,7 @@ const OwnerPropertyCreate = () => {
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="submit"
+                data-testid="owner-property-create-submit"
                 disabled={submitting}
                 className="rounded-2xl bg-day-primary dark:bg-night-primary px-6 py-3 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
               >

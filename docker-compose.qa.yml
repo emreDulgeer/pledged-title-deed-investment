@@ -1,0 +1,28 @@
+services:
+  mongo:
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --eval \"db.adminCommand({ ping: 1 }).ok\" | grep 1 >/dev/null 2>&1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until /usr/bin/mc alias set qa http://minio:9000 pledgedminio pledgedminio123; do
+          echo "Waiting for MinIO..."
+          sleep 2
+        done
+        /usr/bin/mc mb --ignore-existing qa/uploads
+        /usr/bin/mc anonymous set download qa/uploads >/dev/null 2>&1 || true
+        echo "MinIO uploads bucket is ready."

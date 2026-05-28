@@ -38,7 +38,10 @@ const DocumentsList = ({ documents = [], onDownload, t: translate }) => {
   if (!documents.length) return null;
 
   return (
-    <div className="bg-day-surface dark:bg-night-surface rounded-lg shadow-lg p-6">
+    <div
+      data-testid="document-list"
+      className="bg-day-surface dark:bg-night-surface rounded-lg shadow-lg p-6"
+    >
       <h3 className="text-lg font-semibold text-day-text dark:text-night-text mb-4">
         {tr("properties.documents")}
       </h3>
@@ -47,6 +50,7 @@ const DocumentsList = ({ documents = [], onDownload, t: translate }) => {
         {documents.map((doc, index) => (
           <div
             key={index}
+            data-testid={`document-row-${doc.fileId || index}`}
             className="rounded-lg bg-day-background p-3 dark:bg-night-dashboard"
           >
             <div className="flex items-start justify-between gap-3">
@@ -81,6 +85,13 @@ const DocumentsList = ({ documents = [], onDownload, t: translate }) => {
               </div>
               <button
                 type="button"
+                aria-label={`Download ${
+                  doc.name ||
+                  tr(
+                    `documents.types.${doc.type}`,
+                    prettifyDocType(doc.type) || `Document ${index + 1}`,
+                  )
+                }`}
                 disabled={!onDownload || !doc.fileId}
                 onClick={() =>
                   onDownload?.(

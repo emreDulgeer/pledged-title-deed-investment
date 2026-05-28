@@ -5,8 +5,8 @@ import {
   InfoRow,
   ProfilePageLayout,
   PropertyCard,
-  ROLE_LABELS,
 } from "./profileViewParts";
+import { ROLE_LABELS } from "./profileViewConstants";
 
 const PublicProfilePage = ({ profile, isOwnProfile, onBack, viewerRole }) => {
   return (

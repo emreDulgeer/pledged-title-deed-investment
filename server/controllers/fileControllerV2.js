@@ -864,16 +864,21 @@ class FileControllerV2 {
    */
   async logFileAccess(metadata, user, action) {
     try {
+      if (!user?._id) {
+        return;
+      }
+
       const ActivityLog = require("../models/ActivityLog");
+      const normalizedAction = action === "preview" ? "download" : action;
 
       await ActivityLog.create({
         user: user?._id,
-        action: `file_${action}`,
+        action: `file_${normalizedAction}`,
         details: {
           fileId: metadata._id,
           filename: metadata.filename,
           originalName: metadata.originalName,
-          action: action,
+          action: normalizedAction,
         },
         ip: user?.lastLoginIP,
         severity: "low",

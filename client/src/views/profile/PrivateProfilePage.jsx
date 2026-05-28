@@ -9,8 +9,8 @@ import {
   InvestmentCard,
   ProfilePageLayout,
   PropertyCard,
-  ROLE_LABELS,
 } from "./profileViewParts";
+import { ROLE_LABELS } from "./profileViewConstants";
 
 const PrivateProfilePage = ({ profile, isOwnProfile, onBack, viewerRole }) => {
   return (

@@ -437,8 +437,15 @@ class MembershipService {
         priority: "medium",
       });
 
+      const oldAmount = Number(oldPlan?.pricing?.monthly?.amount || 0);
+      const newAmount = Number(newPlan?.pricing?.monthly?.amount || 0);
+      const membershipAction =
+        newAmount >= oldAmount
+          ? "membership_upgraded"
+          : "membership_downgraded";
+
       // Activity Log
-      await this.logActivity(userId, "membership_plan_changed", {
+      await this.logActivity(userId, membershipAction, {
         oldPlan: this.getPlanDisplayName(oldPlan),
         newPlan: this.getPlanDisplayName(newPlan),
         changedBy: adminId ? "admin" : "user",

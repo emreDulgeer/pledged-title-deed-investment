@@ -2,11 +2,13 @@
 
 const rateLimit = require("express-rate-limit");
 const { ipKeyGenerator } = rateLimit;
+const shouldSkipRateLimit = () => process.env.DISABLE_RATE_LIMIT === "true";
 
 // Light limiter - Genel API istekleri için
 const light = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 dakika
   max: 150, // 150 istek
+  skip: shouldSkipRateLimit,
   message: {
     success: false,
     message: "Çok fazla istek gönderdiniz, lütfen biraz bekleyin",
@@ -19,6 +21,7 @@ const light = rateLimit({
 const moderate = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 dakika
   max: 75, // 75 istek
+  skip: shouldSkipRateLimit,
   message: {
     success: false,
     message: "İstek limiti aşıldı, lütfen 1 dakika bekleyin",
@@ -31,6 +34,7 @@ const moderate = rateLimit({
 const strict = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 dakika
   max: 5, // 5 istek
+  skip: shouldSkipRateLimit,
   message: {
     success: false,
     message: "Çok fazla deneme yaptınız, lütfen 15 dakika bekleyin",
@@ -46,6 +50,7 @@ const strict = rateLimit({
 const uploadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 dakika
   max: 75, // 15 dakikada 75 yükleme
+  skip: shouldSkipRateLimit,
   message: {
     success: false,
     message: "Çok fazla dosya yükleme isteği. Lütfen 1 dakika bekleyin",
@@ -70,6 +75,7 @@ const uploadLimiter = rateLimit({
 const downloadLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 dakika
   max: 150, // 15 dakikada 150 indirme
+  skip: shouldSkipRateLimit,
   message: {
     success: false,
     message: "Çok fazla indirme isteği. Lütfen biraz bekleyin",
@@ -82,6 +88,7 @@ const downloadLimiter = rateLimit({
 const heavyOperation = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 saat
   max: 10, // Saatte 10 işlem
+  skip: shouldSkipRateLimit,
   message: {
     success: false,
     message: "Bu işlem için saatlik limit aşıldı",
@@ -94,6 +101,7 @@ const heavyOperation = rateLimit({
 const passwordReset = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 saat
   max: 3, // Saatte 3 deneme
+  skip: shouldSkipRateLimit,
   message: {
     success: false,
     message: "Çok fazla şifre sıfırlama isteği",
@@ -105,6 +113,7 @@ const passwordReset = rateLimit({
 const emailVerification = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 saat
   max: 5, // Saatte 5 deneme
+  skip: shouldSkipRateLimit,
   message: {
     success: false,
     message: "Çok fazla email doğrulama isteği",
@@ -116,6 +125,7 @@ const createCustomLimiter = (options) => {
   return rateLimit({
     windowMs: options.windowMs || 15 * 60 * 1000,
     max: options.max || 100,
+    skip: shouldSkipRateLimit,
     message: options.message || {
       success: false,
       message: "Rate limit exceeded",

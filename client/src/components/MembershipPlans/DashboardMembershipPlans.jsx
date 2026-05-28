@@ -190,7 +190,10 @@ const DashboardMembershipPlans = ({ role }) => {
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+    <section
+      data-testid="membership-dashboard"
+      className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800"
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
@@ -206,7 +209,10 @@ const DashboardMembershipPlans = ({ role }) => {
           </p>
         </div>
 
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+        <div
+          data-testid="membership-current-plan"
+          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300"
+        >
           <span className="font-semibold">Current plan:</span> {currentPlanName}
           {membership?.expiresAt ? (
             <span className="block text-xs text-emerald-700/80 dark:text-emerald-300/80">
@@ -237,6 +243,8 @@ const DashboardMembershipPlans = ({ role }) => {
           return (
             <article
               key={plan._id}
+              data-testid={`membership-plan-${plan.name}`}
+              data-plan-name={plan.displayName}
               className={`rounded-2xl border p-5 transition-all ${
                 isCurrent
                   ? "border-emerald-400 bg-emerald-50/70 shadow-md dark:border-emerald-400/70 dark:bg-emerald-500/10"
@@ -303,6 +311,7 @@ const DashboardMembershipPlans = ({ role }) => {
 
               <button
                 type="button"
+                data-testid={`membership-switch-${plan.name}`}
                 onClick={() => handleChangePlan(plan._id)}
                 disabled={isCurrent || isChanging || isPending}
                 className={`mt-5 inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${

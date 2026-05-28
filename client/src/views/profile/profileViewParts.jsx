@@ -13,40 +13,27 @@ import {
   getPropertyImageUrl,
 } from "../../utils/propertyImages";
 import { APP_CURRENCY } from "../../utils/currency";
+import { ROLE_LABELS, STAT_LABELS } from "./profileViewConstants";
 
-export const ROLE_LABELS = {
-  admin: "Admin",
-  investor: "Investor",
-  property_owner: "Property Owner",
-  local_representative: "Local Representative",
-};
+export const InfoRow = ({ icon, label, value }) => {
+  const Icon = icon;
 
-export const STAT_LABELS = {
-  totalProperties: "Total Properties",
-  publishedProperties: "Published Properties",
-  totalInvestments: "Total Investments",
-  activeInvestments: "Active Investments",
-  completedContracts: "Completed Contracts",
-  ongoingContracts: "Ongoing Contracts",
-  investmentLimit: "Investment Limit",
-  activeInvestmentCount: "Active Investment Count",
-};
-
-export const InfoRow = ({ icon: Icon, label, value }) => (
-  <div className="flex items-center gap-3 rounded-2xl border border-day-border/70 dark:border-night-border/70 px-4 py-3">
-    <div className="rounded-xl bg-day-background dark:bg-night-background p-2">
-      <Icon className="h-4 w-4 text-day-text/70 dark:text-night-text/70" />
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-day-border/70 dark:border-night-border/70 px-4 py-3">
+      <div className="rounded-xl bg-day-background dark:bg-night-background p-2">
+        <Icon className="h-4 w-4 text-day-text/70 dark:text-night-text/70" />
+      </div>
+      <div>
+        <p className="text-xs uppercase tracking-[0.16em] text-day-text/45 dark:text-night-text/45">
+          {label}
+        </p>
+        <p className="text-sm font-medium text-day-text dark:text-night-text">
+          {value || "-"}
+        </p>
+      </div>
     </div>
-    <div>
-      <p className="text-xs uppercase tracking-[0.16em] text-day-text/45 dark:text-night-text/45">
-        {label}
-      </p>
-      <p className="text-sm font-medium text-day-text dark:text-night-text">
-        {value || "-"}
-      </p>
-    </div>
-  </div>
-);
+  );
+};
 
 export const StatCard = ({ label, value }) => (
   <div className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-4">

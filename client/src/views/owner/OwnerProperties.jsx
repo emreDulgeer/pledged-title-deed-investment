@@ -720,6 +720,7 @@ export const OffersTab = () => {
             return (
               <div
                 key={pid}
+                data-testid={`owner-offer-property-${pid}`}
                 className="rounded-xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface overflow-hidden"
               >
                 {/* Mülk satırı */}
@@ -767,6 +768,7 @@ export const OffersTab = () => {
                       {t("properties.property_details") || "Property Details"}
                     </button>
                     <button
+                      data-testid={`owner-offer-toggle-${pid}`}
                       onClick={() => toggleOffers(pid)}
                       className="px-3 py-1.5 text-xs font-medium rounded-lg bg-day-primary dark:bg-night-primary text-white hover:opacity-90 transition-opacity"
                     >
@@ -842,6 +844,7 @@ export const OffersTab = () => {
                               {/* Aksiyon */}
                               <div className="flex items-center gap-2 shrink-0">
                                 <button
+                                  data-testid={`owner-offer-detail-${invId}`}
                                   onClick={() =>
                                     navigate(`/owner/investments/${invId}`)
                                   }

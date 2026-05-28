@@ -2,10 +2,17 @@
   "name": "server",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "bootstrap.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon app.js",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "dev": "nodemon bootstrap.js",
+    "dev:qa": "node -r dotenv/config ./node_modules/nodemon/bin/nodemon.js bootstrap.js dotenv_config_path=./config/env/qa.env.sample",
+    "start": "node bootstrap.js",
+    "start:qa": "node -r dotenv/config bootstrap.js dotenv_config_path=./config/env/qa.env.sample",
+    "seed:qa": "node -r dotenv/config seed/seed.js dotenv_config_path=./config/env/qa.env.sample",
+    "dropdb:qa": "node -r dotenv/config seed/dropDb.js dotenv_config_path=./config/env/qa.env.sample",
+    "qa:reset": "npm run dropdb:qa && npm run seed:qa",
     "seed": "node seed/seed.js",
     "seedmembership": "node seed/membershipPlans.js",
     "dropdb": "node seed/dropDb.js"
@@ -53,7 +60,9 @@
     "winston": "^3.17.0"
   },
   "devDependencies": {
+    "jest": "^30.4.2",
     "morgan": "^1.10.1",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "supertest": "^7.2.2"
   }
 }
