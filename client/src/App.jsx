@@ -370,13 +370,34 @@ const AppContent = () => {
 
         <Route
           path="/auth/admin/pending-kyc/:userId"
-          element={<AdminPendingKycDetail />}
+          element={
+            <PrivateRoute>
+              <RoleBasedRoute allowedRoles={["admin"]}>
+                <AdminPendingKycDetail />
+              </RoleBasedRoute>
+            </PrivateRoute>
+          }
         />
-        <Route path="/owner/properties/:id" element={<PropertyDetail />} />
+        <Route
+          path="/owner/properties/:id"
+          element={
+            <PrivateRoute>
+              <RoleBasedRoute allowedRoles={["property_owner"]}>
+                <PropertyDetail />
+              </RoleBasedRoute>
+            </PrivateRoute>
+          }
+        />
 
         <Route
           path="/properties/my/properties/:propertyId"
-          element={<AdminPropertyDetail />}
+          element={
+            <PrivateRoute>
+              <RoleBasedRoute allowedRoles={["admin"]}>
+                <AdminPropertyDetail />
+              </RoleBasedRoute>
+            </PrivateRoute>
+          }
         />
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />

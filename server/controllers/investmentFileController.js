@@ -195,7 +195,7 @@ class InvestmentFileController {
       const investment = await Investment.findById(investmentId).populate(
         "property",
         "owner"
-      ).populate("localRepresentative", "_id");
+      );
 
       if (!investment) {
         return responseWrapper.notFound(res, "Investment not found");
@@ -204,16 +204,8 @@ class InvestmentFileController {
       // Yetki kontrolü
       const isOwner =
         investment.property.owner.toString() === userId.toString();
-      const isAssignedRepresentative =
-        String(
-          investment.localRepresentative?._id || investment.localRepresentative,
-        ) === String(userId);
 
-      if (
-        !isOwner &&
-        userRole !== "admin" &&
-        !isAssignedRepresentative
-      ) {
+      if (!isOwner && userRole !== "admin") {
         return responseWrapper.forbidden(
           res,
           "Unauthorized to upload title deed"
@@ -634,8 +626,7 @@ class InvestmentFileController {
       // Investment kontrolü
       const investment = await Investment.findById(investmentId)
         .populate("investor", "_id")
-        .populate("property", "owner")
-        .populate("localRepresentative", "_id");
+        .populate("property", "owner");
 
       if (!investment) {
         return responseWrapper.notFound(res, "Investment not found");
@@ -646,17 +637,8 @@ class InvestmentFileController {
         investment.investor._id.toString() === userId.toString();
       const isOwner =
         investment.property.owner.toString() === userId.toString();
-      const isAssignedRepresentative =
-        String(
-          investment.localRepresentative?._id || investment.localRepresentative,
-        ) === String(userId);
 
-      if (
-        !isInvestor &&
-        !isOwner &&
-        userRole !== "admin" &&
-        !isAssignedRepresentative
-      ) {
+      if (!isInvestor && !isOwner && userRole !== "admin") {
         return responseWrapper.forbidden(
           res,
           "Unauthorized to upload documents"

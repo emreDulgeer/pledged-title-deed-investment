@@ -66,8 +66,8 @@ const RepresentativeCases = () => {
             My Representative Cases
           </h1>
           <p className="mt-2 text-sm text-day-text/60 dark:text-night-text/60">
-            Follow the investments you have already claimed and keep the process
-            moving locally.
+            These are the investments you already manage. Use them as workflow
+            queues and decide what can move to the next step.
           </p>
         </div>
 
@@ -131,8 +131,8 @@ const RepresentativeCases = () => {
                   <th className="px-5 py-4">Investor</th>
                   <th className="px-5 py-4">Owner</th>
                   <th className="px-5 py-4">Status</th>
-                  <th className="px-5 py-4">Next Step</th>
-                  <th className="px-5 py-4">Action</th>
+                  <th className="px-5 py-4">Workflow Gate</th>
+                  <th className="px-5 py-4">Workflow</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-day-border dark:divide-night-border">
@@ -165,7 +165,7 @@ const RepresentativeCases = () => {
                         to={`/rep/investments/${item.id}`}
                         className="text-sm font-medium text-sky-600 hover:underline dark:text-sky-300"
                       >
-                        Open case
+                        Manage workflow
                       </Link>
                     </td>
                   </tr>

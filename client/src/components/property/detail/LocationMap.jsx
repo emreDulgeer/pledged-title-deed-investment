@@ -7,6 +7,7 @@ const LocationMap = ({ property, t }) => {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRef = useRef(null);
+  const translate = t || ((key, fallback) => fallback || key);
 
   const lat = Number(property?.locationPin?.lat);
   const lng = Number(property?.locationPin?.lng);
@@ -64,7 +65,7 @@ const LocationMap = ({ property, t }) => {
       <div className="flex items-start justify-between gap-4 mb-4">
         <div>
           <h3 className="text-lg font-semibold text-day-text dark:text-night-text">
-            {t("properties.location", "Location")}
+            {translate("properties.location", "Location")}
           </h3>
           <div className="mt-2 flex items-start gap-2 text-day-text/70 dark:text-night-text/70">
             <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
@@ -79,7 +80,7 @@ const LocationMap = ({ property, t }) => {
           className="inline-flex items-center gap-2 rounded-lg border border-day-border dark:border-night-border px-3 py-2 text-sm text-day-primary dark:text-night-primary hover:bg-day-background dark:hover:bg-night-dashboard transition-colors"
         >
           <Navigation className="w-4 h-4" />
-          {t("properties.open_in_map", "Open map")}
+          {translate("properties.open_in_map", "Open map")}
         </a>
       </div>
 

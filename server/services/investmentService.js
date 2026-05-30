@@ -1021,16 +1021,8 @@ class InvestmentService {
 
     // Yetki kontrolü
     const isOwner = investment.property.owner.toString() === userId.toString();
-    const isAssignedRepresentative =
-      String(
-        investment.localRepresentative?._id || investment.localRepresentative,
-      ) === String(userId);
 
-    if (
-      !isOwner &&
-      userRole !== "admin" &&
-      !isAssignedRepresentative
-    ) {
+    if (!isOwner && userRole !== "admin") {
       throw new Error("Unauthorized to upload title deed");
     }
 

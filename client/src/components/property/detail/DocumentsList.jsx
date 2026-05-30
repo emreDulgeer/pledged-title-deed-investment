@@ -1,6 +1,6 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { FileText, Download, Shield } from "lucide-react";
+import { Eye, FileText, Download, Shield } from "lucide-react";
 
 const prettifyDocType = (type = "") =>
   String(type)
@@ -31,7 +31,7 @@ const formatReviewLabel = (status) => {
   }
 };
 
-const DocumentsList = ({ documents = [], onDownload, t: translate }) => {
+const DocumentsList = ({ documents = [], onDownload, onPreview, t: translate }) => {
   const { t } = useTranslation();
   const tr = translate || t;
 
@@ -83,28 +83,45 @@ const DocumentsList = ({ documents = [], onDownload, t: translate }) => {
                   ) : null}
                 </div>
               </div>
-              <button
-                type="button"
-                aria-label={`Download ${
-                  doc.name ||
-                  tr(
-                    `documents.types.${doc.type}`,
-                    prettifyDocType(doc.type) || `Document ${index + 1}`,
-                  )
-                }`}
-                disabled={!onDownload || !doc.fileId}
-                onClick={() =>
-                  onDownload?.(
-                    doc.fileId,
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label={`Preview ${
                     doc.name ||
-                      prettifyDocType(doc.type) ||
-                      `document-${index + 1}`,
-                  )
-                }
-                className="text-day-secondary dark:text-night-secondary hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Download className="w-4 h-4" />
-              </button>
+                    tr(
+                      `documents.types.${doc.type}`,
+                      prettifyDocType(doc.type) || `Document ${index + 1}`,
+                    )
+                  }`}
+                  disabled={!onPreview || !doc.previewUrl}
+                  onClick={() => onPreview?.(doc.previewUrl)}
+                  className="text-day-secondary dark:text-night-secondary hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Download ${
+                    doc.name ||
+                    tr(
+                      `documents.types.${doc.type}`,
+                      prettifyDocType(doc.type) || `Document ${index + 1}`,
+                    )
+                  }`}
+                  disabled={!onDownload || !doc.fileId}
+                  onClick={() =>
+                    onDownload?.(
+                      doc.fileId,
+                      doc.name ||
+                        prettifyDocType(doc.type) ||
+                        `document-${index + 1}`,
+                    )
+                  }
+                  className="text-day-secondary dark:text-night-secondary hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         ))}

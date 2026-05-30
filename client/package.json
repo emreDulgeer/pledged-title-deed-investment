@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "preview:ci": "vite preview --host localhost --port 4173 --strictPort",
     "test:e2e:smoke": "playwright test tests/e2e/login.smoke.spec.js",
-    "test:e2e:critical": "playwright test --config=playwright.critical.config.js"
+    "test:e2e:critical": "playwright test --config=playwright.critical.config.js",
+    "test:e2e:critical:reuse": "PW_REUSE_SERVERS=1 playwright test --config=playwright.critical.config.js"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

@@ -37,6 +37,19 @@ const fileController = {
     return downloadUrl.toString();
   },
 
+  getPreviewUrl: (fileId) => {
+    if (!fileId) return "";
+
+    const token = tokenManager.getAccessToken();
+    const previewUrl = new URL(`${BASE_URL}/files/preview/${fileId}`);
+
+    if (token) {
+      previewUrl.searchParams.set("token", token);
+    }
+
+    return previewUrl.toString();
+  },
+
   download: async (fileId) => {
     const token = tokenManager.getAccessToken();
 

@@ -26,6 +26,7 @@ import {
   DeleteModal,
   FlagModal,
 } from "../../components/property/detail";
+import { resolveFileUrl } from "../../components/property/detail/_utils";
 
 const PropertyDetail = () => {
   const { t } = useTranslation();
@@ -205,6 +206,14 @@ const PropertyDetail = () => {
     }
   };
 
+  const handlePreviewDocument = (previewUrl) => {
+    if (!previewUrl) {
+      return;
+    }
+
+    window.open(previewUrl, "_blank", "noopener,noreferrer");
+  };
+
   // UI states
   if (loading)
     return (
@@ -289,8 +298,12 @@ const PropertyDetail = () => {
                   document.name ||
                   document.originalName ||
                   document.fileId?.originalName,
+                previewUrl:
+                  bridge.files.getPreviewUrl(getDocumentFileId(document)) ||
+                  resolveFileUrl(document.url || document.path || ""),
               }))}
               onDownload={handleDownloadDocument}
+              onPreview={handlePreviewDocument}
               t={t}
             />
           )}

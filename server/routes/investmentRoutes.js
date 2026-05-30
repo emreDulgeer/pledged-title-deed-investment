@@ -98,11 +98,11 @@ router.post(
   investmentFileController.uploadContract
 );
 
-// Tapu kaydı yükle (Property Owner & Local Rep)
+// Tapu kaydı yükle (Property Owner)
 router.post(
   "/:id/title-deed",
   auth,
-  authorize(["property_owner", "local_representative", "admin"]),
+  authorize(["property_owner", "admin"]),
   investmentFileController.uploadTitleDeed
 );
 
@@ -126,7 +126,7 @@ router.post(
 router.post(
   "/:id/documents",
   auth,
-  authorize(["investor", "property_owner", "admin", "local_representative"]),
+  authorize(["investor", "property_owner", "admin"]),
   investmentFileController.uploadAdditionalDocument
 );
 

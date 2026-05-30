@@ -27,7 +27,7 @@ class AuthService {
     });
 
     const refreshToken = jwt.sign(
-      { userId: user._id, type: "refresh" },
+      { userId: user._id, type: "refresh", jti: crypto.randomUUID() },
       process.env.JWT_REFRESH_SECRET,
       { expiresIn: rememberMe ? "90d" : "7d" }
     );

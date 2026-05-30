@@ -380,6 +380,7 @@ class FileControllerV2 {
   preview = async (req, res) => {
     try {
       const { fileId } = req.params;
+      const requestUser = await this.resolveRequestUser(req);
 
       // Metadata'yı bul
       const metadata = await FileMetadata.findById(fileId);
@@ -391,7 +392,7 @@ class FileControllerV2 {
       // Public değilse yetki kontrolü
       if (
         !metadata.isPublic &&
-        !(await this.canAccessFileWithContext(metadata, req.user))
+        !(await this.canAccessFileWithContext(metadata, requestUser))
       ) {
         return responseWrapper.forbidden(res, "Bu dosyaya erişim yetkiniz yok");
       }
@@ -419,7 +420,7 @@ class FileControllerV2 {
       );
 
       // Preview log
-      await this.logFileAccess(metadata, req.user, "preview");
+      await this.logFileAccess(metadata, requestUser, "preview");
 
       // Dosyayı gönder
       res.setHeader("Content-Type", metadata.mimeType);

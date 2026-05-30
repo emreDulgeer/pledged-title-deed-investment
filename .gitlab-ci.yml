@@ -21,7 +21,7 @@ stages:
   - lint
   - build
   - api-test
-  - e2e-smoke
+  - e2e-critical
 
 lint:
   stage: lint
@@ -57,21 +57,59 @@ api-test:
     - npm ci --prefer-offline
     - npm test
 
-e2e-smoke:
-  stage: e2e-smoke
-  image: mcr.microsoft.com/playwright:v1.54.2-jammy
+e2e-critical:
+  stage: e2e-critical
+  image: mcr.microsoft.com/playwright:v1.60.0-jammy
   tags:
     - docker
-  needs:
-    - job: build
-      artifacts: true
+  services:
+    - name: mongo:6.0
+      alias: mongo
+    - name: minio/minio:latest
+      alias: minio
+      command:
+        - server
+        - /data
+        - --console-address
+        - :9001
+  variables:
+    CI: "true"
+    MONGO_URI: mongodb://mongo:27017/pledged_platform
+    MONGODB_URI: mongodb://mongo:27017/pledged_platform
+    MONGO_INITDB_DATABASE: pledged_platform
+    STORAGE_TYPE: minio
+    MINIO_ROOT_USER: pledgedminio
+    MINIO_ROOT_PASSWORD: pledgedminio123
+    MINIO_ENDPOINT: minio
+    MINIO_PORT: "9000"
+    MINIO_USE_SSL: "false"
+    MINIO_ACCESS_KEY: pledgedminio
+    MINIO_SECRET_KEY: pledgedminio123
+    MINIO_BUCKET: uploads
+    MINIO_PUBLIC_URL: http://minio:9000
   script:
-    - cd client
+    - cd server
     - npm ci --prefer-offline
-    - npm run test:e2e:smoke
+    - |
+      until node -e "const net=require('node:net'); const socket=net.connect(27017, 'mongo'); socket.on('connect', () => { socket.end(); process.exit(0); }); socket.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 1000);"; do
+        echo "Waiting for MongoDB..."
+        sleep 2
+      done
+    - |
+      until curl -sf http://minio:9000/minio/health/live >/dev/null; do
+        echo "Waiting for MinIO..."
+        sleep 2
+      done
+    - npm run qa:reset
+    - cd ../client
+    - npm ci --prefer-offline
+    - npm run test:e2e:critical
   artifacts:
     when: always
     paths:
       - client/playwright-report/
       - client/test-results/
+    reports:
+      junit:
+        - client/test-results/critical-junit.xml
     expire_in: 1 week

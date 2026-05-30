@@ -470,7 +470,11 @@ class AuthController {
       );
 
       const refreshToken = jwt.sign(
-        { userId: user._id, type: "refresh" },
+        {
+          userId: user._id,
+          type: "refresh",
+          jti: crypto.randomUUID(),
+        },
         process.env.JWT_REFRESH_SECRET,
         { expiresIn: refreshExpiry }
       );
@@ -683,7 +687,11 @@ class AuthController {
 
         // Generate new refresh token
         newRefreshToken = jwt.sign(
-          { userId: user._id, type: "refresh" },
+          {
+            userId: user._id,
+            type: "refresh",
+            jti: crypto.randomUUID(),
+          },
           process.env.JWT_REFRESH_SECRET,
           { expiresIn: "7d" }
         );

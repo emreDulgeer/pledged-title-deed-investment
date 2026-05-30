@@ -129,6 +129,23 @@ const RepresentativeRequestPool = () => {
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-xl border border-day-border dark:border-night-border p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
+                    Case Stage
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-day-text dark:text-night-text">
+                    {String(item.status || "-").replaceAll("_", " ")}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-day-border dark:border-night-border p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
+                    Investment Amount
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-day-text dark:text-night-text">
+                    {item.amountInvested?.toLocaleString?.() || "-"}{" "}
+                    {item.currency || ""}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-day-border dark:border-night-border p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
                     Investor
                   </p>
                   <p className="mt-2 text-sm font-medium text-day-text dark:text-night-text">
@@ -145,10 +162,18 @@ const RepresentativeRequestPool = () => {
                 </div>
                 <div className="rounded-xl border border-day-border dark:border-night-border p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
+                    Property Type
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-day-text dark:text-night-text">
+                    {String(item.property?.propertyType || "-").replaceAll("_", " ")}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-day-border dark:border-night-border p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
                     Requested By
                   </p>
                   <p className="mt-2 text-sm font-medium capitalize text-day-text dark:text-night-text">
-                    {String(item.representativeRequest?.requestedByRole || "-").replace(
+                    {String(item.representativeRequest?.requestedByRole || "-").replaceAll(
                       "_",
                       " ",
                     )}
@@ -169,7 +194,7 @@ const RepresentativeRequestPool = () => {
                   to={`/rep/investments/${item.id}`}
                   className="rounded-xl border border-day-border dark:border-night-border px-4 py-2 text-sm font-medium text-day-text dark:text-night-text hover:bg-day-border/10 dark:hover:bg-night-border/10"
                 >
-                  Review Details
+                  Review Opportunity
                 </Link>
                 <button
                   type="button"
@@ -183,7 +208,7 @@ const RepresentativeRequestPool = () => {
                       Claiming...
                     </>
                   ) : (
-                    "Claim Request"
+                    "Claim and Manage"
                   )}
                 </button>
               </div>

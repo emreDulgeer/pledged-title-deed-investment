@@ -1397,6 +1397,7 @@ const OwnerPropertyCreate = () => {
                     <label className="rounded-2xl border border-day-border dark:border-night-border px-4 py-2 text-sm font-semibold cursor-pointer">
                       Select Documents
                       <input
+                        data-testid="owner-property-document-input"
                         type="file"
                         multiple
                         accept=".pdf,.jpg,.jpeg,.png"
@@ -1415,6 +1416,7 @@ const OwnerPropertyCreate = () => {
                       documentEntries.map((entry) => (
                         <div
                           key={entry.id}
+                          data-testid="owner-property-document-entry"
                           className="rounded-2xl border border-day-border dark:border-night-border p-4"
                         >
                           <div className="mb-3 flex items-center justify-between gap-3">
@@ -1437,6 +1439,7 @@ const OwnerPropertyCreate = () => {
 
                           <div className="grid gap-3 md:grid-cols-2">
                             <select
+                              data-testid="owner-property-document-type"
                               value={entry.type}
                               onChange={(e) =>
                                 updateDocumentEntry(
@@ -1454,6 +1457,7 @@ const OwnerPropertyCreate = () => {
                               ))}
                             </select>
                             <input
+                              data-testid="owner-property-document-description"
                               value={entry.description}
                               onChange={(e) =>
                                 updateDocumentEntry(

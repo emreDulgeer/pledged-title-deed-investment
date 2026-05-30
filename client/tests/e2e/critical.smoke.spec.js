@@ -64,6 +64,23 @@ const loginAs = async (page, account) => {
   await expect(page).toHaveURL(new RegExp(`${escapeRegex(account.expectedPath)}$`));
 };
 
+const expectAnonymousRouteRedirect = async (page, targetPath) => {
+  await clearSession(page);
+  await page.goto(targetPath);
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.locator('input[name="email"]')).toBeVisible();
+};
+
+const expectAccessDeniedForRole = async (page, account, targetPath) => {
+  await loginAs(page, account);
+  await page.goto(targetPath);
+  await expect(page).toHaveURL(new RegExp(`${escapeRegex(targetPath)}$`));
+  await expect(page.getByTestId("access-denied-screen")).toBeVisible();
+  await expect(page.getByTestId("access-denied-title")).toHaveText(
+    "Access Denied",
+  );
+};
+
 const acceptDialogIfPresent = async (page, action, timeout = 5000) => {
   const dialogPromise = page
     .waitForEvent("dialog", { timeout })
@@ -74,6 +91,73 @@ const acceptDialogIfPresent = async (page, action, timeout = 5000) => {
   await dialogPromise;
 };
 
+const fillOwnerPropertyForm = async (
+  page,
+  {
+    country = "Georgia",
+    city,
+    address,
+    estimatedValue = "250000",
+    requestedInvestment = "50000",
+    monthlyRent = "600",
+    annualYieldPercent = "7.5",
+    contractPeriodMonths = "18",
+    description = "Critical smoke property detail validation.",
+    latitude = "41.647178",
+    longitude = "41.636932",
+  },
+) => {
+  await page.getByLabel("Country").selectOption(country);
+  await page.getByLabel("City").fill(city);
+  await page.getByLabel("Title Deed Address").fill(address);
+  await page.getByLabel("Estimated Value").fill(estimatedValue);
+  await page.getByLabel("Requested Investment").fill(requestedInvestment);
+  await page.getByLabel("Monthly Rent Offered").fill(monthlyRent);
+  await page.getByLabel("Annual Yield Percent").fill(annualYieldPercent);
+  await page.getByLabel("Contract Period (Months)").fill(contractPeriodMonths);
+  await page
+    .getByRole("textbox", { name: "Description", exact: true })
+    .fill(description);
+  await page.getByLabel("Latitude").fill(latitude);
+  await page.getByLabel("Longitude").fill(longitude);
+};
+
+const createOwnerProperty = async (
+  page,
+  { city, address, description, document = null },
+) => {
+  await page.goto("/owner/properties/new");
+  await fillOwnerPropertyForm(page, { city, address, description });
+
+  if (document) {
+    await page.getByTestId("owner-property-document-input").setInputFiles({
+      name: document.fileName,
+      mimeType: document.mimeType,
+      buffer: document.buffer,
+    });
+
+    const documentEntry = page
+      .getByTestId("owner-property-document-entry")
+      .filter({ hasText: document.fileName })
+      .first();
+    await expect(documentEntry).toBeVisible();
+    await documentEntry
+      .getByTestId("owner-property-document-type")
+      .selectOption(document.type);
+
+    if (document.description) {
+      await documentEntry
+        .getByTestId("owner-property-document-description")
+        .fill(document.description);
+    }
+  }
+
+  await page.getByTestId("owner-property-create-submit").click();
+  await expect(page).toHaveURL(/\/owner\/properties\/[^/]+$/);
+
+  return page.url().split("/").pop();
+};
+
 test("login redirects each seeded role to its dashboard", async ({ page }) => {
   for (const role of roles) {
     await test.step(role.label, async () => {
@@ -82,34 +166,98 @@ test("login redirects each seeded role to its dashboard", async ({ page }) => {
   }
 });
 
+test("protected routes block anonymous and wrong-role access", async ({
+  page,
+}) => {
+  const fakePropertyId = "unauthorized-property-smoke";
+  const fakeUserId = "unauthorized-kyc-smoke";
+
+  await expectAnonymousRouteRedirect(page, `/owner/properties/${fakePropertyId}`);
+  await expectAnonymousRouteRedirect(
+    page,
+    `/properties/my/properties/${fakePropertyId}`,
+  );
+
+  await expectAccessDeniedForRole(
+    page,
+    roles[1],
+    `/owner/properties/${fakePropertyId}`,
+  );
+  await expectAccessDeniedForRole(
+    page,
+    roles[1],
+    `/auth/admin/pending-kyc/${fakeUserId}`,
+  );
+  await expectAccessDeniedForRole(page, roles[2], "/admin/dashboard");
+});
+
 test("owner can create a property and lands on its detail page", async ({ page }) => {
   const suffix = `${Date.now()}`.slice(-6);
   const city = `Smoke${suffix}`;
   const address = `QA Street ${suffix}, Block A`;
 
   await loginAs(page, roles[2]);
-  await page.goto("/owner/properties/new");
-
-  await page.getByLabel("Country").selectOption("Georgia");
-  await page.getByLabel("City").fill(city);
-  await page.getByLabel("Title Deed Address").fill(address);
-  await page.getByLabel("Estimated Value").fill("250000");
-  await page.getByLabel("Requested Investment").fill("50000");
-  await page.getByLabel("Monthly Rent Offered").fill("600");
-  await page.getByLabel("Annual Yield Percent").fill("7.5");
-  await page.getByLabel("Contract Period (Months)").fill("18");
-  await page
-    .getByRole("textbox", { name: "Description", exact: true })
-    .fill("Critical smoke property detail validation.");
-  await page.getByLabel("Latitude").fill("41.647178");
-  await page.getByLabel("Longitude").fill("41.636932");
-
-  await page.getByTestId("owner-property-create-submit").click();
-
-  await expect(page).toHaveURL(/\/owner\/properties\/[^/]+$/);
+  await createOwnerProperty(page, { city, address });
   await expect(page.getByText(`${city}, Georgia`)).toBeVisible();
   await expect(page.getByText(address).first()).toBeVisible();
   await expect(page.getByTestId("document-list")).toHaveCount(0);
+});
+
+test("owner can upload property documents and preview/download them from detail", async ({
+  page,
+}) => {
+  const suffix = `${Date.now()}`.slice(-6);
+  const city = `Docs${suffix}`;
+  const address = `QA Document Street ${suffix}, Block B`;
+  const fileName = `property-smoke-${Date.now()}.pdf`;
+  const uploadBuffer = await fs.readFile(uploadFixturePath);
+
+  await loginAs(page, roles[2]);
+  const propertyId = await createOwnerProperty(page, {
+    city,
+    address,
+    description: "Critical smoke property document validation.",
+    document: {
+      fileName,
+      mimeType: "application/pdf",
+      buffer: uploadBuffer,
+      type: "title_deed",
+      description: "Critical smoke property title deed.",
+    },
+  });
+
+  await expect(page).toHaveURL(
+    new RegExp(`/owner/properties/${escapeRegex(propertyId)}$`),
+  );
+  await expect(page.getByText(`${city}, Georgia`)).toBeVisible();
+
+  const documentRow = page
+    .locator('[data-testid^="document-row-"]')
+    .filter({ hasText: fileName })
+    .first();
+  await expect(documentRow).toBeVisible();
+
+  const previewResponsePromise = page.context().waitForEvent(
+    "response",
+    (response) =>
+      /\/api\/v1\/files\/preview\/[^?]+/.test(response.url()) &&
+      response.status() === 200,
+  );
+  const previewPopupPromise = page.waitForEvent("popup");
+  await page.getByLabel(`Preview ${fileName}`).click();
+  const [previewPopup, previewResponse] = await Promise.all([
+    previewPopupPromise,
+    previewResponsePromise,
+  ]);
+  expect(previewResponse.headers()["content-type"] || "").toContain(
+    "application/pdf",
+  );
+  await previewPopup.close();
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByLabel(`Download ${fileName}`).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe(fileName);
 });
 
 test("investor can switch membership plans from the dashboard", async ({ page }) => {

@@ -9,10 +9,16 @@ const RoleBasedRoute = ({ children, allowedRoles = [] }) => {
 
   if (!user || !allowedRoles.includes(user.role)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div
+        data-testid="access-denied-screen"
+        className="min-h-screen flex items-center justify-center bg-gray-50"
+      >
         <div className="max-w-md w-full bg-white shadow rounded-lg p-6">
           <div className="text-center">
-            <h2 className="mt-2 text-lg font-medium text-gray-900">
+            <h2
+              data-testid="access-denied-title"
+              className="mt-2 text-lg font-medium text-gray-900"
+            >
               Access Denied
             </h2>
             <p className="mt-2 text-sm text-gray-600">
