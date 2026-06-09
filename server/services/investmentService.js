@@ -2183,15 +2183,41 @@ class InvestmentService {
       throw new Error("This investment is not in a supported representative region");
     }
 
-    // Talebi kaydet
-    investment.representativeRequestedBy = userId;
-    investment.representativeRequestDate = new Date();
-    investment.representativeRequestedByRole = userRole;
-    investment.representativeRequestedRegion = requestedRegion;
-    investment.representativeRequestStatus = "pending";
-    investment.representativeRequestClaimedAt = null;
-    investment.representativeRequestResolvedAt = null;
-    await investment.save();
+    const requestDate = new Date();
+    const updatedInvestment =
+      await this.investmentRepository.createRepresentativeRequestIfAvailable(
+        investmentId,
+        {
+          representativeRequestedBy: userId,
+          representativeRequestDate: requestDate,
+          representativeRequestedByRole: userRole,
+          representativeRequestedRegion: requestedRegion,
+          representativeRequestStatus: "pending",
+          representativeRequestClaimedAt: null,
+          representativeRequestResolvedAt: null,
+        },
+      );
+
+    if (!updatedInvestment) {
+      const currentState = await this.investmentRepository.findById(
+        investmentId,
+        "localRepresentative representativeRequestStatus",
+      );
+
+      if (!currentState) {
+        throw new Error("Investment not found");
+      }
+
+      if (currentState.localRepresentative) {
+        throw new Error("A local representative is already assigned");
+      }
+
+      if (currentState.representativeRequestStatus === "pending") {
+        throw new Error("A representative request is already pending");
+      }
+
+      throw new Error("Failed to create representative request");
+    }
 
     // Admin'e bildirim
     await this.safeNotify("notifyAdminRepresentativeRequested", investmentId, {
@@ -2283,11 +2309,34 @@ class InvestmentService {
       throw new Error("You are not authorized to claim this request");
     }
 
-    investment.localRepresentative = representative._id;
-    investment.representativeRequestStatus = "fulfilled";
-    investment.representativeRequestClaimedAt = new Date();
-    investment.representativeRequestResolvedAt = new Date();
-    await investment.save();
+    const claimedAt = new Date();
+    const claimedInvestment =
+      await this.investmentRepository.claimRepresentativeRequestIfPending(
+        investmentId,
+        representative._id,
+        claimedAt,
+      );
+
+    if (!claimedInvestment) {
+      const currentState = await this.investmentRepository.findById(
+        investmentId,
+        "localRepresentative representativeRequestStatus",
+      );
+
+      if (!currentState) {
+        throw new Error("Investment not found");
+      }
+
+      if (currentState.localRepresentative) {
+        throw new Error("This request has already been claimed");
+      }
+
+      if (currentState.representativeRequestStatus !== "pending") {
+        throw new Error("There is no pending representative request for this investment");
+      }
+
+      throw new Error("Failed to claim representative request");
+    }
 
     await this.safeNotify("notifyRepresentativeAssigned", representative._id, {
       investmentId,

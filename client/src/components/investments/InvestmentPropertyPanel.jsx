@@ -48,7 +48,7 @@ const InvestmentPropertyPanel = ({
         <div className="flex justify-end">
           <Link
             to={propertyPath}
-            className="inline-flex items-center gap-2 rounded-full border border-day-border dark:border-night-border px-4 py-2 text-sm font-medium text-day-accent dark:text-night-accent hover:bg-day-border/10 dark:hover:bg-night-border/10 transition-colors"
+            className="inline-flex items-center gap-2 rounded-2xl border border-day-border bg-day-surface px-4 py-3 text-sm font-semibold text-day-primary transition hover:bg-day-panel dark:border-night-border dark:bg-night-surface dark:text-night-primary dark:hover:bg-night-panel"
           >
             <FileStack className="h-4 w-4" />
             {navigateLabel}
@@ -60,11 +60,14 @@ const InvestmentPropertyPanel = ({
       <PropertySummary property={property} t={translate} />
 
       {property.description && (
-        <section className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
-          <h3 className="text-lg font-semibold text-day-text dark:text-night-text">
+        <section className="shell-surface px-6 py-6 sm:px-7">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+            Narrative
+          </p>
+          <h3 className="mt-3 text-2xl font-semibold text-day-text dark:text-night-text">
             About this property
           </h3>
-          <p className="mt-3 text-sm leading-7 text-day-text/75 dark:text-night-text/75">
+          <p className="mt-3 text-sm leading-7 text-day-muted dark:text-night-muted">
             {property.description}
           </p>
         </section>

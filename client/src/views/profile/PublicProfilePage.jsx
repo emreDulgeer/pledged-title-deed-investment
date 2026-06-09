@@ -16,11 +16,14 @@ const PublicProfilePage = ({ profile, isOwnProfile, onBack, viewerRole }) => {
       onBack={onBack}
     >
       <section className="grid gap-6">
-        <div className="rounded-3xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-day-text dark:text-night-text">
+        <div className="shell-surface px-5 py-5 sm:px-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-day-muted dark:text-night-muted">
+            Public details
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold text-day-text dark:text-night-text">
             Overview
           </h2>
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <InfoRow
               icon={Globe2}
               label="Role"
@@ -51,7 +54,7 @@ const PublicProfilePage = ({ profile, isOwnProfile, onBack, viewerRole }) => {
             <h2 className="text-2xl font-semibold text-day-text dark:text-night-text">
               Published Properties
             </h2>
-            <p className="mt-1 text-sm text-day-text/60 dark:text-night-text/60">
+            <p className="mt-1 text-sm text-day-muted dark:text-night-muted">
               Only public listings are shown in public profile mode.
             </p>
           </div>
@@ -69,13 +72,13 @@ const PublicProfilePage = ({ profile, isOwnProfile, onBack, viewerRole }) => {
       )}
 
       {profile.role === "property_owner" && (profile.properties || []).length === 0 && (
-        <section className="rounded-3xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6 text-sm text-day-text/60 dark:text-night-text/60">
+        <section className="shell-surface px-6 py-8 text-sm text-day-muted dark:text-night-muted">
           This property owner does not have any published listings right now.
         </section>
       )}
 
       {profile.role !== "property_owner" && !isOwnProfile && (
-        <section className="rounded-3xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6 text-sm text-day-text/60 dark:text-night-text/60">
+        <section className="shell-surface px-6 py-8 text-sm text-day-muted dark:text-night-muted">
           This profile is currently available in public mode only.
         </section>
       )}

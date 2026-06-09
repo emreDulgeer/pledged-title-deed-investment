@@ -21,49 +21,68 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["Geist", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["ui-monospace", "SFMono-Regular", "monospace"],
+      },
+      boxShadow: {
+        shell: "0 24px 48px -24px rgba(11, 28, 48, 0.18)",
+        panel: "0 18px 36px -24px rgba(11, 28, 48, 0.22)",
+        accent: "0 18px 40px -28px rgba(0, 53, 39, 0.55)",
+      },
+      maxWidth: {
+        shell: "1600px",
+      },
       colors: {
         day: {
-          background: "#f8fafc", // kırık beyaz
-          text: "#111827", // koyu gri
-          surface: "#ffffff", // kart/alan arka planı
-          border: "#e5e7eb",
-          dashboard: "#f4ede4",
+          background: "#f5f7fc",
+          text: "#0b1c30",
+          muted: "#5d687c",
+          surface: "#ffffff",
+          panel: "#eef3fb",
+          panelStrong: "#dde7f7",
+          border: "#d6dde8",
+          dashboard: "#eef3fb",
           primary: {
-            light: "#9a7dff", // açık mor
-            DEFAULT: "#6B4DE6", // canlı mor
-            dark: "#4a34b5", // koyu mor
+            light: "#d9efe5",
+            DEFAULT: "#003527",
+            dark: "#064e3b",
           },
           secondary: {
-            light: "#66aaff", // açık mavi
-            DEFAULT: "#3A8DFF", // parlak mavi
-            dark: "#1e64cc", // koyu mavi
+            light: "#dae2fd",
+            DEFAULT: "#5c647a",
+            dark: "#3f465c",
           },
           accent: {
-            light: "#ff9b73", // açık turuncu
-            DEFAULT: "#FF7B54", // turuncu (kontrast)
-            dark: "#cc4f2a", // koyu turuncu
+            light: "#ffdad6",
+            DEFAULT: "#8d4b41",
+            dark: "#6b342d",
           },
         },
         night: {
-          background: "#121212", // siyah yerine koyu gri-siyah
-          text: "#eaeaea", // beyaz yerine açık gri
-          surface: "#1e1e1e", // kart arka planı
-          border: "#2a2a2a",
-          dashboard: "#0f172a",
+          background: "#0f1722",
+          text: "#eaf1ff",
+          muted: "#9baac0",
+          surface: "#182230",
+          panel: "#1e2a39",
+          panelStrong: "#273648",
+          border: "#314253",
+          dashboard: "#101b2a",
           primary: {
-            light: "#33e6b0", // açık yeşil
-            DEFAULT: "#00C896", // canlı yeşil
-            dark: "#009e74", // koyu yeşil
+            light: "#b0f0d6",
+            DEFAULT: "#95d3ba",
+            dark: "#5aa184",
           },
           secondary: {
-            light: "#33ebff", // açık turkuaz
-            DEFAULT: "#00E0FF", // parlak turkuaz
-            dark: "#00b2cc", // koyu turkuaz
+            light: "#dae2fd",
+            DEFAULT: "#bec6e0",
+            dark: "#8993ad",
           },
           accent: {
-            light: "#d1a6ff", // açık mor
-            DEFAULT: "#BB86FC", // mor accent
-            dark: "#8856c9", // koyu mor
+            light: "#ffdad5",
+            DEFAULT: "#ffb4a9",
+            dark: "#c78176",
           },
         },
       },

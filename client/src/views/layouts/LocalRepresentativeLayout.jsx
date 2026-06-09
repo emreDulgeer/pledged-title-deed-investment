@@ -6,7 +6,11 @@ import LayoutShell from "../../components/Layouts/common/LayoutShell";
 import RepresentativeSidebar from "../../components/Layouts/Representative/Sidebar/RepresentativeSidebar";
 import OwnerTopbar from "../../components/Layouts/Owner/Topbar/OwnerTopbar";
 import { selectUser, logout } from "../../store/slices/authSlice";
-import { toggleSidebar, selectSidebarOpen } from "../../store/slices/uiSlice";
+import {
+  toggleSidebar,
+  selectSidebarOpen,
+  setSidebarOpen,
+} from "../../store/slices/uiSlice";
 import { useTheme } from "../../utils/hooks/useTheme";
 import { useLanguage } from "../../utils/hooks/useLanguage";
 
@@ -43,6 +47,7 @@ const LocalRepresentativeLayout = () => {
   return (
     <LayoutShell
       sidebarOpen={sidebarOpen}
+      onCloseSidebar={() => dispatch(setSidebarOpen(false))}
       sidebar={
         <RepresentativeSidebar
           menuItems={menuItems}
@@ -59,6 +64,8 @@ const LocalRepresentativeLayout = () => {
           changeLanguage={changeLanguage}
           user={user}
           onLogout={() => dispatch(logout())}
+          workspaceLabel="Representative workspace"
+          searchPlaceholder="Search requests, cases, or participants..."
         />
       }
     >

@@ -20,8 +20,11 @@ const PrivateProfilePage = ({ profile, isOwnProfile, onBack, viewerRole }) => {
       onBack={onBack}
     >
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-3xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-day-text dark:text-night-text">
+        <div className="shell-surface px-5 py-5 sm:px-6">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-day-muted dark:text-night-muted">
+            Private profile
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold text-day-text dark:text-night-text">
             Overview
           </h2>
           <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -49,8 +52,11 @@ const PrivateProfilePage = ({ profile, isOwnProfile, onBack, viewerRole }) => {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-3xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-day-text dark:text-night-text">
+          <div className="shell-surface px-5 py-5 sm:px-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-day-muted dark:text-night-muted">
+              Direct contact
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-day-text dark:text-night-text">
               Contact
             </h2>
             <div className="mt-5 space-y-3">
@@ -67,37 +73,34 @@ const PrivateProfilePage = ({ profile, isOwnProfile, onBack, viewerRole }) => {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-day-text dark:text-night-text">
+          <div className="shell-surface px-5 py-5 sm:px-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-day-muted dark:text-night-muted">
+              Membership
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-day-text dark:text-night-text">
               Account
             </h2>
-            <div className="mt-4 space-y-3 text-sm text-day-text/70 dark:text-night-text/70">
-              <p>
-                Account Status:{" "}
-                <span className="font-medium text-day-text dark:text-night-text">
-                  {profile.account?.accountStatus || "-"}
-                </span>
-              </p>
-              <p>
-                Membership Plan:{" "}
-                <span className="font-medium text-day-text dark:text-night-text">
-                  {profile.account?.membershipPlan || "-"}
-                </span>
-              </p>
-              <p>
-                Membership Status:{" "}
-                <span className="font-medium text-day-text dark:text-night-text">
-                  {profile.account?.membershipStatus || "-"}
-                </span>
-              </p>
-              <p>
-                Last Login:{" "}
-                <span className="font-medium text-day-text dark:text-night-text">
-                  {profile.account?.lastLoginAt
+            <div className="mt-5 grid gap-3">
+              <AccountLine
+                label="Account Status"
+                value={profile.account?.accountStatus || "-"}
+              />
+              <AccountLine
+                label="Membership Plan"
+                value={profile.account?.membershipPlan || "-"}
+              />
+              <AccountLine
+                label="Membership Status"
+                value={profile.account?.membershipStatus || "-"}
+              />
+              <AccountLine
+                label="Last Login"
+                value={
+                  profile.account?.lastLoginAt
                     ? new Date(profile.account.lastLoginAt).toLocaleString()
-                    : "-"}
-                </span>
-              </p>
+                    : "-"
+                }
+              />
             </div>
           </div>
         </div>
@@ -109,7 +112,7 @@ const PrivateProfilePage = ({ profile, isOwnProfile, onBack, viewerRole }) => {
             <h2 className="text-2xl font-semibold text-day-text dark:text-night-text">
               Properties
             </h2>
-            <p className="mt-1 text-sm text-day-text/60 dark:text-night-text/60">
+            <p className="mt-1 text-sm text-day-muted dark:text-night-muted">
               Admin can review the full property set for this profile.
             </p>
           </div>
@@ -132,7 +135,7 @@ const PrivateProfilePage = ({ profile, isOwnProfile, onBack, viewerRole }) => {
             <h2 className="text-2xl font-semibold text-day-text dark:text-night-text">
               Investments
             </h2>
-            <p className="mt-1 text-sm text-day-text/60 dark:text-night-text/60">
+            <p className="mt-1 text-sm text-day-muted dark:text-night-muted">
               Private admin view of this user's related investment records.
             </p>
           </div>
@@ -151,5 +154,16 @@ const PrivateProfilePage = ({ profile, isOwnProfile, onBack, viewerRole }) => {
     </ProfilePageLayout>
   );
 };
+
+const AccountLine = ({ label, value }) => (
+  <div className="rounded-2xl border border-day-border/70 bg-day-panel/60 px-4 py-3 dark:border-night-border/70 dark:bg-night-panel/60">
+    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-day-muted dark:text-night-muted">
+      {label}
+    </p>
+    <p className="mt-1 text-sm font-semibold text-day-text dark:text-night-text">
+      {value}
+    </p>
+  </div>
+);
 
 export default PrivateProfilePage;

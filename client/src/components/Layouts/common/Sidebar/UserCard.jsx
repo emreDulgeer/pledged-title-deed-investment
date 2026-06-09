@@ -1,35 +1,51 @@
 // src/components/Layouts/common/Sidebar/UserCard.jsx
 import React from "react";
+import { LogOut } from "lucide-react";
+
+const getInitials = (fullName = "User") =>
+  fullName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "U";
+
+const formatRole = (role = "") =>
+  role
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ") || "Workspace";
+
 const UserCard = ({ user, onLogout, logoutTitle = "Logout" }) => (
-  <div className="flex items-center justify-between">
-    <div>
-      <p className="text-sm font-medium text-day-text dark:text-night-text">
-        {user?.fullName || "User"}
-      </p>
-      <p className="text-xs text-day-text dark:text-night-text opacity-75">
-        {user?.email}
-      </p>
-    </div>
-    <button
-      onClick={onLogout}
-      className="p-2 rounded-lg transition-colors text-day-text dark:text-night-text hover:bg-day-primary-light hover:text-white dark:hover:bg-night-primary-dark dark:hover:text-night-background"
-      title={logoutTitle}
-    >
-      {/* icon */}
-      <svg
-        className="w-5 h-5"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
+  <div className="shell-subtle-surface p-4">
+    <div className="flex items-center gap-3">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-day-primary text-sm font-semibold text-white shadow-accent dark:bg-night-primary dark:text-night-background">
+        {getInitials(user?.fullName)}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-day-text dark:text-night-text">
+          {user?.fullName || "User"}
+        </p>
+        <p className="truncate text-xs text-day-muted dark:text-night-muted">
+          {user?.email || "No email available"}
+        </p>
+        <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-day-muted/85 dark:text-night-muted/85">
+          {formatRole(user?.role)}
+        </p>
+      </div>
+
+      <button
+        onClick={onLogout}
+        className="shell-icon-button h-10 w-10 shrink-0"
+        title={logoutTitle}
+        aria-label={logoutTitle}
       >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-        />
-      </svg>
-    </button>
+        <LogOut className="h-4 w-4" />
+      </button>
+    </div>
   </div>
 );
+
 export default UserCard;

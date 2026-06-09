@@ -2,7 +2,7 @@
 import React from "react";
 import SidebarNavItem from "./SidebarNavItem";
 const SidebarNav = ({ items }) => (
-  <nav className="space-y-2">
+  <nav className="space-y-1.5">
     {items.map((it) => (
       <SidebarNavItem
         key={it.path}

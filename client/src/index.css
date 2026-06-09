@@ -1,7 +1,80 @@
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  html {
+    @apply bg-day-background text-day-text antialiased dark:bg-night-background dark:text-night-text;
+  }
+
+  body {
+    @apply min-h-screen bg-day-background text-day-text font-sans dark:bg-night-background dark:text-night-text;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display tracking-tight text-day-text dark:text-night-text;
+  }
+
+  ::selection {
+    @apply bg-day-primary/15 text-day-text dark:bg-night-primary/20 dark:text-night-text;
+  }
+}
+
+@layer components {
+  .shell-icon-button {
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-transparent text-day-muted transition-all duration-200 hover:border-day-border hover:bg-day-panel hover:text-day-text focus:outline-none focus:ring-2 focus:ring-day-primary/15 dark:text-night-muted dark:hover:border-night-border dark:hover:bg-night-panel dark:hover:text-night-text dark:focus:ring-night-primary/20;
+  }
+
+  .shell-chip-button {
+    @apply inline-flex items-center gap-2 rounded-2xl border border-transparent px-3 py-2 text-sm font-medium text-day-muted transition-all duration-200 hover:border-day-border hover:bg-day-panel hover:text-day-text focus:outline-none focus:ring-2 focus:ring-day-primary/15 dark:text-night-muted dark:hover:border-night-border dark:hover:bg-night-panel dark:hover:text-night-text dark:focus:ring-night-primary/20;
+  }
+
+  .shell-input {
+    @apply w-full rounded-2xl border border-day-border bg-day-surface px-4 py-3 text-sm text-day-text placeholder:text-day-muted/80 shadow-sm transition focus:border-day-primary focus:outline-none focus:ring-4 focus:ring-day-primary/10 dark:border-night-border dark:bg-night-surface dark:text-night-text dark:placeholder:text-night-muted dark:focus:border-night-primary dark:focus:ring-night-primary/10;
+  }
+
+  .shell-surface {
+    @apply rounded-[28px] border border-day-border/80 bg-day-surface shadow-panel dark:border-night-border/80 dark:bg-night-surface;
+  }
+
+  .shell-subtle-surface {
+    @apply rounded-3xl border border-day-border/70 bg-day-panel/70 dark:border-night-border/70 dark:bg-night-panel/70;
+  }
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+.light {
+  color-scheme: light;
+}
+
 .leaflet-container {
   z-index: 0;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(93, 104, 124, 0.32);
+  border-radius: 999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(155, 170, 192, 0.35);
 }

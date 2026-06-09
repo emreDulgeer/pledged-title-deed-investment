@@ -337,6 +337,7 @@ const AppContent = () => {
           <Route path="offers" element={<OwnerOffers />} />
           <Route path="properties" element={<OwnerProperties />} />
           <Route path="properties/new" element={<OwnerPropertyCreate />} />
+          <Route path="properties/edit/:id" element={<OwnerPropertyCreate />} />
           <Route path="rental-payments" element={<OwnerRentalPayments />} />
           <Route
             path="membership-plans"

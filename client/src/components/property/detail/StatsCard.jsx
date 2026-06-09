@@ -17,12 +17,15 @@ const Row = ({ icon, label, value }) => (
 );
 
 const StatsCard = ({ metadata = {}, createdAt, updatedAt, t }) => (
-  <div className="bg-day-surface dark:bg-night-surface rounded-lg shadow-lg p-6">
-    <h3 className="text-lg font-semibold text-day-text dark:text-night-text mb-4">
+  <div className="shell-surface px-6 py-6 sm:px-7">
+    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+      Performance
+    </p>
+    <h3 className="mt-3 text-2xl font-semibold text-day-text dark:text-night-text">
       {t("dashboard.quick_stats")}
     </h3>
 
-    <div className="space-y-4">
+    <div className="mt-6 space-y-4">
       <Row
         icon={Eye}
         label={t("properties.total_views")}

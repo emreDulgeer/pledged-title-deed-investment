@@ -207,6 +207,48 @@ class InvestmentRepository extends BaseRepository {
     );
   }
 
+  async createRepresentativeRequestIfAvailable(investmentId, requestData) {
+    return await this.model.findOneAndUpdate(
+      {
+        _id: investmentId,
+        localRepresentative: null,
+        representativeRequestStatus: { $ne: "pending" },
+      },
+      {
+        $set: requestData,
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+  }
+
+  async claimRepresentativeRequestIfPending(
+    investmentId,
+    representativeId,
+    claimedAt = new Date()
+  ) {
+    return await this.model.findOneAndUpdate(
+      {
+        _id: investmentId,
+        localRepresentative: null,
+        representativeRequestStatus: "pending",
+      },
+      {
+        $set: {
+          localRepresentative: representativeId,
+          representativeRequestStatus: "fulfilled",
+          representativeRequestClaimedAt: claimedAt,
+          representativeRequestResolvedAt: claimedAt,
+        },
+      },
+      {
+        new: true,
+      }
+    );
+  }
+
   // Property owner'ın tüm kira ödemelerini getir
   async getPropertyOwnerRentalPayments(propertyOwnerId, filters = {}) {
     const query = {

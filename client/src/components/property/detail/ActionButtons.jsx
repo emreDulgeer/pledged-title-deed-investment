@@ -21,50 +21,80 @@ const ActionButtons = ({
 }) => {
   if (!canEdit) return null;
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 flex flex-wrap gap-2">
-      {isOwner && (
-        <button
-          onClick={onEdit}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Edit className="w-4 h-4" /> {t("common.edit")}
-        </button>
-      )}
+    <div className="shell-surface px-5 py-5 sm:px-6">
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+        Action center
+      </p>
+      <h3 className="mt-3 text-2xl font-semibold text-day-text dark:text-night-text">
+        Available actions
+      </h3>
 
-      {isAdmin && status === "draft" && (
-        <>
-          <button
-            onClick={onOpenApprove}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
-          >
-            <CheckCircle className="w-4 h-4" /> {t("admin.property.approve")}
-          </button>
-          <button
-            onClick={onOpenReject}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
-          >
-            <XCircle className="w-4 h-4" /> {t("admin.property.reject")}
-          </button>
-        </>
-      )}
+      <div className="mt-6 grid gap-3">
+        {isOwner && (
+          <ActionButton
+            onClick={onEdit}
+            tone="primary"
+            icon={Edit}
+            label={t("common.edit")}
+          />
+        )}
 
-      {isAdmin && (
-        <button
-          onClick={onOpenFlag}
-          className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 flex items-center gap-2"
-        >
-          <AlertTriangle className="w-4 h-4" /> {t("admin.property.flag")}
-        </button>
-      )}
+        {isAdmin && status === "draft" && (
+          <>
+            <ActionButton
+              onClick={onOpenApprove}
+              tone="success"
+              icon={CheckCircle}
+              label={t("admin.property.approve")}
+            />
+            <ActionButton
+              onClick={onOpenReject}
+              tone="danger"
+              icon={XCircle}
+              label={t("admin.property.reject")}
+            />
+          </>
+        )}
 
-      <button
-        onClick={onOpenDelete}
-        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
-      >
-        <Trash2 className="w-4 h-4" /> {t("common.delete")}
-      </button>
+        {isAdmin && (
+          <ActionButton
+            onClick={onOpenFlag}
+            tone="warning"
+            icon={AlertTriangle}
+            label={t("admin.property.flag")}
+          />
+        )}
+
+        <ActionButton
+          onClick={onOpenDelete}
+          tone="danger"
+          icon={Trash2}
+          label={t("common.delete")}
+        />
+      </div>
     </div>
   );
 };
+
+const TONE_CLASSES = {
+  primary: "bg-day-primary text-white hover:opacity-95 dark:bg-night-primary dark:text-night-background",
+  success: "bg-emerald-600 text-white hover:bg-emerald-700",
+  warning: "bg-amber-500 text-white hover:bg-amber-600",
+  danger: "bg-red-600 text-white hover:bg-red-700",
+};
+
+const ActionButton = ({ onClick, tone, icon, label }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition ${TONE_CLASSES[tone]}`}
+  >
+    {React.createElement(icon, {
+      className: "h-4 w-4",
+      strokeWidth: 2.1,
+    })}
+    {label}
+  </button>
+);
 
 export default ActionButtons;

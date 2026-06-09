@@ -2,12 +2,15 @@ import React from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
+  ArrowRight,
   Building2,
+  CalendarDays,
   FolderLock,
   MapPin,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
+
 import {
   getPropertyImageStyle,
   getPropertyImageUrl,
@@ -15,29 +18,48 @@ import {
 import { APP_CURRENCY } from "../../utils/currency";
 import { ROLE_LABELS, STAT_LABELS } from "./profileViewConstants";
 
+const formatDate = (value) => {
+  if (!value) return "-";
+
+  try {
+    return new Date(value).toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "-";
+  }
+};
+
+const formatAmount = (value) =>
+  value || value === 0 ? `${Number(value).toLocaleString("en-US")} ${APP_CURRENCY}` : "-";
+
 export const InfoRow = ({ icon, label, value }) => {
   const Icon = icon;
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-day-border/70 dark:border-night-border/70 px-4 py-3">
-      <div className="rounded-xl bg-day-background dark:bg-night-background p-2">
-        <Icon className="h-4 w-4 text-day-text/70 dark:text-night-text/70" />
-      </div>
-      <div>
-        <p className="text-xs uppercase tracking-[0.16em] text-day-text/45 dark:text-night-text/45">
-          {label}
-        </p>
-        <p className="text-sm font-medium text-day-text dark:text-night-text">
-          {value || "-"}
-        </p>
+    <div className="rounded-3xl border border-day-border/70 bg-day-panel/60 px-4 py-4 dark:border-night-border/70 dark:bg-night-panel/60">
+      <div className="flex items-start gap-3">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-day-surface text-day-primary dark:bg-night-surface dark:text-night-primary">
+          <Icon className="h-4 w-4" strokeWidth={2.1} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-day-muted dark:text-night-muted">
+            {label}
+          </p>
+          <p className="mt-1 break-words text-sm font-semibold text-day-text dark:text-night-text">
+            {value || "-"}
+          </p>
+        </div>
       </div>
     </div>
   );
 };
 
 export const StatCard = ({ label, value }) => (
-  <div className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-4">
-    <p className="text-xs uppercase tracking-[0.16em] text-day-text/45 dark:text-night-text/45">
+  <div className="shell-subtle-surface px-4 py-4">
+    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-day-muted dark:text-night-muted">
       {label}
     </p>
     <p className="mt-3 text-2xl font-semibold text-day-text dark:text-night-text">
@@ -54,62 +76,53 @@ export const PropertyCard = ({ property, detailPath }) => {
   return (
     <Wrapper
       {...wrapperProps}
-      className={`block rounded-3xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface overflow-hidden shadow-sm ${
-        detailPath ? "transition-transform hover:-translate-y-0.5" : ""
+      className={`group block overflow-hidden rounded-[28px] border border-day-border/80 bg-day-surface shadow-panel dark:border-night-border/80 dark:bg-night-surface ${
+        detailPath ? "transition hover:-translate-y-0.5 hover:shadow-shell" : ""
       }`}
     >
-      <div className="h-40 bg-day-background dark:bg-night-background">
+      <div className="relative h-44 bg-day-panel dark:bg-night-panel">
         {thumbnailUrl ? (
           <img
             src={thumbnailUrl}
             alt={`${property.city || "Property"} cover`}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
             style={getPropertyImageStyle(property.thumbnail)}
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-day-text/40 dark:text-night-text/40">
-            <Building2 className="h-8 w-8" />
+          <div className="flex h-full items-center justify-center text-day-muted dark:text-night-muted">
+            <Building2 className="h-9 w-9" strokeWidth={2.1} />
           </div>
         )}
+        <div className="absolute left-4 top-4 rounded-full bg-day-surface/90 px-3 py-1 text-xs font-semibold text-day-text backdrop-blur dark:bg-night-surface/90 dark:text-night-text">
+          {property.status || "Status pending"}
+        </div>
       </div>
 
-      <div className="space-y-3 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-semibold text-day-text dark:text-night-text">
-              {property.city || "Property"}, {property.country || "-"}
-            </h3>
-            <p className="mt-1 text-sm text-day-text/60 dark:text-night-text/60">
-              {property.propertyType || "Property"} ·{" "}
-              {property.requestedInvestment?.toLocaleString?.() || "-"}{" "}
-              {APP_CURRENCY}
-            </p>
-          </div>
-          <span className="rounded-full bg-day-accent/10 px-3 py-1 text-xs font-medium text-day-accent dark:bg-night-accent/15 dark:text-night-accent">
-            {property.status || "-"}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 text-sm text-day-text/70 dark:text-night-text/70">
-          <div>
-            <p className="text-xs uppercase tracking-[0.12em]">Yield</p>
-            <p className="mt-1 font-medium text-day-text dark:text-night-text">
-              {property.annualYieldPercent ?? "-"}%
-            </p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.12em]">Contract</p>
-            <p className="mt-1 font-medium text-day-text dark:text-night-text">
-              {property.contractPeriodMonths ?? "-"} months
-            </p>
-          </div>
-        </div>
-
-        {detailPath && (
-          <p className="text-sm font-medium text-day-accent dark:text-night-accent">
-            Open property
+      <div className="space-y-4 p-5">
+        <div>
+          <h3 className="text-lg font-semibold text-day-text dark:text-night-text">
+            {property.city || "Property"}, {property.country || "-"}
+          </h3>
+          <p className="mt-1 text-sm text-day-muted dark:text-night-muted">
+            {property.propertyType || "Property"} ·{" "}
+            {formatAmount(property.requestedInvestment)}
           </p>
-        )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <MiniMetric label="Yield" value={`${property.annualYieldPercent ?? "-"}%`} />
+          <MiniMetric
+            label="Contract"
+            value={`${property.contractPeriodMonths ?? "-"} months`}
+          />
+        </div>
+
+        {detailPath ? (
+          <p className="inline-flex items-center gap-2 text-sm font-semibold text-day-primary dark:text-night-primary">
+            Open property
+            <ArrowRight className="h-4 w-4" strokeWidth={2.1} />
+          </p>
+        ) : null}
       </div>
     </Wrapper>
   );
@@ -122,13 +135,13 @@ export const InvestmentCard = ({ investment, detailPath }) => {
   return (
     <Wrapper
       {...wrapperProps}
-      className={`block rounded-3xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-5 shadow-sm ${
-        detailPath ? "transition-transform hover:-translate-y-0.5" : ""
+      className={`shell-surface block p-5 ${
+        detailPath ? "transition hover:-translate-y-0.5 hover:shadow-shell" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.16em] text-day-text/45 dark:text-night-text/45">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-day-muted dark:text-night-muted">
             Investment
           </p>
           <h3 className="mt-2 text-lg font-semibold text-day-text dark:text-night-text">
@@ -136,61 +149,40 @@ export const InvestmentCard = ({ investment, detailPath }) => {
             {investment.property?.country || "-"}
           </h3>
         </div>
-        <span className="rounded-full bg-day-primary/10 px-3 py-1 text-xs font-medium text-day-primary dark:bg-night-primary/15 dark:text-night-primary">
+        <span className="rounded-full border border-day-border bg-day-panel px-3 py-1 text-xs font-semibold text-day-text dark:border-night-border dark:bg-night-panel dark:text-night-text">
           {investment.status || "-"}
         </span>
       </div>
 
-      <div className="mt-4 grid gap-3 text-sm text-day-text/70 dark:text-night-text/70 md:grid-cols-2">
-        <div>
-          <p className="text-xs uppercase tracking-[0.12em]">Amount</p>
-          <p className="mt-1 font-medium text-day-text dark:text-night-text">
-            {investment.amountInvested?.toLocaleString?.() || "-"}{" "}
-            {APP_CURRENCY}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs uppercase tracking-[0.12em]">Created</p>
-          <p className="mt-1 font-medium text-day-text dark:text-night-text">
-            {investment.createdAt
-              ? new Date(investment.createdAt).toLocaleDateString()
-              : "-"}
-          </p>
-        </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        <MiniMetric
+          label="Amount"
+          value={formatAmount(investment.amountInvested)}
+        />
+        <MiniMetric label="Created" value={formatDate(investment.createdAt)} />
       </div>
 
-      <div className="mt-4 space-y-2 text-sm text-day-text/70 dark:text-night-text/70">
-        {investment.investor?.fullName && (
-          <p>
-            Investor:{" "}
-            <span className="font-medium text-day-text dark:text-night-text">
-              {investment.investor.fullName}
-            </span>
-          </p>
-        )}
-        {investment.propertyOwner?.fullName && (
-          <p>
-            Owner:{" "}
-            <span className="font-medium text-day-text dark:text-night-text">
-              {investment.propertyOwner.fullName}
-            </span>
-          </p>
-        )}
-        {investment.localRepresentative?.fullName && (
-          <p>
-            Representative:{" "}
-            <span className="font-medium text-day-text dark:text-night-text">
-              {investment.localRepresentative.fullName}
-            </span>
-          </p>
-        )}
+      <div className="mt-5 space-y-2 text-sm text-day-muted dark:text-night-muted">
+        {investment.investor?.fullName ? (
+          <RoleLine label="Investor" value={investment.investor.fullName} />
+        ) : null}
+        {investment.propertyOwner?.fullName ? (
+          <RoleLine label="Owner" value={investment.propertyOwner.fullName} />
+        ) : null}
+        {investment.localRepresentative?.fullName ? (
+          <RoleLine
+            label="Representative"
+            value={investment.localRepresentative.fullName}
+          />
+        ) : null}
       </div>
 
-      {detailPath && (
-        <p className="mt-4 text-sm font-medium text-day-accent dark:text-night-accent">
+      {detailPath ? (
+        <p className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-day-primary dark:text-night-primary">
           Open investment
+          <ArrowRight className="h-4 w-4" strokeWidth={2.1} />
         </p>
-      )}
+      ) : null}
     </Wrapper>
   );
 };
@@ -208,88 +200,101 @@ export const ProfilePageLayout = ({
   const isPrivateView = profile?.viewMode === "private";
 
   return (
-    <div className="min-h-screen bg-day-background dark:bg-night-background px-4 py-8">
-      <div className="mx-auto max-w-6xl space-y-6">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-day-background px-4 py-6 dark:bg-night-background sm:px-6 xl:px-8">
+      <div className="mx-auto max-w-shell space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-2 text-sm font-medium text-day-text dark:text-night-text hover:opacity-80 transition-opacity"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-day-primary transition hover:underline dark:text-night-primary"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4" strokeWidth={2.1} />
             Back
           </button>
 
-          {isOwnProfile && (
+          {isOwnProfile ? (
             <Link
               to="/profile/settings"
-              className="inline-flex items-center gap-2 rounded-full border border-day-border dark:border-night-border px-4 py-2 text-sm font-medium text-day-text dark:text-night-text hover:bg-day-surface dark:hover:bg-night-surface transition-colors"
+              className="inline-flex items-center gap-2 rounded-2xl border border-day-border bg-day-surface px-4 py-3 text-sm font-semibold text-day-text transition hover:bg-day-panel dark:border-night-border dark:bg-night-surface dark:text-night-text dark:hover:bg-night-panel"
             >
-              <FolderLock className="h-4 w-4" />
+              <FolderLock className="h-4 w-4" strokeWidth={2.1} />
               Profile Settings
             </Link>
-          )}
+          ) : null}
         </div>
 
-        <section className="rounded-[2rem] border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-8 shadow-sm">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex items-start gap-5">
-              <img
-                className="h-24 w-24 rounded-3xl border border-day-border dark:border-night-border object-cover"
-                src={`https://ui-avatars.com/api/?name=${avatarName}&background=0F9D58&color=fff&size=160`}
-                alt={profile.fullName}
-              />
+        <section className="shell-surface overflow-hidden">
+          <div className="relative px-6 py-7 sm:px-8">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-r from-day-primary/10 via-day-panel to-day-accent/10 dark:from-night-primary/10 dark:via-night-panel/40 dark:to-night-accent/10" />
+            <div className="relative flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+                <img
+                  className="h-24 w-24 rounded-3xl border border-day-border object-cover shadow-panel dark:border-night-border"
+                  src={`https://ui-avatars.com/api/?name=${avatarName}&background=003527&color=fff&size=160`}
+                  alt={profile.fullName}
+                />
 
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-3xl font-semibold text-day-text dark:text-night-text">
-                    {profile.fullName}
-                  </h1>
-                  <span className="rounded-full bg-day-accent/10 px-3 py-1 text-sm font-medium text-day-accent dark:bg-night-accent/15 dark:text-night-accent">
-                    {ROLE_LABELS[profile.role] || profile.role}
-                  </span>
-                  <span className="rounded-full bg-day-primary/10 px-3 py-1 text-sm font-medium text-day-primary dark:bg-night-primary/15 dark:text-night-primary">
-                    {isPrivateView ? "Private View" : "Public View"}
-                  </span>
-                </div>
+                <div className="min-w-0 space-y-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-day-border/70 bg-day-surface px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-day-muted dark:border-night-border/70 dark:bg-night-surface dark:text-night-muted">
+                      User profile
+                    </span>
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200">
+                      {isPrivateView ? "Private View" : "Public View"}
+                    </span>
+                  </div>
 
-                <p className="max-w-2xl text-sm leading-6 text-day-text/65 dark:text-night-text/65">
-                  {isPrivateView
-                    ? "Admin view includes private contact details plus this user's related properties and investments."
-                    : "Public view shares non-sensitive profile information and published listings only."}
-                </p>
+                  <div>
+                    <h1 className="text-4xl font-semibold tracking-tight text-day-text dark:text-night-text sm:text-5xl">
+                      {profile.fullName || "User"}
+                    </h1>
+                    <p className="mt-3 max-w-2xl text-base leading-7 text-day-muted dark:text-night-muted">
+                      {isPrivateView
+                        ? "Admin view includes private contact details plus this user's related properties and investments."
+                        : "Public view shares non-sensitive profile information and published listings only."}
+                    </p>
+                  </div>
 
-                <div className="flex flex-wrap gap-3 text-sm text-day-text/70 dark:text-night-text/70">
-                  <span className="inline-flex items-center gap-2 rounded-full bg-day-background dark:bg-night-background px-3 py-2">
-                    <MapPin className="h-4 w-4" />
-                    {profile.country || "Country not set"}
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-full bg-day-background dark:bg-night-background px-3 py-2">
-                    <ShieldCheck className="h-4 w-4" />
-                    KYC: {profile.kycStatus || "Unknown"}
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-full bg-day-background dark:bg-night-background px-3 py-2">
-                    <UserRound className="h-4 w-4" />
-                    Trust Score: {profile.trustScore ?? "-"}
-                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <ProfileChip icon={UserRound}>
+                      {ROLE_LABELS[profile.role] || profile.role || "Role"}
+                    </ProfileChip>
+                    <ProfileChip icon={MapPin}>
+                      {profile.country || "Country not set"}
+                    </ProfileChip>
+                    <ProfileChip icon={ShieldCheck}>
+                      KYC: {profile.kycStatus || "Unknown"}
+                    </ProfileChip>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="rounded-3xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-5 py-4">
-              <p className="text-xs uppercase tracking-[0.16em] text-day-text/45 dark:text-night-text/45">
-                Member Since
-              </p>
-              <p className="mt-2 text-lg font-semibold text-day-text dark:text-night-text">
-                {profile.memberSince
-                  ? new Date(profile.memberSince).toLocaleDateString()
-                  : "-"}
-              </p>
+              <div className="rounded-3xl border border-day-border/70 bg-day-panel/70 px-5 py-4 dark:border-night-border/70 dark:bg-night-panel/70">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-11 w-11 place-items-center rounded-2xl bg-day-surface text-day-primary dark:bg-night-surface dark:text-night-primary">
+                    <CalendarDays className="h-5 w-5" strokeWidth={2.1} />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-day-muted dark:text-night-muted">
+                      Member Since
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-day-text dark:text-night-text">
+                      {formatDate(profile.memberSince)}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-4 text-sm text-day-muted dark:text-night-muted">
+                  Trust Score:{" "}
+                  <span className="font-semibold text-day-text dark:text-night-text">
+                    {profile.trustScore ?? "-"}
+                  </span>
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
-        {stats.length > 0 && (
+        {stats.length > 0 ? (
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {stats.map(([key, value]) => (
               <StatCard
@@ -299,10 +304,41 @@ export const ProfilePageLayout = ({
               />
             ))}
           </section>
-        )}
+        ) : null}
 
         {children}
       </div>
     </div>
   );
 };
+
+const ProfileChip = ({ icon, children }) => {
+  const Icon = icon;
+
+  return (
+    <span className="inline-flex items-center gap-2 rounded-2xl border border-day-border/70 bg-day-surface px-3 py-2 text-sm font-semibold text-day-text dark:border-night-border/70 dark:bg-night-surface dark:text-night-text">
+      <Icon className="h-4 w-4 text-day-primary dark:text-night-primary" strokeWidth={2.1} />
+      {children}
+    </span>
+  );
+};
+
+const MiniMetric = ({ label, value }) => (
+  <div className="rounded-2xl border border-day-border/70 bg-day-panel/70 px-4 py-3 dark:border-night-border/70 dark:bg-night-panel/70">
+    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-day-muted dark:text-night-muted">
+      {label}
+    </p>
+    <p className="mt-1 text-sm font-semibold text-day-text dark:text-night-text">
+      {value}
+    </p>
+  </div>
+);
+
+const RoleLine = ({ label, value }) => (
+  <p>
+    {label}:{" "}
+    <span className="font-semibold text-day-text dark:text-night-text">
+      {value}
+    </span>
+  </p>
+);

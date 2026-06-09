@@ -6,7 +6,11 @@ import LayoutShell from "../../components/Layouts/common/LayoutShell";
 import AdminSidebar from "../../components/Layouts/Admin/Sidebar/AdminSidebar";
 import AdminTopbar from "../../components/Layouts/admin/Topbar/AdminTopbar";
 import { selectUser, logout } from "../../store/slices/authSlice";
-import { toggleSidebar, selectSidebarOpen } from "../../store/slices/uiSlice";
+import {
+  toggleSidebar,
+  selectSidebarOpen,
+  setSidebarOpen,
+} from "../../store/slices/uiSlice";
 import { useTheme } from "../../utils/hooks/useTheme";
 import { useLanguage } from "../../utils/hooks/useLanguage";
 import { Outlet } from "react-router-dom";
@@ -76,6 +80,7 @@ const AdminLayout = () => {
   return (
     <LayoutShell
       sidebarOpen={sidebarOpen}
+      onCloseSidebar={() => dispatch(setSidebarOpen(false))}
       sidebar={
         <AdminSidebar
           menuItems={menuItems}

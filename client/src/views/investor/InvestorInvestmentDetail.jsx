@@ -1,54 +1,74 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
-import InvestmentController from "../../controllers/investmentController";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BadgeCheck,
+  Building2,
+  CalendarClock,
+  CircleDollarSign,
+  Clock3,
+  FileCheck2,
+  FileText,
+  HandCoins,
+  Loader2,
+  MapPin,
+  ReceiptText,
+  ShieldCheck,
+  UploadCloud,
+  UserRound,
+} from "lucide-react";
+
+import InvestmentController from "../../controllers/investmentController";
+import ConfirmationModal from "../../components/common/ConfirmationModal";
 import DocumentsList from "../../components/property/detail/DocumentsList";
 import InvestmentPropertyPanel from "../../components/investments/InvestmentPropertyPanel";
-import { getUserId, getUserProfilePath } from "../../utils/profileRoutes";
-import { getInvestmentPropertyPath } from "../../utils/profileRoutes";
-import { APP_CURRENCY, APP_CURRENCY_SYMBOL } from "../../utils/currency";
+import { getPropertyImageStyle, getPropertyImageUrl } from "../../utils/propertyImages";
+import { getInvestmentPropertyPath, getUserId, getUserProfilePath } from "../../utils/profileRoutes";
+import { APP_CURRENCY } from "../../utils/currency";
+import { useAppFeedback } from "../../utils/hooks/useAppFeedback";
 
-const getStatusColor = (status) => {
-  const colors = {
-    offer_sent: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-    rejected: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-    contract_signed:
-      "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-    title_deed_pending:
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-    active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-    completed: "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200",
-    refunded:
-      "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
-    defaulted: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  };
-  return colors[status] || "bg-gray-100 text-gray-800";
+const STATUS_STYLES = {
+  offer_sent:
+    "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-200",
+  rejected:
+    "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200",
+  contract_signed:
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
+  title_deed_pending:
+    "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-200",
+  active:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200",
+  completed:
+    "bg-slate-200 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200",
+  refunded:
+    "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-200",
+  defaulted:
+    "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200",
 };
 
-const getPaymentStatusColor = (status) => {
-  const colors = {
-    pending:
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-    paid: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-    delayed: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  };
-  return colors[status] || "bg-gray-100 text-gray-800";
+const PAYMENT_STATUS_STYLES = {
+  pending:
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
+  paid: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200",
+  delayed:
+    "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200",
 };
 
-const getPrincipalPaymentStatusColor = (status) => {
-  const colors = {
-    not_started:
-      "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200",
-    instructions_ready:
-      "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-    receipt_uploaded:
-      "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-    confirmed:
-      "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-    failed: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-    cancelled: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200",
-  };
-  return colors[status] || colors.not_started;
+const PRINCIPAL_PAYMENT_STATUS_STYLES = {
+  not_started:
+    "bg-slate-200 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200",
+  instructions_ready:
+    "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-200",
+  receipt_uploaded:
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
+  confirmed:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200",
+  failed:
+    "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200",
+  cancelled:
+    "bg-slate-200 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200",
 };
 
 const PROCESS_LABELS = {
@@ -69,13 +89,405 @@ const PAYMENT_STATUS_LABELS = {
   cancelled: "Cancelled",
 };
 
+const TAB_LABELS = {
+  overview: "Overview",
+  property: "Property",
+  payments: "Payments",
+  documents: "Documents",
+};
+
+const PRIMARY_BUTTON_CLASS =
+  "inline-flex items-center justify-center gap-2 rounded-2xl bg-day-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-day-primary-dark focus:outline-none focus:ring-4 focus:ring-day-primary/15 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-night-primary dark:text-night-background dark:hover:bg-night-primary-dark dark:focus:ring-night-primary/20";
+
+const SECONDARY_BUTTON_CLASS =
+  "inline-flex items-center justify-center gap-2 rounded-2xl border border-day-border bg-day-surface px-4 py-3 text-sm font-semibold text-day-text transition hover:bg-day-panel/60 focus:outline-none focus:ring-4 focus:ring-day-primary/10 disabled:cursor-not-allowed disabled:opacity-50 dark:border-night-border dark:bg-night-surface dark:text-night-text dark:hover:bg-night-panel/60 dark:focus:ring-night-primary/10";
+
+const DANGER_BUTTON_CLASS =
+  "inline-flex items-center justify-center gap-2 rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 focus:outline-none focus:ring-4 focus:ring-rose-500/20 disabled:cursor-not-allowed disabled:opacity-50";
+
+const NOTICE_STYLES = {
+  slate:
+    "border-day-border/70 bg-day-panel/55 text-day-text/80 dark:border-night-border/70 dark:bg-night-panel/55 dark:text-night-text/80",
+  blue:
+    "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900/50 dark:bg-sky-900/20 dark:text-sky-100",
+  amber:
+    "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-100",
+  rose:
+    "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-100",
+  emerald:
+    "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-900/20 dark:text-emerald-100",
+  sky:
+    "border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900/50 dark:bg-sky-900/20 dark:text-sky-100",
+};
+
+const REVIEW_STATUS_STYLES = {
+  pending_review:
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
+  approved:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200",
+  changes_requested:
+    "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200",
+};
+
+const formatAmount = (value, currency = APP_CURRENCY) => {
+  const parsed = Number(value || 0);
+  if (!Number.isFinite(parsed)) return "—";
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(parsed);
+};
+
+const formatDate = (value) => {
+  if (!value) return "—";
+
+  try {
+    return new Date(value).toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "—";
+  }
+};
+
+const formatDateTime = (value) => {
+  if (!value) return "—";
+
+  try {
+    return new Date(value).toLocaleString("en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "—";
+  }
+};
+
+const formatPercent = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return "—";
+
+  return `${parsed % 1 === 0 ? parsed.toFixed(0) : parsed.toFixed(2)}%`;
+};
+
+const formatKeyLabel = (value = "") =>
+  String(value)
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || "Unknown";
+
+const formatPropertyType = (value = "") => formatKeyLabel(value) || "Property";
+
+const getStatusClass = (status) =>
+  STATUS_STYLES[status] ||
+  "bg-slate-200 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200";
+
+const getPaymentStatusClass = (status) =>
+  PAYMENT_STATUS_STYLES[status] ||
+  "bg-slate-200 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200";
+
+const getPrincipalPaymentStatusClass = (status) =>
+  PRINCIPAL_PAYMENT_STATUS_STYLES[status] ||
+  PRINCIPAL_PAYMENT_STATUS_STYLES.not_started;
+
+const getExpectedIncome = (investment) =>
+  Number(
+    investment?.calculations?.totalExpectedIncome ||
+      investment?.expectedTotalIncome ||
+      0,
+  );
+
+const getCollectedIncome = (investment) =>
+  Number(
+    investment?.calculations?.totalPaidAmount ||
+      investment?.rentalPaymentsSummary?.totalPaidAmount ||
+      0,
+  );
+
+const getPaymentProgress = (investment) => {
+  const explicit = Number(investment?.calculations?.paymentProgress);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+
+  const totalPayments = Number(investment?.rentalPaymentsSummary?.totalPayments || 0);
+  const paidPayments = Number(investment?.rentalPaymentsSummary?.paidPayments || 0);
+  if (totalPayments <= 0) return 0;
+
+  return Math.round((paidPayments / totalPayments) * 100);
+};
+
+const getPropertyHeadline = (property) =>
+  property?.title ||
+  [property?.city, property?.country].filter(Boolean).join(", ") ||
+  "Associated property";
+
+const getPropertyLocation = (property) =>
+  property?.fullAddress ||
+  property?.mapSearchAddress ||
+  [property?.city, property?.country].filter(Boolean).join(", ") ||
+  "Address not yet available";
+
+const getReviewLabel = (status) => {
+  switch (status) {
+    case "pending_review":
+      return "Pending review";
+    case "approved":
+      return "Approved";
+    case "changes_requested":
+      return "Re-upload requested";
+    default:
+      return "No review required";
+  }
+};
+
+const SectionCard = ({
+  eyebrow = "",
+  title,
+  description = "",
+  action = null,
+  className = "",
+  children,
+}) => (
+  <section className={`shell-surface px-5 py-5 sm:px-6 ${className}`.trim()}>
+    {(eyebrow || title || description || action) && (
+      <div className="flex flex-col gap-4 border-b border-day-border/70 pb-4 dark:border-night-border/70 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          {eyebrow ? (
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+              {eyebrow}
+            </p>
+          ) : null}
+          {title ? (
+            <h2 className="mt-2 text-2xl font-semibold text-day-text dark:text-night-text">
+              {title}
+            </h2>
+          ) : null}
+          {description ? (
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-day-muted dark:text-night-muted">
+              {description}
+            </p>
+          ) : null}
+        </div>
+        {action}
+      </div>
+    )}
+    <div className={eyebrow || title || description || action ? "pt-5" : ""}>
+      {children}
+    </div>
+  </section>
+);
+
+const MetricCard = ({ label, value, hint = "", icon: Icon, accentClass = "" }) => (
+  <div className="shell-subtle-surface px-4 py-4">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-day-muted dark:text-night-muted">
+          {label}
+        </p>
+        <p
+          className={`mt-3 text-xl font-semibold text-day-text dark:text-night-text ${accentClass}`.trim()}
+        >
+          {value}
+        </p>
+        {hint ? (
+          <p className="mt-2 text-sm leading-6 text-day-muted dark:text-night-muted">
+            {hint}
+          </p>
+        ) : null}
+      </div>
+
+      {Icon ? (
+        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-day-surface text-day-primary dark:bg-night-surface dark:text-night-primary">
+          <Icon className="h-5 w-5" strokeWidth={2.1} />
+        </div>
+      ) : null}
+    </div>
+  </div>
+);
+
+const DetailRow = ({ label, value, valueClassName = "" }) => (
+  <div className="flex items-start justify-between gap-4 border-b border-day-border/70 py-3 first:pt-0 last:border-b-0 last:pb-0 dark:border-night-border/70">
+    <span className="text-sm text-day-muted dark:text-night-muted">{label}</span>
+    <span
+      className={`text-right text-sm font-medium text-day-text dark:text-night-text ${valueClassName}`.trim()}
+    >
+      {value}
+    </span>
+  </div>
+);
+
+const Notice = ({ tone = "slate", children, className = "" }) => (
+  <div
+    className={`rounded-3xl border px-4 py-4 text-sm leading-6 ${NOTICE_STYLES[tone] || NOTICE_STYLES.slate} ${className}`.trim()}
+  >
+    {children}
+  </div>
+);
+
+const UploadField = ({
+  label,
+  hint = "",
+  accept,
+  disabled = false,
+  onChange,
+  dataTestId,
+}) => (
+  <label className="block">
+    <span className="mb-2 block text-sm font-semibold text-day-text dark:text-night-text">
+      {label}
+    </span>
+    <input
+      data-testid={dataTestId}
+      type="file"
+      accept={accept}
+      onChange={onChange}
+      disabled={disabled}
+      className="block w-full rounded-2xl border border-day-border bg-day-surface px-3 py-2 text-sm text-day-text transition file:mr-4 file:rounded-full file:border-0 file:bg-day-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-day-primary-dark disabled:cursor-not-allowed disabled:opacity-60 dark:border-night-border dark:bg-night-surface dark:text-night-text dark:file:bg-night-primary dark:file:text-night-background dark:hover:file:bg-night-primary-dark"
+    />
+    {hint ? (
+      <span className="mt-2 block text-xs text-day-muted dark:text-night-muted">
+        {hint}
+      </span>
+    ) : null}
+  </label>
+);
+
+const TabButton = ({ active, children, ...props }) => (
+  <button
+    type="button"
+    className={`rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+      active
+        ? "bg-day-primary text-white shadow-sm dark:bg-night-primary dark:text-night-background"
+        : "bg-day-surface text-day-muted hover:bg-day-panel hover:text-day-text dark:bg-night-surface dark:text-night-muted dark:hover:bg-night-panel dark:hover:text-night-text"
+    }`}
+    {...props}
+  >
+    {children}
+  </button>
+);
+
+const WorkflowStep = ({ title, meta, active = false, completed = false, isLast = false }) => (
+  <div className="flex gap-4">
+    <div className="flex flex-col items-center">
+      <div
+        className={`grid h-10 w-10 place-items-center rounded-2xl border ${
+          completed || active
+            ? "border-day-primary bg-day-primary text-white dark:border-night-primary dark:bg-night-primary dark:text-night-background"
+            : "border-day-border bg-day-surface text-day-muted dark:border-night-border dark:bg-night-surface dark:text-night-muted"
+        }`}
+      >
+        {completed || active ? (
+          <BadgeCheck className="h-4 w-4" strokeWidth={2.1} />
+        ) : (
+          <Clock3 className="h-4 w-4" strokeWidth={2.1} />
+        )}
+      </div>
+      {!isLast ? (
+        <div className="mt-2 h-full w-px bg-day-border/70 dark:bg-night-border/70" />
+      ) : null}
+    </div>
+
+    <div className="pb-6">
+      <h3 className="text-sm font-semibold text-day-text dark:text-night-text">
+        {title}
+      </h3>
+      {meta ? (
+        <p className="mt-2 text-sm leading-6 text-day-muted dark:text-night-muted">
+          {meta}
+        </p>
+      ) : null}
+    </div>
+  </div>
+);
+
+const PropertyPreview = ({ property, propertyPath }) => {
+  const image = property?.thumbnail;
+
+  return (
+    <aside className="shell-surface overflow-hidden">
+      <div className="relative h-52 bg-day-panel dark:bg-night-panel">
+        {image ? (
+          <img
+            src={getPropertyImageUrl(image)}
+            alt={getPropertyHeadline(property)}
+            className="h-full w-full object-cover"
+            style={getPropertyImageStyle(image)}
+          />
+        ) : (
+          <div className="grid h-full w-full place-items-center text-day-primary/35 dark:text-night-primary/35">
+            <Building2 className="h-12 w-12" strokeWidth={1.8} />
+          </div>
+        )}
+
+        <div className="absolute left-4 top-4 rounded-full bg-white/85 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-day-primary backdrop-blur dark:bg-night-surface/85 dark:text-night-primary">
+          {formatPropertyType(property?.propertyType)}
+        </div>
+      </div>
+
+      <div className="px-6 py-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+          Associated asset
+        </p>
+        <h2 className="mt-3 text-2xl font-semibold text-day-text dark:text-night-text">
+          {getPropertyHeadline(property)}
+        </h2>
+
+        <div className="mt-3 flex items-start gap-2 text-sm leading-6 text-day-muted dark:text-night-muted">
+          <MapPin className="mt-1 h-4 w-4 shrink-0" strokeWidth={2} />
+          <span>{getPropertyLocation(property)}</span>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          <DetailRow
+            label="Requested investment"
+            value={
+              property?.requestedInvestment
+                ? formatAmount(property.requestedInvestment)
+                : "—"
+            }
+          />
+          <DetailRow
+            label="Listed rent"
+            value={
+              property?.rentOffered ? formatAmount(property.rentOffered) : "—"
+            }
+          />
+          <DetailRow
+            label="City / Country"
+            value={[property?.city, property?.country].filter(Boolean).join(", ") || "—"}
+          />
+        </div>
+
+        {propertyPath ? (
+          <Link
+            to={propertyPath}
+            className="mt-6 inline-flex items-center gap-2 rounded-full border border-day-border px-4 py-2 text-sm font-semibold text-day-primary transition hover:bg-day-panel/60 dark:border-night-border dark:text-night-primary dark:hover:bg-night-panel/60"
+          >
+            Open property page
+            <ArrowRight className="h-4 w-4" strokeWidth={2.1} />
+          </Link>
+        ) : null}
+      </div>
+    </aside>
+  );
+};
+
 export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const isOwnerView = viewerRole === "owner";
+  const feedback = useAppFeedback();
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [investment, setInvestment] = useState(null);
   const [documents, setDocuments] = useState([]);
   const [activeTab, setActiveTab] = useState("overview");
@@ -86,17 +498,24 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("");
   const [reviewingFileId, setReviewingFileId] = useState(null);
   const [reviewNotes, setReviewNotes] = useState({});
+  const [confirmAction, setConfirmAction] = useState(null);
 
   const loadInvestmentDetails = useCallback(async () => {
     try {
       setLoading(true);
+      setError("");
       const response = await InvestmentController.getInvestmentById(id);
 
-      if (response.success) {
+      if (response?.success) {
         setInvestment(response.data);
+      } else {
+        setInvestment(null);
+        setError("Investment could not be loaded.");
       }
-    } catch (error) {
-      console.error("Yatırım detayı yükleme hatası:", error);
+    } catch (loadError) {
+      console.error("Investment detail load error:", loadError);
+      setInvestment(null);
+      setError(loadError.message || "Investment could not be loaded.");
     } finally {
       setLoading(false);
     }
@@ -106,26 +525,27 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
     try {
       const response = await InvestmentController.getInvestmentDocuments(id);
 
-      if (response.success) {
-        setDocuments(response.data);
+      if (response?.success) {
+        setDocuments(response.data || []);
+      } else {
+        setDocuments([]);
       }
-    } catch (error) {
-      console.error("Dökümanlar yükleme hatası:", error);
+    } catch (loadError) {
+      console.error("Investment documents load error:", loadError);
+      setDocuments([]);
     }
   }, [id]);
 
   useEffect(() => {
-    if (id) {
-      loadInvestmentDetails();
-      loadDocuments();
-    }
+    if (!id) return;
+
+    loadInvestmentDetails();
+    loadDocuments();
   }, [id, loadDocuments, loadInvestmentDetails]);
 
   useEffect(() => {
     const availableMethods = investment?.paymentOptions || [];
-    if (availableMethods.length === 0) {
-      return;
-    }
+    if (availableMethods.length === 0) return;
 
     const currentMethod = investment?.principalPayment?.method;
     const fallbackMethod = currentMethod || availableMethods[0]?.key || "";
@@ -139,7 +559,7 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
   }, [investment, selectedPaymentMethod]);
 
   const handleDocumentUpload = async (event, type) => {
-    const file = event.target.files[0];
+    const file = event.target.files?.[0];
     if (!file) return;
 
     try {
@@ -151,10 +571,7 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
       if (type === "contract") {
         response = await InvestmentController.uploadContract(id, formData);
       } else if (type === "payment_receipt") {
-        response = await InvestmentController.uploadPaymentReceipt(
-          id,
-          formData,
-        );
+        response = await InvestmentController.uploadPaymentReceipt(id, formData);
       } else if (type === "title_deed") {
         response = await InvestmentController.uploadTitleDeed(id, formData);
       } else {
@@ -165,24 +582,23 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
         );
       }
 
-      if (response.success) {
+      if (response?.success) {
         await loadInvestmentDetails();
         await loadDocuments();
-        alert(t("investor.documentUploadedSuccessfully"));
+        feedback.success(t("investor.documentUploadedSuccessfully"));
       }
-    } catch (error) {
-      console.error("Döküman yükleme hatası:", error);
-      alert(error.message || t("investor.documentUploadFailed"));
+    } catch (uploadError) {
+      console.error("Investment document upload error:", uploadError);
+      feedback.error(uploadError.message || t("investor.documentUploadFailed"));
     } finally {
       setUploadingDoc(false);
+      event.target.value = "";
     }
   };
 
   const handleDownloadDocument = async (fileId, fileName) => {
     try {
       const response = await InvestmentController.downloadDocument(id, fileId);
-
-      // Blob'u indirilebilir hale getir
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
@@ -191,9 +607,9 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Döküman indirme hatası:", error);
-      alert(t("investor.documentDownloadFailed"));
+    } catch (downloadError) {
+      console.error("Investment document download error:", downloadError);
+      feedback.error(t("investor.documentDownloadFailed"));
     }
   };
 
@@ -202,13 +618,13 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
       setActionLoading("accept");
       const response = await InvestmentController.acceptOffer(id);
 
-      if (response.success) {
+      if (response?.success) {
         await loadInvestmentDetails();
-        alert("Offer accepted successfully");
+        feedback.success("Offer accepted successfully.");
       }
-    } catch (error) {
-      console.error("Offer accept error:", error);
-      alert(error.message || "Failed to accept offer");
+    } catch (actionError) {
+      console.error("Offer accept error:", actionError);
+      feedback.error(actionError.message || "Failed to accept offer.");
     } finally {
       setActionLoading(null);
     }
@@ -222,34 +638,35 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
         rejectReason || "Rejected by owner",
       );
 
-      if (response.success) {
+      if (response?.success) {
         setShowRejectModal(false);
         setRejectReason("");
-        alert("Offer rejected successfully");
+        feedback.success("Offer rejected successfully.");
         navigate("/owner/offers");
       }
-    } catch (error) {
-      console.error("Offer reject error:", error);
-      alert(error.message || "Failed to reject offer");
+    } catch (actionError) {
+      console.error("Offer reject error:", actionError);
+      feedback.error(actionError.message || "Failed to reject offer.");
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleRequestRepresentative = async () => {
-    if (!confirm(t("investor.confirmRequestRepresentative"))) return;
-
+  const submitRepresentativeRequest = async () => {
     try {
+      setConfirmAction(null);
       const response =
         await InvestmentController.requestLocalRepresentative(id);
 
-      if (response.success) {
+      if (response?.success) {
         await loadInvestmentDetails();
-        alert(t("investor.representativeRequestedSuccessfully"));
+        feedback.success(t("investor.representativeRequestedSuccessfully"));
       }
-    } catch (error) {
-      console.error("Temsilci talep hatası:", error);
-      alert(error.message || t("investor.representativeRequestFailed"));
+    } catch (requestError) {
+      console.error("Representative request error:", requestError);
+      feedback.error(
+        requestError.message || t("investor.representativeRequestFailed"),
+      );
     }
   };
 
@@ -260,32 +677,35 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
         method: selectedPaymentMethod,
       });
 
-      if (response.success) {
+      if (response?.success) {
         await loadInvestmentDetails();
-        alert("Payment instructions are ready");
+        feedback.success("Payment instructions are ready.");
       }
-    } catch (error) {
-      console.error("Payment preparation error:", error);
-      alert(error.message || "Failed to prepare payment instructions");
+    } catch (actionError) {
+      console.error("Payment preparation error:", actionError);
+      feedback.error(
+        actionError.message || "Failed to prepare payment instructions.",
+      );
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleConfirmPrincipalPayment = async () => {
-    if (!confirm("Confirm that you received the principal payment?")) return;
-
+  const submitPrincipalPaymentConfirmation = async () => {
     try {
+      setConfirmAction(null);
       setActionLoading("confirm_payment");
       const response = await InvestmentController.confirmPrincipalPayment(id);
 
-      if (response.success) {
+      if (response?.success) {
         await loadInvestmentDetails();
-        alert("Principal payment confirmed successfully");
+        feedback.success("Principal payment confirmed successfully.");
       }
-    } catch (error) {
-      console.error("Payment confirmation error:", error);
-      alert(error.message || "Failed to confirm principal payment");
+    } catch (actionError) {
+      console.error("Payment confirmation error:", actionError);
+      feedback.error(
+        actionError.message || "Failed to confirm principal payment.",
+      );
     } finally {
       setActionLoading(null);
     }
@@ -295,7 +715,9 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
     const note = String(reviewNotes[fileId] || "").trim();
 
     if (action === "request_changes" && !note) {
-      alert("Please explain what should be corrected before re-upload.");
+      feedback.warning(
+        "Please explain what should be corrected before re-upload.",
+      );
       return;
     }
 
@@ -306,22 +728,22 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
         notes: note,
       });
 
-      if (response.success) {
+      if (response?.success) {
         await loadInvestmentDetails();
         await loadDocuments();
         setReviewNotes((current) => ({
           ...current,
           [fileId]: "",
         }));
-        alert(
+        feedback.success(
           action === "approve"
             ? "Document approved successfully."
             : "Re-upload requested successfully.",
         );
       }
-    } catch (error) {
-      console.error("Document review error:", error);
-      alert(error.message || "Failed to update document review.");
+    } catch (reviewError) {
+      console.error("Document review error:", reviewError);
+      feedback.error(reviewError.message || "Failed to update document review.");
     } finally {
       setReviewingFileId(null);
     }
@@ -332,6 +754,7 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
     : ["offer_sent", "rejected"].includes(investment?.status)
       ? "/investor/offers"
       : "/investor/investments";
+
   const documentsByType = useMemo(() => {
     const mapped = new Map();
     documents.forEach((item) => {
@@ -341,20 +764,21 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
     });
     return mapped;
   }, [documents]);
+
   const viewerContractDocument = documentsByType.get(
     isOwnerView ? "contract_owner_signed" : "contract_investor_signed",
   );
   const paymentReceiptDocument = documentsByType.get("payment_receipt");
   const titleDeedDocument = documentsByType.get("title_deed");
+
   const viewerContractNeedsReupload =
     viewerContractDocument?.reviewStatus === "changes_requested";
   const paymentReceiptNeedsReupload =
     paymentReceiptDocument?.reviewStatus === "changes_requested";
   const titleDeedNeedsReupload =
     titleDeedDocument?.reviewStatus === "changes_requested";
-  const isOfferStage = ["offer_sent", "rejected"].includes(
-    investment?.status,
-  );
+  const isOfferStage = ["offer_sent", "rejected"].includes(investment?.status);
+
   const reviewableDocuments = useMemo(
     () =>
       documents
@@ -372,6 +796,7 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
         }),
     [documents],
   );
+
   const hasRentalPayments = (investment?.rentalPayments?.length || 0) > 0;
   const showPaymentsTab = hasRentalPayments;
   const availableTabs = showPaymentsTab
@@ -386,10 +811,10 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">
+      <div className="grid min-h-[60vh] place-items-center p-4 sm:p-6 xl:p-8">
+        <div className="shell-surface px-8 py-8 text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-day-primary dark:text-night-primary" />
+          <p className="mt-4 text-sm text-day-muted dark:text-night-muted">
             {t("investor.loading")}...
           </p>
         </div>
@@ -399,36 +824,42 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
 
   if (!investment) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-gray-600 dark:text-gray-400 text-xl">
-            {t("investor.investmentNotFound")}
+      <div className="space-y-6 p-4 sm:p-6 xl:p-8">
+        <button
+          type="button"
+          onClick={() => navigate(backPath)}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-day-primary hover:underline dark:text-night-primary"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {t("investor.backToList", "Back to list")}
+        </button>
+
+        <div className="shell-surface px-6 py-8">
+          <h1 className="text-2xl font-semibold text-day-text dark:text-night-text">
+            {t("investor.investmentNotFound", "Investment not found")}
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-day-muted dark:text-night-muted">
+            {error ||
+              "This investment could not be loaded or is no longer available to your account."}
           </p>
-          <button
-            onClick={() => navigate(backPath)}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            {t("investor.backToList")}
-          </button>
         </div>
       </div>
     );
   }
 
-  const counterparty = isOwnerView
-    ? investment.investor
-    : investment.propertyOwner;
+  const counterparty = isOwnerView ? investment.investor : investment.propertyOwner;
   const counterpartyTitle = isOwnerView
     ? t("investments.investor_info") || "Investor Information"
     : "Property Owner";
   const counterpartyProfileLabel = isOwnerView
     ? "View investor profile"
     : "View profile";
-  const title =
+  const pageTitle =
     (isOwnerView && investment.status === "offer_sent") ||
     (!isOwnerView && ["offer_sent", "rejected"].includes(investment.status))
-      ? "Offer Details"
-      : t("investor.investmentDetails");
+      ? "Offer Detail"
+      : t("investor.investmentDetails", "Investment Detail");
+
   const contractWorkflow = investment.contractWorkflow || {};
   const offerTerms = investment.offerTerms || {};
   const agreedMonthlyRent =
@@ -485,29 +916,108 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
     ? "Investor receipt is waiting for your verification below."
     : "Receipt uploaded. Waiting for property owner verification.";
 
+  const statusLabel = formatKeyLabel(investment.status);
+  const processEntries = Object.entries(investment.processTracking || {});
+  const currentProcessKey =
+    processEntries.find(([, value]) => value?.active)?.[0] ||
+    processEntries.find(([, value]) => value?.completed === false)?.[0] ||
+    null;
+  const currentProcessLabel = currentProcessKey
+    ? PROCESS_LABELS[currentProcessKey] || formatKeyLabel(currentProcessKey)
+    : statusLabel;
+  const yieldTarget =
+    formatPercent(
+      offerTerms.annualYieldPercent || investment.property?.annualYieldPercent,
+    ) || "—";
+  const totalExpectedIncome = getExpectedIncome(investment);
+  const totalCollectedIncome = getCollectedIncome(investment);
+  const paymentProgress = getPaymentProgress(investment);
+  const pendingReviewCount = reviewableDocuments.filter(
+    (document) => document.reviewStatus === "pending_review",
+  ).length;
+  const approvedDocumentCount = documents.filter(
+    (document) => document.reviewStatus === "approved",
+  ).length;
+  const changesRequestedCount = documents.filter(
+    (document) => document.reviewStatus === "changes_requested",
+  ).length;
+  const hasAnyAction =
+    (isOwnerView && investment.status === "offer_sent") ||
+    canUploadContract ||
+    canPreparePayment ||
+    canUploadPaymentReceipt ||
+    canConfirmPayment ||
+    canUploadTitleDeed ||
+    canRequestRepresentative ||
+    reviewableDocuments.length > 0;
+  const rentalPaidCount = investment.rentalPayments?.filter(
+    (payment) => payment.status === "paid",
+  ).length;
+  const rentalPendingCount = investment.rentalPayments?.filter(
+    (payment) => payment.status === "pending",
+  ).length;
+  const rentalDelayedCount = investment.rentalPayments?.filter(
+    (payment) => payment.status === "delayed",
+  ).length;
+  const isRepresentativeRequestConfirmOpen =
+    confirmAction === "request_representative";
+  const isPrincipalPaymentConfirmOpen = confirmAction === "confirm_payment";
+
   return (
-    <div className="p-6 space-y-6">
-      {showRejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white dark:bg-gray-800 shadow-2xl p-6 space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Reject Offer
-            </h3>
+    <div className="space-y-6 p-4 sm:p-6 xl:p-8">
+      {isRepresentativeRequestConfirmOpen ? (
+        <ConfirmationModal
+          title="Request local representative"
+          message="Create a local execution support request for this investment. Once submitted, the request will appear in the representative queue for the relevant region."
+          confirmLabel="Send request"
+          onConfirm={submitRepresentativeRequest}
+          onClose={() => setConfirmAction(null)}
+          tone="primary"
+        />
+      ) : null}
+
+      {isPrincipalPaymentConfirmOpen ? (
+        <ConfirmationModal
+          title="Confirm principal payment"
+          message="Use this once you have verified that the principal payment has been received correctly. This will move the workflow to the next stage."
+          confirmLabel="Confirm payment"
+          onConfirm={submitPrincipalPaymentConfirmation}
+          onClose={() => setConfirmAction(null)}
+          processing={actionLoading === "confirm_payment"}
+          tone="success"
+        />
+      ) : null}
+
+      {showRejectModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div className="shell-surface w-full max-w-lg px-6 py-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+              Offer decision
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold text-day-text dark:text-night-text">
+              Reject this offer
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-day-muted dark:text-night-muted">
+              Add a short explanation so the investor sees why this opportunity
+              cannot move forward.
+            </p>
+
             <textarea
-              rows={3}
+              rows={4}
               value={rejectReason}
               onChange={(event) => setRejectReason(event.target.value)}
               placeholder="Reason for rejection (optional)..."
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-400/40"
+              className="shell-input mt-5 min-h-[120px]"
             />
-            <div className="flex justify-end gap-3">
+
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
               <button
                 type="button"
                 onClick={() => {
                   setShowRejectModal(false);
                   setRejectReason("");
                 }}
-                className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className={SECONDARY_BUTTON_CLASS}
               >
                 Cancel
               </button>
@@ -515,202 +1025,348 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
                 type="button"
                 disabled={actionLoading === "reject"}
                 onClick={handleRejectOffer}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors"
+                className={DANGER_BUTTON_CLASS}
               >
                 {actionLoading === "reject" ? "Rejecting..." : "Confirm Reject"}
               </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
+        <div className="shell-surface px-6 py-7 sm:px-8">
           <button
+            type="button"
             onClick={() => navigate(backPath)}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-day-primary hover:underline dark:text-night-primary"
           >
-            ← {t("investor.back")}
+            <ArrowLeft className="h-4 w-4" strokeWidth={2.1} />
+            {t("investor.back", "Back")}
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {title}
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              {investment.property?.city}, {investment.property?.country}
+
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-day-border/70 bg-day-surface px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-day-muted dark:border-night-border/70 dark:bg-night-surface dark:text-night-muted">
+              {investment.id ? `ID ${investment.id}` : "Investment case"}
+            </span>
+            <span
+              className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getStatusClass(
+                investment.status,
+              )}`}
+            >
+              {statusLabel}
+            </span>
+            <span className="rounded-full border border-day-border/70 bg-day-panel/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-day-primary dark:border-night-border/70 dark:bg-night-panel/70 dark:text-night-primary">
+              {isOwnerView ? "Owner workflow" : "Investor portfolio"}
+            </span>
+          </div>
+
+          <div className="mt-6">
+            <p className="text-sm text-day-muted dark:text-night-muted">
+              {pageTitle}
             </p>
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight text-day-text dark:text-night-text sm:text-5xl">
+              {formatAmount(investment.amountInvested)}
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-day-muted dark:text-night-muted">
+              {isOwnerView
+                ? "Review the commercial terms, signed package, payment confirmation, and title deed readiness without losing the broader lifecycle context."
+                : "Track the full lifecycle of this position, from negotiated terms to contract, payment, title deed, and rental income collection."}
+            </p>
+            <div className="mt-4 flex items-start gap-2 text-sm text-day-muted dark:text-night-muted">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
+              <span>{getPropertyHeadline(investment.property)}</span>
+            </div>
+          </div>
+
+          <div className="mt-10 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              label="Ownership share"
+              value={
+                offerTerms.ownershipPercent
+                  ? `${offerTerms.ownershipPercent}%`
+                  : "—"
+              }
+              icon={ShieldCheck}
+            />
+            <MetricCard
+              label="Execution date"
+              value={formatDate(investment.createdAt)}
+              icon={CalendarClock}
+            />
+            <MetricCard
+              label="Yield target"
+              value={yieldTarget}
+              icon={CircleDollarSign}
+            />
+            <MetricCard
+              label="Current stage"
+              value={currentProcessLabel}
+              icon={Clock3}
+            />
           </div>
         </div>
-        <span
-          className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(investment.status)}`}
-        >
-          {t(`investor.${investment.status}`)}
-        </span>
-      </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
-        <nav className="-mb-px flex space-x-8">
+        <PropertyPreview property={investment.property} propertyPath={propertyPath} />
+      </section>
+
+      <section className="shell-surface px-3 py-3">
+        <nav className="flex flex-wrap gap-2">
           {availableTabs.map((tab) => (
-            <button
+            <TabButton
               key={tab}
+              active={activeTab === tab}
               data-testid={`investment-tab-${tab}`}
               onClick={() => setActiveTab(tab)}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === tab
-                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-              }`}
             >
-              {t(`investor.${tab}`)}
-            </button>
+              {TAB_LABELS[tab] || formatKeyLabel(tab)}
+            </TabButton>
           ))}
         </nav>
-      </div>
+      </section>
 
-      {/* Tab Content */}
-      <div>
-        {/* Overview Tab */}
-        {activeTab === "overview" && (
-          <div className="space-y-6">
-            {/* Investment Summary */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t("investor.investmentSummary")}
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    {t("investor.investmentAmount")}
-                  </p>
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    {investment.amountInvested?.toLocaleString()}{" "}
-                    {APP_CURRENCY}
-                  </p>
-                </div>
-                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    Negotiated Monthly Rent
-                  </p>
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    {agreedMonthlyRent?.toLocaleString()}{" "}
-                    {APP_CURRENCY_SYMBOL}
-                  </p>
-                </div>
-                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    {t("investor.totalExpectedReturn")}
-                  </p>
-                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                    {investment.calculations?.totalExpectedIncome?.toLocaleString()}{" "}
-                    {APP_CURRENCY_SYMBOL}
-                  </p>
-                </div>
-                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                    Ownership Share
-                  </p>
-                  <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                    {offerTerms.ownershipPercent
-                      ? `${offerTerms.ownershipPercent}%`
-                      : "—"}
-                  </p>
+      {activeTab === "overview" ? (
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              label="Investment amount"
+              value={formatAmount(investment.amountInvested)}
+              icon={CircleDollarSign}
+            />
+            <MetricCard
+              label="Negotiated monthly rent"
+              value={agreedMonthlyRent ? formatAmount(agreedMonthlyRent) : "—"}
+              icon={HandCoins}
+              accentClass="text-emerald-600 dark:text-emerald-300"
+            />
+            <MetricCard
+              label="Expected total return"
+              value={totalExpectedIncome > 0 ? formatAmount(totalExpectedIncome) : "—"}
+              icon={BadgeCheck}
+            />
+            <MetricCard
+              label="Income collected"
+              value={totalCollectedIncome > 0 ? formatAmount(totalCollectedIncome) : "—"}
+              icon={ReceiptText}
+              hint={
+                paymentProgress > 0
+                  ? `${paymentProgress}% of the scheduled rental period is complete.`
+                  : "Rental collection has not started yet."
+              }
+              accentClass="text-emerald-600 dark:text-emerald-300"
+            />
+          </div>
+
+          <SectionCard
+            eyebrow="Commercial terms"
+            title="Listing versus negotiated position"
+            description="Compare what the property originally asked for with the final investment terms now attached to this case."
+          >
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="shell-subtle-surface px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-day-muted dark:text-night-muted">
+                  Listing terms
+                </p>
+                <div className="mt-4 space-y-0">
+                  <DetailRow
+                    label="Requested investment"
+                    value={
+                      investment.property?.requestedInvestment
+                        ? formatAmount(investment.property.requestedInvestment)
+                        : "—"
+                    }
+                  />
+                  <DetailRow
+                    label="Listed rent"
+                    value={
+                      investment.property?.rentOffered
+                        ? formatAmount(investment.property.rentOffered)
+                        : "—"
+                    }
+                  />
+                  <DetailRow
+                    label="Property type"
+                    value={formatPropertyType(investment.property?.propertyType)}
+                  />
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3">
-                  <p className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-                    Listing Terms
-                  </p>
-                  <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-                    {investment.property?.requestedInvestment?.toLocaleString()}{" "}
-                    {APP_CURRENCY} investment ·{" "}
-                    {investment.property?.rentOffered?.toLocaleString()}{" "}
-                    {APP_CURRENCY} rent
-                  </p>
-                </div>
-                <div className="rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3">
-                  <p className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-                    Offer Terms
-                  </p>
-                  <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-                    {investment.amountInvested?.toLocaleString()} {APP_CURRENCY}{" "}
-                    investment · {agreedMonthlyRent?.toLocaleString()}{" "}
-                    {APP_CURRENCY} rent ·{" "}
-                    {offerTerms.annualYieldPercent
-                      ? `${offerTerms.annualYieldPercent}% yield`
-                      : "Yield n/a"}
-                  </p>
+              <div className="shell-subtle-surface px-4 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-day-muted dark:text-night-muted">
+                  Agreed terms
+                </p>
+                <div className="mt-4 space-y-0">
+                  <DetailRow
+                    label="Amount invested"
+                    value={formatAmount(investment.amountInvested)}
+                  />
+                  <DetailRow
+                    label="Monthly rent"
+                    value={agreedMonthlyRent ? formatAmount(agreedMonthlyRent) : "—"}
+                  />
+                  <DetailRow
+                    label="Annual yield"
+                    value={yieldTarget}
+                  />
+                  <DetailRow
+                    label="Ownership share"
+                    value={
+                      offerTerms.ownershipPercent
+                        ? `${offerTerms.ownershipPercent}%`
+                        : "—"
+                    }
+                  />
                 </div>
               </div>
-
-              {offerTerms.message && (
-                <div className="mt-4 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3">
-                  <p className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-                    Offer Note
-                  </p>
-                  <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-                    {offerTerms.message}
-                  </p>
-                </div>
-              )}
-
-              {investment.status === "rejected" &&
-                investment.offerDecision?.rejectionReason && (
-                  <div className="mt-4 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4">
-                    <p className="text-sm text-red-700 dark:text-red-300">
-                      {investment.offerDecision.rejectionReason}
-                    </p>
-                  </div>
-                )}
             </div>
 
-            {counterparty && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {counterpartyTitle}
-                    </h2>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                      {counterparty.fullName || counterparty.email || "-"}
+            {offerTerms.message ? (
+              <Notice tone="slate" className="mt-4">
+                <span className="font-semibold">Offer note:</span> {offerTerms.message}
+              </Notice>
+            ) : null}
+
+            {investment.status === "rejected" &&
+            investment.offerDecision?.rejectionReason ? (
+              <Notice tone="rose" className="mt-4">
+                <span className="font-semibold">Rejection note:</span>{" "}
+                {investment.offerDecision.rejectionReason}
+              </Notice>
+            ) : null}
+          </SectionCard>
+
+          <div className="grid gap-6 xl:grid-cols-2">
+            {counterparty ? (
+              <SectionCard
+                eyebrow="Counterparty"
+                title={counterpartyTitle}
+                description="The primary relationship on the other side of this investment lifecycle."
+              >
+                <div className="flex items-start gap-4">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-day-panel text-day-primary dark:bg-night-panel dark:text-night-primary">
+                    <UserRound className="h-5 w-5" strokeWidth={2.1} />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-lg font-semibold text-day-text dark:text-night-text">
+                      {counterparty.fullName || counterparty.email || "—"}
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {counterparty.country || counterparty.region || "-"}
+                    <p className="mt-1 text-sm text-day-muted dark:text-night-muted">
+                      {counterparty.country || counterparty.region || "Region pending"}
                     </p>
-                    {counterparty.email && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {counterparty.email ? (
+                      <p className="mt-1 text-sm text-day-muted dark:text-night-muted">
                         {counterparty.email}
                       </p>
-                    )}
+                    ) : null}
                     {isOwnerView &&
-                      typeof counterparty.activeInvestmentCount === "number" && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          Active investments: {counterparty.activeInvestmentCount}
-                        </p>
-                      )}
+                    typeof counterparty.activeInvestmentCount === "number" ? (
+                      <p className="mt-1 text-sm text-day-muted dark:text-night-muted">
+                        Active investments: {counterparty.activeInvestmentCount}
+                      </p>
+                    ) : null}
                   </div>
-                  {getUserId(counterparty) && (
-                    <Link
-                      to={getUserProfilePath(getUserId(counterparty))}
-                      className="inline-flex items-center justify-center rounded-full border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                    >
-                      {counterpartyProfileLabel}
-                    </Link>
-                  )}
                 </div>
-              </div>
-            )}
 
-            {!isOfferStage && (
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  Contract Status
-                </h2>
-                <div className="space-y-4">
+                {getUserId(counterparty) ? (
+                  <Link
+                    to={getUserProfilePath(getUserId(counterparty))}
+                    className="mt-5 inline-flex items-center gap-2 rounded-full border border-day-border px-4 py-2 text-sm font-semibold text-day-primary transition hover:bg-day-panel/60 dark:border-night-border dark:text-night-primary dark:hover:bg-night-panel/60"
+                  >
+                    {counterpartyProfileLabel}
+                    <ArrowRight className="h-4 w-4" strokeWidth={2.1} />
+                  </Link>
+                ) : null}
+              </SectionCard>
+            ) : null}
+
+            <SectionCard
+              eyebrow="Operations"
+              title="Local execution and document state"
+              description="Track who is supporting the case locally and how many review items are still active."
+            >
+              <div className="space-y-0">
+                <DetailRow
+                  label="Local representative"
+                  value={
+                    investment.localRepresentative?.fullName ||
+                    (representativeRequestPending
+                      ? "Request pending"
+                      : "Not assigned")
+                  }
+                />
+                <DetailRow
+                  label="Requested region"
+                  value={investment.representativeRequest?.region || "—"}
+                />
+                <DetailRow
+                  label="Pending review items"
+                  value={String(pendingReviewCount)}
+                  valueClassName={
+                    pendingReviewCount > 0
+                      ? "text-amber-700 dark:text-amber-200"
+                      : ""
+                  }
+                />
+                <DetailRow
+                  label="Approved documents"
+                  value={String(approvedDocumentCount)}
+                />
+              </div>
+
+              {representativeRequestPending ? (
+                <Notice tone="sky" className="mt-4">
+                  A local representative request is pending for{" "}
+                  {investment.representativeRequest?.region || "this region"}.
+                </Notice>
+              ) : null}
+            </SectionCard>
+          </div>
+
+          <SectionCard
+            eyebrow="Workflow"
+            title="Process tracking"
+            description="Each operational gate remains visible so you can tell what has completed and what still blocks the next milestone."
+          >
+            {processEntries.length > 0 ? (
+              <div>
+                {processEntries.map(([key, value], index) => (
+                  <WorkflowStep
+                    key={key}
+                    title={PROCESS_LABELS[key] || formatKeyLabel(key)}
+                    meta={
+                      value?.date || value?.startDate
+                        ? `${value.completed ? "Completed" : value.active ? "Active" : "Scheduled"} on ${formatDate(
+                            value.date || value.startDate,
+                          )}`
+                        : value?.completed
+                          ? "Completed"
+                          : value?.active
+                            ? "Currently active"
+                            : "Waiting for this stage"
+                    }
+                    active={!!value?.active}
+                    completed={!!value?.completed}
+                    isLast={index === processEntries.length - 1}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Notice tone="slate">
+                No explicit process tracking milestones are available yet for
+                this investment.
+              </Notice>
+            )}
+          </SectionCard>
+
+          {!isOfferStage ? (
+            <div className="grid gap-6 xl:grid-cols-2">
+              <SectionCard
+                eyebrow="Contract package"
+                title="Signature status"
+                description="Both parties must complete their signed contract uploads before the payment workflow can fully open."
+              >
+                <div className="space-y-3">
                   {[
                     {
                       key: "investorSigned",
@@ -722,248 +1378,191 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
                     },
                   ].map((item) => {
                     const entry = contractWorkflow[item.key];
+                    const isCompleted = !!entry?.fileId;
+
                     return (
                       <div
                         key={item.key}
-                        className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3"
+                        className="shell-subtle-surface flex items-center justify-between gap-4 px-4 py-4"
                       >
                         <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          <p className="text-sm font-semibold text-day-text dark:text-night-text">
                             {item.label}
                           </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                          <p className="mt-1 text-sm text-day-muted dark:text-night-muted">
                             {entry?.uploadedAt
-                              ? new Date(entry.uploadedAt).toLocaleString()
+                              ? formatDateTime(entry.uploadedAt)
                               : "Waiting for upload"}
                           </p>
                         </div>
                         <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            entry?.fileId
-                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                              : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                          className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                            isCompleted
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200"
+                              : "bg-slate-200 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200"
                           }`}
                         >
-                          {entry?.fileId ? "Completed" : "Pending"}
+                          {isCompleted ? "Completed" : "Pending"}
                         </span>
                       </div>
                     );
                   })}
-
-                  {contractFullySigned && (
-                    <p className="text-sm text-green-600 dark:text-green-400">
-                      Fully signed on{" "}
-                      {new Date(contractWorkflow.fullySignedAt).toLocaleString()}
-                    </p>
-                  )}
                 </div>
-              </div>
 
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <div className="flex items-center justify-between gap-3 mb-4">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Principal Payment
-                  </h2>
+                {contractFullySigned ? (
+                  <Notice tone="emerald" className="mt-4">
+                    The contract package is fully signed as of{" "}
+                    {formatDateTime(contractWorkflow.fullySignedAt)}.
+                  </Notice>
+                ) : null}
+              </SectionCard>
+
+              <SectionCard
+                eyebrow="Principal payment"
+                title="Funding instructions"
+                description="Provider, method, and transfer details remain visible here as the payment package advances."
+                action={
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${getPrincipalPaymentStatusColor(principalPaymentStatus)}`}
+                    className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getPrincipalPaymentStatusClass(
+                      principalPaymentStatus,
+                    )}`}
                   >
                     {PAYMENT_STATUS_LABELS[principalPaymentStatus] ||
-                      principalPaymentStatus}
+                      formatKeyLabel(principalPaymentStatus)}
                   </span>
+                }
+              >
+                <div className="space-y-0">
+                  <DetailRow
+                    label="Provider"
+                    value={
+                      principalPayment.providerLabel ||
+                      investment.paymentProvider?.name ||
+                      "Manual flow"
+                    }
+                  />
+                  <DetailRow
+                    label="Method"
+                    value={
+                      principalPayment.method
+                        ? formatKeyLabel(principalPayment.method)
+                        : "Not selected"
+                    }
+                  />
+                  <DetailRow
+                    label="Amount"
+                    value={formatAmount(
+                      principalPayment.amount || investment.amountInvested,
+                      principalPayment.currency || APP_CURRENCY,
+                    )}
+                  />
+                  <DetailRow
+                    label="Reference"
+                    value={principalPayment.referenceCode || "Will be generated"}
+                  />
+                  <DetailRow
+                    label="Receipt review"
+                    value={
+                      paymentReceiptDocument?.reviewStatus
+                        ? getReviewLabel(paymentReceiptDocument.reviewStatus)
+                        : investment.paymentReceipt?.fileId
+                          ? "Uploaded"
+                          : "Not uploaded"
+                    }
+                  />
                 </div>
 
-                <dl className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="text-gray-500 dark:text-gray-400">
-                      Provider
-                    </dt>
-                    <dd className="text-gray-900 dark:text-white">
-                      {principalPayment.providerLabel ||
-                        investment.paymentProvider?.name ||
-                        "Manual flow"}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="text-gray-500 dark:text-gray-400">
-                      Method
-                    </dt>
-                    <dd className="text-gray-900 dark:text-white">
-                      {principalPayment.method
-                        ? principalPayment.method.replace(/_/g, " ")
-                        : "Not selected"}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="text-gray-500 dark:text-gray-400">
-                      Amount
-                    </dt>
-                    <dd className="text-gray-900 dark:text-white">
-                      {(principalPayment.amount || investment.amountInvested)?.toLocaleString()}{" "}
-                      {principalPayment.currency || APP_CURRENCY}
-                    </dd>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <dt className="text-gray-500 dark:text-gray-400">
-                      Reference
-                    </dt>
-                    <dd className="text-gray-900 dark:text-white">
-                      {principalPayment.referenceCode || "Will be generated"}
-                    </dd>
-                  </div>
-                </dl>
-
-                {paymentInstructions && (
-                  <div className="mt-4 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4 space-y-3">
-                    <p className="text-sm text-blue-900 dark:text-blue-100">
+                {paymentInstructions ? (
+                  <div className="mt-4 rounded-3xl border border-sky-200 bg-sky-50 px-4 py-4 dark:border-sky-900/50 dark:bg-sky-900/20">
+                    <p className="text-sm leading-6 text-sky-900 dark:text-sky-100">
                       {paymentInstructions.summary}
                     </p>
-                    <dl className="grid grid-cols-1 gap-2 text-sm">
-                      <div className="flex items-center justify-between gap-4">
-                        <dt className="text-blue-700 dark:text-blue-300">
-                          Recipient
-                        </dt>
-                        <dd className="text-blue-950 dark:text-blue-100">
-                          {paymentInstructions.recipientName || "-"}
-                        </dd>
-                      </div>
-                      <div className="flex items-center justify-between gap-4">
-                        <dt className="text-blue-700 dark:text-blue-300">
-                          Bank
-                        </dt>
-                        <dd className="text-blue-950 dark:text-blue-100">
-                          {paymentInstructions.bankName || "-"}
-                        </dd>
-                      </div>
-                      <div className="flex items-center justify-between gap-4">
-                        <dt className="text-blue-700 dark:text-blue-300">
-                          IBAN
-                        </dt>
-                        <dd className="text-blue-950 dark:text-blue-100 break-all">
-                          {paymentInstructions.iban || "-"}
-                        </dd>
-                      </div>
-                      <div className="flex items-center justify-between gap-4">
-                        <dt className="text-blue-700 dark:text-blue-300">
-                          Transfer Note
-                        </dt>
-                        <dd className="text-blue-950 dark:text-blue-100">
-                          {paymentInstructions.transferNote || "-"}
-                        </dd>
-                      </div>
-                    </dl>
 
-                    {paymentInstructions.steps?.length > 0 && (
-                      <ol className="list-decimal list-inside text-sm text-blue-900 dark:text-blue-100 space-y-1">
+                    <div className="mt-4 space-y-0">
+                      <DetailRow
+                        label="Recipient"
+                        value={paymentInstructions.recipientName || "—"}
+                      />
+                      <DetailRow
+                        label="Bank"
+                        value={paymentInstructions.bankName || "—"}
+                      />
+                      <DetailRow
+                        label="IBAN"
+                        value={paymentInstructions.iban || "—"}
+                      />
+                      <DetailRow
+                        label="Transfer note"
+                        value={paymentInstructions.transferNote || "—"}
+                      />
+                    </div>
+
+                    {paymentInstructions.steps?.length > 0 ? (
+                      <ol className="mt-4 list-decimal space-y-1 pl-5 text-sm leading-6 text-sky-900 dark:text-sky-100">
                         {paymentInstructions.steps.map((step) => (
                           <li key={step}>{step}</li>
                         ))}
                       </ol>
-                    )}
+                    ) : null}
                   </div>
-                )}
-              </div>
-              </div>
-            )}
+                ) : null}
+              </SectionCard>
+            </div>
+          ) : null}
 
-            {/* Progress Tracking */}
-            {investment.processTracking && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  {t("investor.processTracking")}
-                </h2>
-                <div className="space-y-4">
-                  {Object.entries(investment.processTracking).map(
-                    ([key, value]) => (
-                      <div key={key} className="flex items-center">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                            value.completed || value.active
-                              ? "bg-green-500"
-                              : "bg-gray-300 dark:bg-gray-600"
-                          }`}
-                        >
-                          {value.completed || value.active ? "✓" : "○"}
-                        </div>
-                        <div className="ml-4 flex-1">
-                          <p className="font-medium text-gray-900 dark:text-white">
-                            {PROCESS_LABELS[key] || key}
-                          </p>
-                          {(value.date || value.startDate) && (
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {new Date(
-                                value.date || value.startDate,
-                              ).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ),
-                  )}
-                </div>
+          {investment.calculations && hasRentalPayments ? (
+            <SectionCard
+              eyebrow="Income calculations"
+              title="Rental period performance"
+              description="This section keeps the financial roll-up visible without having to leave the transaction detail."
+            >
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <MetricCard
+                  label="Total paid"
+                  value={formatAmount(investment.calculations.totalPaidAmount)}
+                  icon={ReceiptText}
+                  accentClass="text-emerald-600 dark:text-emerald-300"
+                />
+                <MetricCard
+                  label="Remaining payments"
+                  value={String(investment.calculations.remainingPayments || 0)}
+                  icon={Clock3}
+                />
+                <MetricCard
+                  label="Payment progress"
+                  value={`${investment.calculations.paymentProgress || 0}%`}
+                  icon={BadgeCheck}
+                />
+                <MetricCard
+                  label="Contract end date"
+                  value={formatDate(investment.calculations.contractEndDate)}
+                  icon={CalendarClock}
+                />
               </div>
-            )}
+            </SectionCard>
+          ) : null}
 
-            {/* Calculations */}
-            {investment.calculations && hasRentalPayments && (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  {t("investor.calculations")}
-                </h2>
-                <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="border-b dark:border-gray-700 pb-4">
-                    <dt className="text-sm text-gray-600 dark:text-gray-400">
-                      {t("investor.totalPaid")}
-                    </dt>
-                    <dd className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {investment.calculations.totalPaidAmount?.toLocaleString()}{" "}
-                      {APP_CURRENCY_SYMBOL}
-                    </dd>
-                  </div>
-                  <div className="border-b dark:border-gray-700 pb-4">
-                    <dt className="text-sm text-gray-600 dark:text-gray-400">
-                      {t("investor.remainingPayments")}
-                    </dt>
-                    <dd className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {investment.calculations.remainingPayments}
-                    </dd>
-                  </div>
-                  <div className="border-b dark:border-gray-700 pb-4">
-                    <dt className="text-sm text-gray-600 dark:text-gray-400">
-                      {t("investor.paymentProgress")}
-                    </dt>
-                    <dd className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {investment.calculations.paymentProgress}%
-                    </dd>
-                  </div>
-                  <div className="border-b dark:border-gray-700 pb-4">
-                    <dt className="text-sm text-gray-600 dark:text-gray-400">
-                      {t("investor.contractEndDate")}
-                    </dt>
-                    <dd className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {investment.calculations.contractEndDate
-                        ? new Date(
-                            investment.calculations.contractEndDate,
-                          ).toLocaleDateString()
-                        : "-"}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t("common.actions")}
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {isOwnerView && investment.status === "offer_sent" && (
-                  <div className="md:col-span-2 flex flex-wrap gap-3">
+          <SectionCard
+            eyebrow="Operational actions"
+            title="What you can do next"
+            description="Available controls change as the investment moves from offer handling into contract, payment, title deed, and rental operations."
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              {isOwnerView && investment.status === "offer_sent" ? (
+                <div className="md:col-span-2 shell-subtle-surface px-4 py-4">
+                  <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                    Owner decision required
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-day-muted dark:text-night-muted">
+                    Review the negotiated offer terms above, then accept or reject
+                    the request from here.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-3">
                     <button
                       type="button"
                       disabled={actionLoading === "accept"}
                       onClick={handleAcceptOffer}
-                      className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
+                      className={PRIMARY_BUTTON_CLASS}
                     >
                       {actionLoading === "accept"
                         ? "Accepting..."
@@ -973,430 +1572,527 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
                       type="button"
                       disabled={actionLoading === "reject"}
                       onClick={() => setShowRejectModal(true)}
-                      className="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 disabled:opacity-50 transition-colors"
+                      className={DANGER_BUTTON_CLASS}
                     >
                       Reject Offer
                     </button>
                   </div>
-                )}
+                </div>
+              ) : null}
 
-                {canUploadContract && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      {isOwnerView
-                        ? "Upload owner-signed contract"
-                        : t("investor.uploadContract")}
-                    </label>
-                    <input
-                      type="file"
+              {canUploadContract ? (
+                <div className="shell-subtle-surface px-4 py-4">
+                  <div className="flex items-start gap-3">
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-day-surface text-day-primary dark:bg-night-surface dark:text-night-primary">
+                      <FileCheck2 className="h-5 w-5" strokeWidth={2.1} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                        {isOwnerView
+                          ? "Upload owner-signed contract"
+                          : t("investor.uploadContract", "Upload signed contract")}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-day-muted dark:text-night-muted">
+                        Upload the latest signed PDF so the contract package can
+                        move toward approval.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <UploadField
+                      label="Signed contract file"
                       accept=".pdf"
-                      onChange={(e) => handleDocumentUpload(e, "contract")}
                       disabled={uploadingDoc}
-                      className="block w-full text-sm text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-700"
+                      onChange={(event) => handleDocumentUpload(event, "contract")}
                     />
                   </div>
-                )}
+                </div>
+              ) : null}
 
-                {viewerContractNeedsReupload && (
-                  <div className="rounded-lg border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 p-4 md:col-span-2">
-                    <p className="text-sm text-rose-900 dark:text-rose-100">
-                      The current signed contract needs to be uploaded again.
-                      {viewerContractDocument?.reviewNotes
-                        ? ` Note from reviewer: ${viewerContractDocument.reviewNotes}`
-                        : ""}
-                    </p>
-                  </div>
-                )}
+              {viewerContractNeedsReupload ? (
+                <Notice tone="rose" className="md:col-span-2">
+                  The current signed contract needs to be uploaded again.
+                  {viewerContractDocument?.reviewNotes
+                    ? ` Note from reviewer: ${viewerContractDocument.reviewNotes}`
+                    : ""}
+                </Notice>
+              ) : null}
 
-                {investment.status === "contract_signed" &&
-                  viewerHasSignedContract &&
-                  !viewerContractNeedsReupload &&
-                  !otherPartyHasSignedContract && (
-                    <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 md:col-span-2">
-                      <p className="text-sm text-amber-900 dark:text-amber-100">
-                        You uploaded your signed contract. Waiting for the other
-                        party to upload theirs before the payment step opens.
-                      </p>
-                    </div>
-                  )}
+              {investment.status === "contract_signed" &&
+              viewerHasSignedContract &&
+              !viewerContractNeedsReupload &&
+              !otherPartyHasSignedContract ? (
+                <Notice tone="amber" className="md:col-span-2">
+                  You uploaded your signed contract. The workflow is now waiting
+                  for the other party to upload theirs before the payment step can
+                  fully open.
+                </Notice>
+              ) : null}
 
-                {investment.status === "contract_signed" &&
-                  viewerHasSignedContract &&
-                  otherPartyHasSignedContract &&
-                  !contractFullySigned && (
-                    <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4 md:col-span-2">
-                      <p className="text-sm text-blue-900 dark:text-blue-100">
-                        Signed contracts were uploaded. Waiting for the required
-                        approvals before the payment step opens.
-                      </p>
-                    </div>
-                  )}
+              {investment.status === "contract_signed" &&
+              viewerHasSignedContract &&
+              otherPartyHasSignedContract &&
+              !contractFullySigned ? (
+                <Notice tone="blue" className="md:col-span-2">
+                  Signed contracts are on file. The workflow is waiting for the
+                  required approvals before the payment step becomes active.
+                </Notice>
+              ) : null}
 
-                {canPreparePayment && (
-                  <div className="space-y-3">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Prepare principal payment instructions
-                    </label>
-                    <select
-                      value={selectedPaymentMethod}
-                      onChange={(event) =>
-                        setSelectedPaymentMethod(event.target.value)
-                      }
-                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white"
-                    >
-                      {paymentOptions.map((option) => (
-                        <option key={option.key} value={option.key}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={actionLoading === "prepare_payment"}
-                      onClick={handlePreparePrincipalPayment}
-                      className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                    >
-                      {actionLoading === "prepare_payment"
-                        ? "Preparing..."
-                        : paymentInstructions
-                          ? "Refresh Instructions"
-                          : "Get Instructions"}
-                    </button>
-                  </div>
-                )}
+              {canPreparePayment ? (
+                <div className="shell-subtle-surface px-4 py-4">
+                  <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                    Prepare principal payment instructions
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-day-muted dark:text-night-muted">
+                    Select the transfer method that best matches how you will pay
+                    for this position.
+                  </p>
+                  <select
+                    value={selectedPaymentMethod}
+                    onChange={(event) => setSelectedPaymentMethod(event.target.value)}
+                    className="shell-input mt-4"
+                  >
+                    {paymentOptions.map((option) => (
+                      <option key={option.key} value={option.key}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={actionLoading === "prepare_payment"}
+                    onClick={handlePreparePrincipalPayment}
+                    className={`mt-4 ${PRIMARY_BUTTON_CLASS}`}
+                  >
+                    {actionLoading === "prepare_payment"
+                      ? "Preparing..."
+                      : paymentInstructions
+                        ? "Refresh Instructions"
+                        : "Get Instructions"}
+                  </button>
+                </div>
+              ) : null}
 
-                {canUploadPaymentReceipt && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      {t("investor.uploadPaymentReceipt")}
-                    </label>
-                    <input
-                      type="file"
+              {canUploadPaymentReceipt ? (
+                <div className="shell-subtle-surface px-4 py-4">
+                  <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                    {t("investor.uploadPaymentReceipt", "Upload payment receipt")}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-day-muted dark:text-night-muted">
+                    Upload the proof of transfer after you follow the payment
+                    instructions.
+                  </p>
+                  <div className="mt-4">
+                    <UploadField
+                      label="Receipt or transfer proof"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleDocumentUpload(e, "payment_receipt")}
                       disabled={uploadingDoc}
-                      className="block w-full text-sm text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-700"
+                      onChange={(event) =>
+                        handleDocumentUpload(event, "payment_receipt")
+                      }
                     />
-                    {investment.paymentReceipt?.fileId && (
-                      <p className="mt-2 text-xs text-green-600 dark:text-green-400">
-                        {paymentReceiptWaitingMessage}
+                  </div>
+                  {investment.paymentReceipt?.fileId ? (
+                    <p className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">
+                      {paymentReceiptWaitingMessage}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {paymentReceiptNeedsReupload && !isOwnerView ? (
+                <Notice tone="rose" className="md:col-span-2">
+                  The uploaded payment receipt needs a corrected version.
+                  {paymentReceiptDocument?.reviewNotes
+                    ? ` Note from reviewer: ${paymentReceiptDocument.reviewNotes}`
+                    : ""}
+                </Notice>
+              ) : null}
+
+              {paymentReceiptNeedsReupload && isOwnerView ? (
+                <Notice tone="rose" className="md:col-span-2">
+                  The investor must upload a corrected payment receipt before you
+                  can confirm the principal payment.
+                  {paymentReceiptDocument?.reviewNotes
+                    ? ` Note from reviewer: ${paymentReceiptDocument.reviewNotes}`
+                    : ""}
+                </Notice>
+              ) : null}
+
+              {reviewableDocuments.length > 0 ? (
+                <div className="md:col-span-2 shell-subtle-surface px-4 py-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                        Approval queue
                       </p>
-                    )}
-                  </div>
-                )}
-
-                {paymentReceiptNeedsReupload && !isOwnerView && (
-                  <div className="rounded-lg border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 p-4 md:col-span-2">
-                    <p className="text-sm text-rose-900 dark:text-rose-100">
-                      The uploaded payment receipt needs a corrected version.
-                      {paymentReceiptDocument?.reviewNotes
-                        ? ` Note from reviewer: ${paymentReceiptDocument.reviewNotes}`
-                        : ""}
-                    </p>
-                  </div>
-                )}
-
-                {paymentReceiptNeedsReupload && isOwnerView && (
-                  <div className="rounded-lg border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 p-4 md:col-span-2">
-                    <p className="text-sm text-rose-900 dark:text-rose-100">
-                      The investor must upload a corrected payment receipt before
-                      you can confirm the principal payment.
-                      {paymentReceiptDocument?.reviewNotes
-                        ? ` Note from reviewer: ${paymentReceiptDocument.reviewNotes}`
-                        : ""}
-                    </p>
-                  </div>
-                )}
-
-                {reviewableDocuments.length > 0 && (
-                  <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/20 p-4 md:col-span-2">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                          Approval Queue
-                        </h3>
-                        <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                          Review the uploaded documents, then approve them or ask
-                          for a corrected re-upload.
-                        </p>
-                      </div>
-                      <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-200">
-                        {reviewableDocuments.length} pending
-                      </span>
+                      <p className="mt-2 text-sm leading-6 text-day-muted dark:text-night-muted">
+                        Review uploaded documents, approve them, or explain what
+                        needs to change before re-upload.
+                      </p>
                     </div>
+                    <span className="rounded-full bg-sky-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700 dark:bg-sky-900/30 dark:text-sky-200">
+                      {reviewableDocuments.length} pending
+                    </span>
+                  </div>
 
-                    <div data-testid="investment-review-queue" className="mt-4 space-y-4">
-                      {reviewableDocuments.map((document) => {
-                        const isReviewing = reviewingFileId === document.fileId;
-                        return (
-                          <div
-                            key={document.fileId}
-                            data-testid="investment-review-card"
-                            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-800 p-4"
-                          >
-                            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                              <div>
-                                <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                  <div
+                    data-testid="investment-review-queue"
+                    className="mt-4 space-y-4"
+                  >
+                    {reviewableDocuments.map((document) => {
+                      const isReviewing = reviewingFileId === document.fileId;
+
+                      return (
+                        <div
+                          key={document.fileId}
+                          data-testid="investment-review-card"
+                          className="rounded-3xl border border-day-border/70 bg-day-surface px-4 py-4 dark:border-night-border/70 dark:bg-night-surface"
+                        >
+                          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-semibold text-day-text dark:text-night-text">
                                   {document.name}
                                 </p>
-                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                  {document.type.replaceAll("_", " ")} uploaded{" "}
-                                  {document.uploadedAt
-                                    ? new Date(document.uploadedAt).toLocaleDateString()
-                                    : "-"}
-                                </p>
-                                {document.reviewNotes ? (
-                                  <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
-                                    Latest note: {document.reviewNotes}
-                                  </p>
-                                ) : null}
+                                <span
+                                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${REVIEW_STATUS_STYLES[document.reviewStatus] || REVIEW_STATUS_STYLES.pending_review}`}
+                                >
+                                  {getReviewLabel(document.reviewStatus)}
+                                </span>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleDownloadDocument(
-                                    document.fileId,
-                                    document.name,
-                                  )
-                                }
-                                className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700"
-                              >
-                                Download
-                              </button>
+                              <p className="mt-2 text-xs text-day-muted dark:text-night-muted">
+                                {formatKeyLabel(document.type)} uploaded{" "}
+                                {document.uploadedAt
+                                  ? formatDate(document.uploadedAt)
+                                  : "—"}
+                              </p>
+                              {document.reviewNotes ? (
+                                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                                  Latest note: {document.reviewNotes}
+                                </p>
+                              ) : null}
                             </div>
 
-                            <textarea
-                              data-testid={`investment-review-note-${document.fileId}`}
-                              value={reviewNotes[document.fileId] || ""}
-                              onChange={(event) =>
-                                setReviewNotes((current) => ({
-                                  ...current,
-                                  [document.fileId]: event.target.value,
-                                }))
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDownloadDocument(document.fileId, document.name)
                               }
-                              placeholder="Optional approval note or required re-upload details..."
-                              className="mt-3 min-h-[88px] w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-white"
-                            />
-
-                            <div className="mt-3 flex flex-wrap gap-3">
-                              <button
-                                type="button"
-                                data-testid={`investment-review-approve-${document.fileId}`}
-                                onClick={() =>
-                                  handleReviewDocument(document.fileId, "approve")
-                                }
-                                disabled={isReviewing}
-                                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
-                              >
-                                {isReviewing
-                                  ? "Saving..."
-                                  : isOwnerView &&
-                                      document.type === "payment_receipt"
-                                    ? "Verify Receipt"
-                                    : "Approve Document"}
-                              </button>
-                              <button
-                                type="button"
-                                data-testid={`investment-review-request-${document.fileId}`}
-                                onClick={() =>
-                                  handleReviewDocument(
-                                    document.fileId,
-                                    "request_changes",
-                                  )
-                                }
-                                disabled={isReviewing}
-                                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
-                              >
-                                {isOwnerView &&
-                                document.type === "payment_receipt"
-                                  ? "Request New Receipt"
-                                  : "Request Re-upload"}
-                              </button>
-                            </div>
+                              className={SECONDARY_BUTTON_CLASS}
+                            >
+                              <FileText className="h-4 w-4" strokeWidth={2.1} />
+                              Download
+                            </button>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
 
-                {canConfirmPayment && (
-                  <div className="space-y-3">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Investor payment is ready for manual confirmation.
-                    </p>
-                    <button
-                      type="button"
-                      disabled={actionLoading === "confirm_payment"}
-                      onClick={handleConfirmPrincipalPayment}
-                      className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 transition-colors"
-                    >
-                      {actionLoading === "confirm_payment"
-                        ? "Confirming..."
-                        : "Confirm Principal Payment"}
-                    </button>
-                  </div>
-                )}
+                          <textarea
+                            data-testid={`investment-review-note-${document.fileId}`}
+                            value={reviewNotes[document.fileId] || ""}
+                            onChange={(event) =>
+                              setReviewNotes((current) => ({
+                                ...current,
+                                [document.fileId]: event.target.value,
+                              }))
+                            }
+                            placeholder="Optional approval note or required re-upload details..."
+                            className="shell-input mt-4 min-h-[104px]"
+                          />
 
-                {canUploadTitleDeed && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Upload Title Deed
-                    </label>
-                    <input
-                      type="file"
+                          <div className="mt-4 flex flex-wrap gap-3">
+                            <button
+                              type="button"
+                              data-testid={`investment-review-approve-${document.fileId}`}
+                              onClick={() =>
+                                handleReviewDocument(document.fileId, "approve")
+                              }
+                              disabled={isReviewing}
+                              className={PRIMARY_BUTTON_CLASS}
+                            >
+                              {isReviewing
+                                ? "Saving..."
+                                : isOwnerView &&
+                                    document.type === "payment_receipt"
+                                  ? "Verify Receipt"
+                                  : "Approve Document"}
+                            </button>
+                            <button
+                              type="button"
+                              data-testid={`investment-review-request-${document.fileId}`}
+                              onClick={() =>
+                                handleReviewDocument(
+                                  document.fileId,
+                                  "request_changes",
+                                )
+                              }
+                              disabled={isReviewing}
+                              className={DANGER_BUTTON_CLASS}
+                            >
+                              {isOwnerView &&
+                              document.type === "payment_receipt"
+                                ? "Request New Receipt"
+                                : "Request Re-upload"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {canConfirmPayment ? (
+                <div className="shell-subtle-surface px-4 py-4">
+                  <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                    Confirm principal payment
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-day-muted dark:text-night-muted">
+                    Payment proof is approved. Confirm the investor transfer once
+                    your manual checks are complete.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={actionLoading === "confirm_payment"}
+                    onClick={() => setConfirmAction("confirm_payment")}
+                    className={`mt-4 ${PRIMARY_BUTTON_CLASS}`}
+                  >
+                    {actionLoading === "confirm_payment"
+                      ? "Confirming..."
+                      : "Confirm Principal Payment"}
+                  </button>
+                </div>
+              ) : null}
+
+              {canUploadTitleDeed ? (
+                <div className="shell-subtle-surface px-4 py-4">
+                  <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                    Upload title deed package
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-day-muted dark:text-night-muted">
+                    Submit the title deed file so the case can move into the next
+                    approval step.
+                  </p>
+                  <div className="mt-4">
+                    <UploadField
+                      label="Title deed document"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleDocumentUpload(e, "title_deed")}
                       disabled={uploadingDoc}
-                      className="block w-full text-sm text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-700"
+                      onChange={(event) => handleDocumentUpload(event, "title_deed")}
                     />
                   </div>
-                )}
+                </div>
+              ) : null}
 
-                {titleDeedNeedsReupload && isOwnerView && (
-                  <div className="rounded-lg border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/20 p-4 md:col-span-2">
-                    <p className="text-sm text-rose-900 dark:text-rose-100">
-                      The uploaded title deed needs a corrected version before
-                      the rental period can start.
-                      {titleDeedDocument?.reviewNotes
-                        ? ` Note from reviewer: ${titleDeedDocument.reviewNotes}`
-                        : ""}
-                    </p>
-                  </div>
-                )}
+              {titleDeedNeedsReupload && isOwnerView ? (
+                <Notice tone="rose" className="md:col-span-2">
+                  The uploaded title deed needs a corrected version before the
+                  rental period can start.
+                  {titleDeedDocument?.reviewNotes
+                    ? ` Note from reviewer: ${titleDeedDocument.reviewNotes}`
+                    : ""}
+                </Notice>
+              ) : null}
 
-                {isOwnerView && investment.status === "title_deed_pending" && (
-                  <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4 md:col-span-2">
-                    <p className="text-sm text-blue-900 dark:text-blue-100">
-                      Title deed document uploaded. Waiting for the remaining
-                      participant approvals before the rental period starts.
-                    </p>
-                  </div>
-                )}
+              {isOwnerView && investment.status === "title_deed_pending" ? (
+                <Notice tone="blue" className="md:col-span-2">
+                  Title deed document uploaded. The case is waiting for the
+                  remaining participant approvals before the rental period starts.
+                </Notice>
+              ) : null}
 
-                {representativeRequestPending && (
-                  <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-100 md:col-span-2">
-                    Local representative request is pending for{" "}
-                    {investment.representativeRequest?.region || "this region"}.
-                  </div>
-                )}
-
-                {canRequestRepresentative && (
+              {canRequestRepresentative ? (
+                <div className="shell-subtle-surface px-4 py-4">
+                  <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                    Local representative support
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-day-muted dark:text-night-muted">
+                    Request local execution support once the investment reaches a
+                    stage that benefits from regional follow-up.
+                  </p>
                   <button
-                    onClick={handleRequestRepresentative}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    type="button"
+                    onClick={() => setConfirmAction("request_representative")}
+                    className={`mt-4 ${SECONDARY_BUTTON_CLASS}`}
                   >
-                    {t("investor.requestLocalRepresentative")}
+                    <UploadCloud className="h-4 w-4" strokeWidth={2.1} />
+                    {t(
+                      "investor.requestLocalRepresentative",
+                      "Request local representative",
+                    )}
                   </button>
-                )}
-              </div>
+                </div>
+              ) : null}
+
+              {!hasAnyAction ? (
+                <Notice tone="slate" className="md:col-span-2">
+                  No manual action is currently required from your side. Keep the
+                  overview, payments, and document tabs as your reference surfaces
+                  while the workflow advances.
+                </Notice>
+              ) : null}
             </div>
+          </SectionCard>
+        </div>
+      ) : null}
+
+      {activeTab === "property" && investment.property ? (
+        <InvestmentPropertyPanel
+          property={investment.property}
+          owner={investment.propertyOwner || investment.property.owner}
+          propertyPath={propertyPath}
+          t={t}
+        />
+      ) : null}
+
+      {activeTab === "payments" && showPaymentsTab ? (
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              label="Collected income"
+              value={formatAmount(totalCollectedIncome)}
+              icon={ReceiptText}
+              accentClass="text-emerald-600 dark:text-emerald-300"
+            />
+            <MetricCard
+              label="Paid cycles"
+              value={String(rentalPaidCount || 0)}
+              icon={BadgeCheck}
+            />
+            <MetricCard
+              label="Pending cycles"
+              value={String(rentalPendingCount || 0)}
+              icon={Clock3}
+            />
+            <MetricCard
+              label="Delayed cycles"
+              value={String(rentalDelayedCount || 0)}
+              icon={HandCoins}
+              accentClass={
+                rentalDelayedCount > 0
+                  ? "text-rose-700 dark:text-rose-300"
+                  : ""
+              }
+            />
           </div>
-        )}
 
-        {/* Property Tab */}
-        {activeTab === "property" && investment.property && (
-          <InvestmentPropertyPanel
-            property={investment.property}
-            owner={investment.propertyOwner || investment.property.owner}
-            propertyPath={propertyPath}
-            t={t}
-          />
-        )}
+          <SectionCard
+            eyebrow="Rental ledger"
+            title={t("investor.rentalPayments", "Rental payments")}
+            description="Each rental cycle remains visible here with the amount, payment state, and settlement date."
+          >
+            {investment.rentalPayments?.length ? (
+              <div className="space-y-3">
+                {investment.rentalPayments.map((payment, index) => (
+                  <div
+                    key={`${payment.month || "payment"}-${index}`}
+                    className="shell-subtle-surface flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                        {payment.month || `Payment ${index + 1}`}
+                      </p>
+                      <p className="mt-1 text-sm text-day-muted dark:text-night-muted">
+                        Paid date: {payment.paidAt ? formatDate(payment.paidAt) : "—"}
+                      </p>
+                    </div>
 
-        {/* Payments Tab */}
-        {activeTab === "payments" && showPaymentsTab && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t("investor.rentalPayments")}
-              </h2>
-            </div>
-            {investment.rentalPayments &&
-            investment.rentalPayments.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t("investor.month")}
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t("investor.amount")}
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t("investor.status")}
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                        {t("investor.paidDate")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {investment.rentalPayments.map((payment, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 text-gray-900 dark:text-white">
-                          {payment.month}
-                        </td>
-                        <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
-                          {payment.amount?.toLocaleString()}{" "}
-                          {APP_CURRENCY_SYMBOL}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(payment.status)}`}
-                          >
-                            {t(`investor.${payment.status}`)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-gray-900 dark:text-white">
-                          {payment.paidAt
-                            ? new Date(payment.paidAt).toLocaleDateString()
-                            : "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+                      <span className="text-sm font-semibold text-day-text dark:text-night-text">
+                        {formatAmount(payment.amount)}
+                      </span>
+                      <span
+                        className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getPaymentStatusClass(
+                          payment.status,
+                        )}`}
+                      >
+                        {formatKeyLabel(payment.status)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
-              <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-                {t("investor.noPaymentsYet")}
-              </div>
+              <Notice tone="slate">
+                {t("investor.noPaymentsYet", "No rental payments yet")}
+              </Notice>
             )}
-          </div>
-        )}
+          </SectionCard>
+        </div>
+      ) : null}
 
-        {/* Documents Tab */}
-        {activeTab === "documents" && (
-          <div className="space-y-4">
+      {activeTab === "documents" ? (
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-3">
+            <MetricCard
+              label="Documents on file"
+              value={String(documents.length)}
+              icon={FileText}
+            />
+            <MetricCard
+              label="Pending review"
+              value={String(pendingReviewCount)}
+              icon={Clock3}
+              accentClass={
+                pendingReviewCount > 0
+                  ? "text-amber-700 dark:text-amber-200"
+                  : ""
+              }
+            />
+            <MetricCard
+              label="Changes requested"
+              value={String(changesRequestedCount)}
+              icon={UploadCloud}
+              accentClass={
+                changesRequestedCount > 0
+                  ? "text-rose-700 dark:text-rose-300"
+                  : ""
+              }
+            />
+          </div>
+
+          {documents.length > 0 ? (
             <DocumentsList
               documents={documents}
               t={t}
               onDownload={handleDownloadDocument}
             />
+          ) : (
+            <SectionCard
+              eyebrow="Data room"
+              title="No uploaded files yet"
+              description="Contracts, payment proofs, and supporting material will appear here as the workflow matures."
+            >
+              <Notice tone="slate">
+                There are currently no uploaded documents attached to this
+                investment.
+              </Notice>
+            </SectionCard>
+          )}
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t("investor.uploadAdditionalDocument")}
-              </h3>
-              <input
-                data-testid="investment-upload-additional-document"
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => handleDocumentUpload(e, "other")}
-                disabled={uploadingDoc}
-                className="block w-full text-sm text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer bg-gray-50 dark:bg-gray-700"
-              />
-              {uploadingDoc && (
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                  {t("investor.uploading")}...
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+          <SectionCard
+            eyebrow="Upload"
+            title={t(
+              "investor.uploadAdditionalDocument",
+              "Upload additional document",
+            )}
+            description="Use this area for extra supporting files that do not belong to the main contract, receipt, or title deed steps."
+          >
+            <UploadField
+              dataTestId="investment-upload-additional-document"
+              label="Additional file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              disabled={uploadingDoc}
+              onChange={(event) => handleDocumentUpload(event, "other")}
+            />
+            {uploadingDoc ? (
+              <p className="mt-3 text-sm text-day-muted dark:text-night-muted">
+                {t("investor.uploading", "Uploading")}...
+              </p>
+            ) : null}
+          </SectionCard>
+        </div>
+      ) : null}
     </div>
   );
 };

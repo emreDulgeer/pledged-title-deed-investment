@@ -1,7 +1,25 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BadgeCheck,
+  Building2,
+  Camera,
+  CheckCircle2,
+  ClipboardList,
+  FileText,
+  ImagePlus,
+  Loader2,
+  LocateFixed,
+  MapPin,
+  Navigation,
+  Save,
+  UploadCloud,
+  X,
+} from "lucide-react";
 import bridge from "../../controllers/bridge";
 import CoverImageEditorModal from "../../components/property/modals/CoverImageEditorModal";
 import {
@@ -20,6 +38,7 @@ import {
   createPropertyImageEntry,
 } from "../../utils/propertyImages";
 import { APP_CURRENCY } from "../../utils/currency";
+import { useAppFeedback } from "../../utils/hooks/useAppFeedback";
 
 const INITIAL_FORM = {
   country: "",
@@ -91,6 +110,36 @@ const buildPayload = (form) => ({
           lng: toNumberOrUndefined(form.locationPin.lng),
         }
       : undefined,
+});
+
+const toFormString = (value, fallback = "") =>
+  value === null || value === undefined ? fallback : String(value);
+
+const propertyToForm = (property) => ({
+  ...INITIAL_FORM,
+  country:
+    normalizeSupportedPropertyCountry(property?.country) ||
+    toFormString(property?.country),
+  city: toFormString(property?.city),
+  fullAddress: toFormString(property?.fullAddress),
+  mapSearchAddress: toFormString(property?.mapSearchAddress),
+  propertyType: toFormString(property?.propertyType, INITIAL_FORM.propertyType),
+  description: toFormString(property?.description),
+  size: toFormString(property?.size),
+  rooms: toFormString(property?.rooms),
+  estimatedValue: toFormString(property?.estimatedValue),
+  requestedInvestment: toFormString(property?.requestedInvestment),
+  rentOffered: toFormString(property?.rentOffered),
+  annualYieldPercent: toFormString(property?.annualYieldPercent),
+  currency: APP_CURRENCY,
+  contractPeriodMonths: toFormString(
+    property?.contractPeriodMonths,
+    INITIAL_FORM.contractPeriodMonths,
+  ),
+  locationPin: {
+    lat: toFormString(property?.locationPin?.lat),
+    lng: toFormString(property?.locationPin?.lng),
+  },
 });
 
 const buildAddress = (form) =>
@@ -265,7 +314,7 @@ const MapPreview = ({ lat, lng, pinpointMode, onPinpointPick }) => {
 
   if (!hasCoordinates) {
     return (
-      <div className="h-72 rounded-2xl border border-dashed border-day-border dark:border-night-border bg-day-background dark:bg-night-background flex items-center justify-center text-center px-6 text-sm text-day-text/55 dark:text-night-text/55">
+      <div className="flex h-72 items-center justify-center rounded-3xl border border-dashed border-day-border bg-day-panel/70 px-6 text-center text-sm text-day-muted dark:border-night-border dark:bg-night-panel/70 dark:text-night-muted">
         Adres veya koordinat girdikten sonra harita önizlemesi burada görünecek.
       </div>
     );
@@ -275,7 +324,7 @@ const MapPreview = ({ lat, lng, pinpointMode, onPinpointPick }) => {
     <div className="relative">
       <div
         ref={containerRef}
-        className={`relative z-0 h-72 w-full rounded-2xl border border-day-border dark:border-night-border overflow-hidden ${
+        className={`relative z-0 h-72 w-full overflow-hidden rounded-3xl border border-day-border dark:border-night-border ${
           pinpointMode ? "ring-2 ring-amber-400/60" : ""
         }`}
       />
@@ -287,21 +336,21 @@ const ProviderBadge = ({ providerInfo }) => {
   if (!providerInfo?.name) return null;
 
   return (
-    <div className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-4">
+    <div className="shell-surface p-5">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-semibold uppercase tracking-[0.24em] text-day-primary dark:text-night-primary">
           Map Provider
         </span>
-        <span className="inline-flex items-center rounded-full bg-day-primary/10 dark:bg-night-primary/15 px-3 py-1 text-xs font-medium text-day-primary dark:text-night-primary">
+        <span className="inline-flex items-center rounded-full bg-day-primary/10 px-3 py-1 text-xs font-semibold text-day-primary dark:bg-night-primary/15 dark:text-night-primary">
           {providerInfo.name}
         </span>
         {providerInfo.fallback?.name ? (
-          <span className="text-xs text-day-text/55 dark:text-night-text/55">
+          <span className="text-xs text-day-muted dark:text-night-muted">
             Fallback: {providerInfo.fallback.name}
           </span>
         ) : null}
       </div>
-      <p className="mt-2 text-sm text-day-text/65 dark:text-night-text/65">
+      <p className="mt-3 text-sm leading-6 text-day-muted dark:text-night-muted">
         Frontend önizleme katmanı hem OpenStreetMap hem Google Maps provider
         akışını destekliyor. Asıl geocoding işlemi backend provider seçimine göre
         çalışıyor.
@@ -312,7 +361,12 @@ const ProviderBadge = ({ providerInfo }) => {
 
 const OwnerPropertyCreate = () => {
   const navigate = useNavigate();
+  const { id: propertyId } = useParams();
+  const isEditMode = Boolean(propertyId);
+  const feedback = useAppFeedback();
   const [form, setForm] = useState(INITIAL_FORM);
+  const [existingProperty, setExistingProperty] = useState(null);
+  const [loadingProperty, setLoadingProperty] = useState(false);
   const [providerInfo, setProviderInfo] = useState(null);
   const [providerError, setProviderError] = useState("");
   const [submitError, setSubmitError] = useState("");
@@ -364,6 +418,48 @@ const OwnerPropertyCreate = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isEditMode) {
+      setExistingProperty(null);
+      setForm(INITIAL_FORM);
+      setManualPinOverride(false);
+      return undefined;
+    }
+
+    let active = true;
+
+    const loadProperty = async () => {
+      setLoadingProperty(true);
+      setSubmitError("");
+      try {
+        const response = await bridge.properties.getMyPropertyById(propertyId);
+        const property = response?.data;
+
+        if (!active) return;
+
+        setExistingProperty(property);
+        setForm(propertyToForm(property));
+        setManualPinOverride(
+          Boolean(property?.locationPin?.lat && property?.locationPin?.lng),
+        );
+      } catch (error) {
+        if (active) {
+          setSubmitError(error.message || "Property bilgisi yuklenemedi.");
+        }
+      } finally {
+        if (active) {
+          setLoadingProperty(false);
+        }
+      }
+    };
+
+    loadProperty();
+
+    return () => {
+      active = false;
+    };
+  }, [isEditMode, propertyId]);
+
   const providerKey = providerKeyFromInfo(providerInfo);
   const lat = Number(form.locationPin.lat);
   const lng = Number(form.locationPin.lng);
@@ -387,7 +483,16 @@ const OwnerPropertyCreate = () => {
       })
     : [];
   const addressQuery = buildAddress(form);
-  const geocodeAddressInput = buildGeocodeAddressInput(form);
+  const geocodeAddressInput = useMemo(
+    () =>
+      buildGeocodeAddressInput({
+        fullAddress: form.fullAddress,
+        mapSearchAddress: form.mapSearchAddress,
+        city: form.city,
+        country: form.country,
+      }),
+    [form.city, form.country, form.fullAddress, form.mapSearchAddress],
+  );
   const geocodeAddressKey =
     typeof geocodeAddressInput === "string"
       ? geocodeAddressInput
@@ -489,7 +594,7 @@ const OwnerPropertyCreate = () => {
       const requestId = autoGeocodeRequestIdRef.current + 1;
       autoGeocodeRequestIdRef.current = requestId;
       setGeocodeLoading(true);
-      const addressInput = buildGeocodeAddressInput(form);
+      const addressInput = geocodeAddressInput;
 
       try {
         const response = await bridge.geocoding.geocode(
@@ -541,6 +646,7 @@ const OwnerPropertyCreate = () => {
   }, [
     providerInfo,
     addressQuery,
+    geocodeAddressInput,
     geocodeAddressKey,
     hasEnoughAddressForGeocoding,
     manualPinOverride,
@@ -608,10 +714,13 @@ const OwnerPropertyCreate = () => {
       }
 
       const payload = buildPayload(form);
-      const response = await bridge.properties.create(payload);
-      const createdId = response.data?.id || response.data?._id;
+      const response = isEditMode
+        ? await bridge.properties.update(propertyId, payload)
+        : await bridge.properties.create(payload);
+      const savedId =
+        propertyId || response.data?.id || response.data?._id || response.data?.property?.id;
 
-      if (createdId) {
+      if (savedId) {
         try {
           if (imageEntries.length > 0) {
             const imageFormData = new FormData();
@@ -649,7 +758,7 @@ const OwnerPropertyCreate = () => {
                 String(primaryImageIndex),
               );
             }
-            await bridge.properties.uploadImage(createdId, imageFormData);
+            await bridge.properties.uploadImage(savedId, imageFormData);
           }
 
           if (documentEntries.length > 0) {
@@ -671,27 +780,32 @@ const OwnerPropertyCreate = () => {
                 })),
               ),
             );
-            await bridge.properties.uploadDocument(createdId, documentFormData);
+            await bridge.properties.uploadDocument(savedId, documentFormData);
           }
         } catch (uploadError) {
-          window.alert(
+          feedback.warning(
             uploadError?.message
-              ? `Property created, but some files could not be uploaded: ${uploadError.message}`
-              : "Property created, but some files could not be uploaded.",
+              ? `Property saved, but some files could not be uploaded: ${uploadError.message}`
+              : "Property saved, but some files could not be uploaded.",
           );
-          navigate(`/owner/properties/${createdId}`, { replace: true });
+          navigate(`/owner/properties/${savedId}`, { replace: true });
           return;
         }
       }
 
-      if (createdId) {
-        navigate(`/owner/properties/${createdId}`, { replace: true });
+      if (savedId) {
+        navigate(`/owner/properties/${savedId}`, { replace: true });
         return;
       }
 
       navigate("/owner/properties");
     } catch (error) {
-      setSubmitError(error.message || "Property oluşturulamadı.");
+      setSubmitError(
+        error.message ||
+          (isEditMode
+            ? "Property guncellenemedi."
+            : "Property oluşturulamadı."),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -943,26 +1057,90 @@ const OwnerPropertyCreate = () => {
   }, [form.mapSearchAddress, form.city, form.country, countryCode]);
 
   return (
-    <div className="min-h-screen bg-day-dashboard dark:bg-night-dashboard px-4 py-6 sm:px-6">
-      <div className="mx-auto max-w-7xl">
-        <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
+    <div className="min-h-screen bg-day-dashboard px-4 py-6 text-day-text dark:bg-night-dashboard dark:text-night-text sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-shell space-y-6">
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="relative overflow-hidden rounded-[32px] bg-[radial-gradient(circle_at_top_left,_rgba(149,211,186,0.32),_transparent_34%),linear-gradient(135deg,#0b1c30_0%,#14253a_52%,#003527_100%)] px-6 py-7 text-white shadow-accent sm:px-8 sm:py-9">
+            <div className="absolute -right-10 top-8 h-40 w-40 rounded-full border border-white/10 bg-white/5" />
+            <div className="absolute bottom-0 right-16 h-40 w-40 translate-y-24 rounded-full bg-night-primary/20 blur-3xl" />
+
             <Link
               to="/owner/properties"
-              className="text-sm text-day-primary dark:text-night-primary"
+              className="relative inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-semibold text-white/80 transition hover:bg-white/15"
             >
-              ← Properties
+              <ArrowLeft className="h-4 w-4" strokeWidth={2.2} />
+              Properties
             </Link>
-            <h1 className="mt-2 text-3xl font-bold text-day-text dark:text-night-text">
-              Create Property
-            </h1>
-            <p className="mt-1 max-w-2xl text-sm text-day-text/65 dark:text-night-text/65">
-              Owner listing akışını backend geocoding katmanıyla bağlıyoruz.
-              Adresi koordinata çevirebilir, koordinattan adres doldurabilir ve
-              aktif provider’a göre harita önizlemesi görebilirsiniz.
-            </p>
+
+            <div className="relative mt-8 max-w-3xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/55">
+                Owner listing studio
+              </p>
+              <h1 className="mt-3 text-3xl font-semibold leading-tight sm:text-4xl lg:text-5xl">
+                {isEditMode
+                  ? "Refine the property record without losing operational context."
+                  : "Create an investor-ready property record with media, files, and map precision."}
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-white/72 sm:text-base">
+                Keep title deed address, public map reference, investment terms,
+                gallery images, and private documents together in one structured
+                owner workflow.
+              </p>
+            </div>
           </div>
-        </div>
+
+          <aside className="shell-surface flex flex-col justify-between px-6 py-6">
+            <div>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+                    Save mode
+                  </p>
+                  <h2 className="mt-3 text-2xl font-semibold text-day-text dark:text-night-text">
+                    {isEditMode ? "Edit property" : "New property"}
+                  </h2>
+                </div>
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-day-panel text-day-primary dark:bg-night-panel dark:text-night-primary">
+                  {isEditMode ? (
+                    <Save className="h-5 w-5" strokeWidth={2.2} />
+                  ) : (
+                    <Building2 className="h-5 w-5" strokeWidth={2.2} />
+                  )}
+                </div>
+              </div>
+
+              <p className="mt-4 text-sm leading-6 text-day-muted dark:text-night-muted">
+                {isEditMode
+                  ? "Existing media and documents stay attached. Add new files here if the listing needs fresh supporting material."
+                  : "Start as draft, add the official address, map location, public gallery, and owner-only evidence files."}
+              </p>
+            </div>
+
+            <div className="mt-6 grid gap-3">
+              <div className="rounded-2xl border border-day-border/70 bg-day-panel/70 p-4 dark:border-night-border/70 dark:bg-night-panel/70">
+                <div className="flex items-center gap-3">
+                  <MapPin className="h-5 w-5 text-day-primary dark:text-night-primary" />
+                  <div>
+                    <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                      Two address tracks
+                    </p>
+                    <p className="text-xs leading-5 text-day-muted dark:text-night-muted">
+                      Title deed address is official; map search controls the
+                      public location preview.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </section>
+
+        {loadingProperty ? (
+          <div className="shell-surface flex items-center gap-3 px-5 py-4 text-sm font-medium text-day-muted dark:text-night-muted">
+            <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.2} />
+            Property bilgisi yukleniyor...
+          </div>
+        ) : null}
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_420px]">
           <form
@@ -970,18 +1148,18 @@ const OwnerPropertyCreate = () => {
             onSubmit={handleSubmit}
             className="space-y-6"
           >
-            <div className="rounded-3xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
+            <div className="shell-surface p-6">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
                     Listing Details
                   </h2>
-                  <p className="text-sm text-day-text/60 dark:text-night-text/60">
+                  <p className="text-sm text-day-muted dark:text-night-muted">
                     Temel mülk ve yatırım bilgilerini girin.
                   </p>
                 </div>
-                <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                  Status: draft
+                <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold capitalize text-emerald-700 dark:text-emerald-300">
+                  Status: {existingProperty?.status?.replace(/_/g, " ") || "draft"}
                 </span>
               </div>
 
@@ -994,7 +1172,7 @@ const OwnerPropertyCreate = () => {
                     required
                     value={form.country}
                     onChange={(e) => updateField("country", e.target.value)}
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none focus:ring-2 focus:ring-day-primary/25 dark:focus:ring-night-primary/25"
+                    className="shell-input"
                   >
                     <option value="" disabled>
                       Select a supported country
@@ -1005,7 +1183,7 @@ const OwnerPropertyCreate = () => {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-day-text/55 dark:text-night-text/55">
+                  <p className="text-xs text-day-muted dark:text-night-muted">
                     Supported countries: {SUPPORTED_PROPERTY_COUNTRIES_LABEL}
                   </p>
                 </label>
@@ -1018,7 +1196,7 @@ const OwnerPropertyCreate = () => {
                     required
                     value={form.city}
                     onChange={(e) => updateField("city", e.target.value)}
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none focus:ring-2 focus:ring-day-primary/25 dark:focus:ring-night-primary/25"
+                    className="shell-input"
                     placeholder="Istanbul"
                   />
                 </label>
@@ -1031,10 +1209,10 @@ const OwnerPropertyCreate = () => {
                     rows={3}
                     value={form.fullAddress}
                     onChange={(e) => updateField("fullAddress", e.target.value)}
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none focus:ring-2 focus:ring-day-primary/25 dark:focus:ring-night-primary/25"
+                    className="shell-input min-h-28 resize-y"
                     placeholder="Tapudaki resmi adresi girin"
                   />
-                  <p className="text-xs text-day-text/55 dark:text-night-text/55">
+                  <p className="text-xs text-day-muted dark:text-night-muted">
                     Bu alan resmi tapu adresi icindir. Harita konumu icin
                     asagidaki ayri arama alanini kullanin.
                   </p>
@@ -1047,7 +1225,7 @@ const OwnerPropertyCreate = () => {
                   <select
                     value={form.propertyType}
                     onChange={(e) => updateField("propertyType", e.target.value)}
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none"
+                    className="shell-input"
                   >
                     <option value="apartment">Apartment</option>
                     <option value="house">House</option>
@@ -1063,11 +1241,11 @@ const OwnerPropertyCreate = () => {
                   <select
                     value={APP_CURRENCY}
                     disabled
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none"
+                    className="shell-input disabled:opacity-70"
                   >
                     <option value={APP_CURRENCY}>{APP_CURRENCY}</option>
                   </select>
-                  <p className="text-xs text-day-text/55 dark:text-night-text/55">
+                  <p className="text-xs text-day-muted dark:text-night-muted">
                     Currency is fixed to Euro.
                   </p>
                 </label>
@@ -1081,7 +1259,7 @@ const OwnerPropertyCreate = () => {
                     min="0"
                     value={form.size}
                     onChange={(e) => updateField("size", e.target.value)}
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none"
+                    className="shell-input"
                   />
                 </label>
 
@@ -1094,7 +1272,7 @@ const OwnerPropertyCreate = () => {
                     min="0"
                     value={form.rooms}
                     onChange={(e) => updateField("rooms", e.target.value)}
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none"
+                    className="shell-input"
                   />
                 </label>
 
@@ -1110,7 +1288,7 @@ const OwnerPropertyCreate = () => {
                     onChange={(e) =>
                       updateField("estimatedValue", e.target.value)
                     }
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none"
+                    className="shell-input"
                   />
                 </label>
 
@@ -1126,7 +1304,7 @@ const OwnerPropertyCreate = () => {
                     onChange={(e) =>
                       updateField("requestedInvestment", e.target.value)
                     }
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none"
+                    className="shell-input"
                   />
                 </label>
 
@@ -1139,7 +1317,7 @@ const OwnerPropertyCreate = () => {
                     min="0"
                     value={form.rentOffered}
                     onChange={(e) => updateField("rentOffered", e.target.value)}
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none"
+                    className="shell-input"
                   />
                 </label>
 
@@ -1155,7 +1333,7 @@ const OwnerPropertyCreate = () => {
                     onChange={(e) =>
                       updateField("annualYieldPercent", e.target.value)
                     }
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none"
+                    className="shell-input"
                   />
                 </label>
 
@@ -1171,7 +1349,7 @@ const OwnerPropertyCreate = () => {
                     onChange={(e) =>
                       updateField("contractPeriodMonths", e.target.value)
                     }
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none"
+                    className="shell-input"
                   />
                 </label>
 
@@ -1185,19 +1363,29 @@ const OwnerPropertyCreate = () => {
                     onChange={(e) =>
                       updateField("description", e.target.value)
                     }
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none"
+                    className="shell-input"
                     placeholder="Property details, neighborhood context, and investment notes."
                   />
                 </label>
               </div>
             </div>
 
-            <div className="rounded-3xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
+            <div className="shell-surface p-6">
               <div className="mb-4">
-                <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
-                  Media & Documents
-                </h2>
-                <p className="text-sm text-day-text/60 dark:text-night-text/60">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-11 w-11 place-items-center rounded-2xl bg-day-panel text-day-primary dark:bg-night-panel dark:text-night-primary">
+                    <ImagePlus className="h-5 w-5" strokeWidth={2.2} />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
+                      Media & Documents
+                    </h2>
+                    <p className="text-sm text-day-muted dark:text-night-muted">
+                      Public gallery assets and private owner/admin documents.
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-4 text-sm text-day-muted dark:text-night-muted">
                   Property image files public gorunur. Belgeler sadece owner ve
                   admin tarafinda gorunur.
                 </p>
@@ -1210,12 +1398,13 @@ const OwnerPropertyCreate = () => {
                       <h3 className="text-sm font-semibold text-day-text dark:text-night-text">
                         Property Images
                       </h3>
-                      <p className="text-xs text-day-text/55 dark:text-night-text/55">
+                      <p className="text-xs text-day-muted dark:text-night-muted">
                         Upload flexible gallery photos, then choose one cover
                         image and adjust its 16:9 framing.
                       </p>
                     </div>
-                    <label className="rounded-2xl bg-day-primary dark:bg-night-primary px-4 py-2 text-sm font-semibold text-white cursor-pointer">
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-day-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-day-primary-dark dark:bg-night-primary dark:text-night-background dark:hover:bg-night-primary-dark">
+                      <UploadCloud className="h-4 w-4" strokeWidth={2.2} />
                       {imageAnalysisLoading ? "Analyzing..." : "Select Images"}
                       <input
                         type="file"
@@ -1229,7 +1418,7 @@ const OwnerPropertyCreate = () => {
 
                   <div className="space-y-2">
                     {imageEntries.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-day-border dark:border-night-border px-4 py-4 text-sm text-day-text/55 dark:text-night-text/55">
+                      <div className="rounded-2xl border border-dashed border-day-border bg-day-panel/60 px-4 py-5 text-sm text-day-muted dark:border-night-border dark:bg-night-panel/60 dark:text-night-muted">
                         No images selected yet. Upload gallery photos first,
                         then pick a cover crop preset like{" "}
                         {PROPERTY_CROP_PRESETS.map((preset) => preset.label).join(
@@ -1240,13 +1429,13 @@ const OwnerPropertyCreate = () => {
                     ) : (
                       <>
                         {coverImage && (
-                          <div className="rounded-3xl border border-day-border dark:border-night-border p-4">
+                          <div className="rounded-3xl border border-day-border/70 bg-day-panel/60 p-4 dark:border-night-border/70 dark:bg-night-panel/60">
                             <div className="mb-3 flex items-center justify-between gap-3">
                               <div>
                                 <p className="text-sm font-semibold text-day-text dark:text-night-text">
                                   Cover Preview
                                 </p>
-                                <p className="text-xs text-day-text/55 dark:text-night-text/55">
+                                <p className="text-xs text-day-muted dark:text-night-muted">
                                   The selected crop preset and framing are shown
                                   here before upload.
                                 </p>
@@ -1254,14 +1443,14 @@ const OwnerPropertyCreate = () => {
                               <button
                                 type="button"
                                 onClick={() => setCoverEditorImageId(coverImage.id)}
-                                className="rounded-2xl border border-day-border dark:border-night-border px-3 py-2 text-xs font-semibold text-day-text dark:text-night-text"
+                                className="rounded-2xl border border-day-border bg-day-surface px-3 py-2 text-xs font-semibold text-day-text transition hover:bg-day-panel dark:border-night-border dark:bg-night-surface dark:text-night-text dark:hover:bg-night-panel"
                               >
                                 Adjust cover
                               </button>
                             </div>
 
                             <div
-                              className="overflow-hidden rounded-2xl bg-day-background dark:bg-night-background"
+                              className="overflow-hidden rounded-2xl bg-day-surface dark:bg-night-surface"
                               style={{
                                 aspectRatio: getCropAspectRatio(
                                   coverImage.presentation?.cropPreset,
@@ -1282,14 +1471,14 @@ const OwnerPropertyCreate = () => {
                               <span className="rounded-full bg-day-primary/10 px-3 py-1 text-xs font-semibold text-day-primary dark:bg-night-primary/15 dark:text-night-primary">
                                 Cover image
                               </span>
-                              <span className="rounded-full bg-day-background px-3 py-1 text-xs text-day-text/70 dark:bg-night-background dark:text-night-text/70">
+                              <span className="rounded-full bg-day-surface px-3 py-1 text-xs text-day-muted dark:bg-night-surface dark:text-night-muted">
                                 {coverPreset.label}
                               </span>
-                              <span className="rounded-full bg-day-background px-3 py-1 text-xs text-day-text/70 dark:bg-night-background dark:text-night-text/70">
+                              <span className="rounded-full bg-day-surface px-3 py-1 text-xs text-day-muted dark:bg-night-surface dark:text-night-muted">
                                 Crop {coverCropMetrics?.width ?? "-"} ×{" "}
                                 {coverCropMetrics?.height ?? "-"}
                               </span>
-                              <span className="rounded-full bg-day-background px-3 py-1 text-xs text-day-text/70 dark:bg-night-background dark:text-night-text/70">
+                              <span className="rounded-full bg-day-surface px-3 py-1 text-xs text-day-muted dark:bg-night-surface dark:text-night-muted">
                                 {coverImage.width} × {coverImage.height} original
                               </span>
                             </div>
@@ -1306,9 +1495,9 @@ const OwnerPropertyCreate = () => {
                           {imageEntries.map((entry) => (
                             <div
                               key={entry.id}
-                              className="overflow-hidden rounded-3xl border border-day-border dark:border-night-border"
+                              className="overflow-hidden rounded-3xl border border-day-border/70 bg-day-surface dark:border-night-border/70 dark:bg-night-surface"
                             >
-                              <div className="relative h-48 bg-day-background dark:bg-night-background">
+                              <div className="relative h-48 bg-day-panel dark:bg-night-panel">
                                 <img
                                   src={entry.previewUrl}
                                   alt={entry.file.name}
@@ -1336,7 +1525,7 @@ const OwnerPropertyCreate = () => {
                                   <p className="text-sm font-medium text-day-text dark:text-night-text">
                                     {entry.file.name}
                                   </p>
-                                  <p className="text-xs text-day-text/55 dark:text-night-text/55">
+                                  <p className="text-xs text-day-muted dark:text-night-muted">
                                     {entry.width} × {entry.height} · {entry.sizeLabel}
                                   </p>
                                 </div>
@@ -1354,7 +1543,7 @@ const OwnerPropertyCreate = () => {
                                     className={`rounded-2xl px-3 py-2 text-xs font-semibold ${
                                       entry.isCover
                                         ? "bg-day-primary text-white dark:bg-night-primary"
-                                        : "border border-day-border text-day-text dark:border-night-border dark:text-night-text"
+                                        : "border border-day-border text-day-text transition hover:bg-day-panel dark:border-night-border dark:text-night-text dark:hover:bg-night-panel"
                                     }`}
                                   >
                                     {entry.isCover ? "Selected cover" : "Use as cover"}
@@ -1362,14 +1551,14 @@ const OwnerPropertyCreate = () => {
                                   <button
                                     type="button"
                                     onClick={() => setCoverEditorImageId(entry.id)}
-                                    className="rounded-2xl border border-day-border dark:border-night-border px-3 py-2 text-xs font-semibold text-day-text dark:text-night-text"
+                                    className="rounded-2xl border border-day-border px-3 py-2 text-xs font-semibold text-day-text transition hover:bg-day-panel dark:border-night-border dark:text-night-text dark:hover:bg-night-panel"
                                   >
                                     Adjust framing
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => removeImageFile(entry.id)}
-                                    className="rounded-2xl border border-day-border dark:border-night-border px-3 py-2 text-xs font-semibold text-day-text dark:text-night-text"
+                                    className="rounded-2xl border border-day-border px-3 py-2 text-xs font-semibold text-day-text transition hover:bg-day-panel dark:border-night-border dark:text-night-text dark:hover:bg-night-panel"
                                   >
                                     Remove
                                   </button>
@@ -1389,12 +1578,13 @@ const OwnerPropertyCreate = () => {
                       <h3 className="text-sm font-semibold text-day-text dark:text-night-text">
                         Property Documents
                       </h3>
-                      <p className="text-xs text-day-text/55 dark:text-night-text/55">
+                      <p className="text-xs text-day-muted dark:text-night-muted">
                         Allowed: pdf, jpg, jpeg, png. Each document needs a
                         type.
                       </p>
                     </div>
-                    <label className="rounded-2xl border border-day-border dark:border-night-border px-4 py-2 text-sm font-semibold cursor-pointer">
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-day-border px-4 py-2.5 text-sm font-semibold text-day-text transition hover:bg-day-panel dark:border-night-border dark:text-night-text dark:hover:bg-night-panel">
+                      <FileText className="h-4 w-4" strokeWidth={2.2} />
                       Select Documents
                       <input
                         data-testid="owner-property-document-input"
@@ -1409,7 +1599,7 @@ const OwnerPropertyCreate = () => {
 
                   <div className="space-y-3">
                     {documentEntries.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-day-border dark:border-night-border px-4 py-4 text-sm text-day-text/55 dark:text-night-text/55">
+                      <div className="rounded-2xl border border-dashed border-day-border bg-day-panel/60 px-4 py-5 text-sm text-day-muted dark:border-night-border dark:bg-night-panel/60 dark:text-night-muted">
                         No documents selected yet.
                       </div>
                     ) : (
@@ -1417,21 +1607,21 @@ const OwnerPropertyCreate = () => {
                         <div
                           key={entry.id}
                           data-testid="owner-property-document-entry"
-                          className="rounded-2xl border border-day-border dark:border-night-border p-4"
+                          className="rounded-2xl border border-day-border/70 bg-day-panel/60 p-4 dark:border-night-border/70 dark:bg-night-panel/60"
                         >
                           <div className="mb-3 flex items-center justify-between gap-3">
                             <div>
                               <p className="text-sm font-medium text-day-text dark:text-night-text">
                                 {entry.file.name}
                               </p>
-                              <p className="text-xs text-day-text/55 dark:text-night-text/55">
+                              <p className="text-xs text-day-muted dark:text-night-muted">
                                 {(entry.file.size / 1024 / 1024).toFixed(2)} MB
                               </p>
                             </div>
                             <button
                               type="button"
                               onClick={() => removeDocumentEntry(entry.id)}
-                              className="rounded-xl border border-day-border dark:border-night-border px-3 py-1.5 text-xs font-semibold"
+                              className="rounded-xl border border-day-border px-3 py-1.5 text-xs font-semibold text-day-text transition hover:bg-day-surface dark:border-night-border dark:text-night-text dark:hover:bg-night-surface"
                             >
                               Remove
                             </button>
@@ -1448,7 +1638,7 @@ const OwnerPropertyCreate = () => {
                                   e.target.value,
                                 )
                               }
-                              className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm"
+                              className="shell-input"
                             >
                               {PROPERTY_DOCUMENT_TYPES.map((option) => (
                                 <option key={option.value} value={option.value}>
@@ -1466,7 +1656,7 @@ const OwnerPropertyCreate = () => {
                                   e.target.value,
                                 )
                               }
-                              className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm"
+                              className="shell-input"
                               placeholder="Optional description"
                             />
                           </div>
@@ -1478,136 +1668,206 @@ const OwnerPropertyCreate = () => {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
-                  Location & Maps
-                </h2>
-                <p className="text-sm text-day-text/60 dark:text-night-text/60">
-                  Musteriye haritada gosterilecek konumu buradan secin. Bu alan
-                  tapu adresinden bagimsiz calisir.
-                </p>
+            <div className="shell-surface overflow-hidden p-6">
+              <div className="mb-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-11 w-11 place-items-center rounded-2xl bg-day-panel text-day-primary dark:bg-night-panel dark:text-night-primary">
+                      <LocateFixed className="h-5 w-5" strokeWidth={2.2} />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
+                        Location & Maps
+                      </h2>
+                      <p className="text-sm text-day-muted dark:text-night-muted">
+                        Musteriye haritada gosterilecek konumu buradan secin. Bu alan
+                        tapu adresinden bagimsiz calisir.
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className="inline-flex w-fit items-center gap-2 rounded-full border border-day-border/70 bg-day-panel/70 px-3 py-1.5 text-xs font-semibold text-day-muted dark:border-night-border/70 dark:bg-night-panel/70 dark:text-night-muted">
+                    <MapPin className="h-3.5 w-3.5 text-day-primary dark:text-night-primary" />
+                    Aktif provider:{" "}
+                    <span className="text-day-text dark:text-night-text">
+                      {providerKey === "google"
+                        ? "Google Maps"
+                        : "OpenStreetMap"}
+                    </span>
+                  </span>
+                </div>
               </div>
 
-              <div className="mb-4">
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-day-text dark:text-night-text">
-                    Map Search / Location Description
-                  </span>
-                  <div className="relative">
-                    <input
-                      value={form.mapSearchAddress}
-                      onChange={(e) => {
-                        updateField("mapSearchAddress", e.target.value);
-                        setShowSuggestions(true);
-                      }}
-                      onFocus={() => setShowSuggestions(true)}
-                      className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none focus:ring-2 focus:ring-day-primary/25 dark:focus:ring-night-primary/25"
-                      placeholder="Mekan adi, mahalle, sokak veya bilinen bir lokasyon yazin"
-                    />
-                    {showSuggestions &&
-                    (suggestionsLoading || suggestions.length > 0) ? (
-                      <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-2 shadow-2xl">
-                        {suggestionsLoading ? (
-                          <div className="px-3 py-2 text-sm text-day-text/60 dark:text-night-text/60">
-                            Adres onerileri aranıyor...
-                          </div>
-                        ) : (
-                          suggestions.map((suggestion) => (
-                            <button
-                              key={suggestion.placeId}
-                              type="button"
-                              onClick={() => handleSuggestionSelect(suggestion)}
-                              className="block w-full rounded-xl px-3 py-2 text-left hover:bg-day-background dark:hover:bg-night-background"
-                            >
-                              <div className="text-sm font-medium text-day-text dark:text-night-text">
-                                {suggestion.name || suggestion.formattedAddress}
-                              </div>
-                              <div className="mt-0.5 text-xs text-day-text/60 dark:text-night-text/60">
-                                {suggestion.formattedAddress}
-                              </div>
-                            </button>
-                          ))
-                        )}
-                      </div>
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+                <div className="space-y-4">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-day-text dark:text-night-text">
+                      Map Search / Location Description
+                    </span>
+                    <div className="relative">
+                      <input
+                        value={form.mapSearchAddress}
+                        onChange={(e) => {
+                          updateField("mapSearchAddress", e.target.value);
+                          setShowSuggestions(true);
+                        }}
+                        onFocus={() => setShowSuggestions(true)}
+                        className="shell-input"
+                        placeholder="Mekan adi, mahalle, sokak veya bilinen bir lokasyon yazin"
+                      />
+                      {showSuggestions &&
+                      (suggestionsLoading || suggestions.length > 0) ? (
+                        <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-2xl border border-day-border bg-day-surface p-2 shadow-2xl dark:border-night-border dark:bg-night-surface">
+                          {suggestionsLoading ? (
+                            <div className="px-3 py-2 text-sm text-day-muted dark:text-night-muted">
+                              Adres onerileri aranıyor...
+                            </div>
+                          ) : (
+                            suggestions.map((suggestion) => (
+                              <button
+                                key={suggestion.placeId}
+                                type="button"
+                                onClick={() => handleSuggestionSelect(suggestion)}
+                                className="block w-full rounded-xl px-3 py-2 text-left transition hover:bg-day-panel dark:hover:bg-night-panel"
+                              >
+                                <div className="text-sm font-medium text-day-text dark:text-night-text">
+                                  {suggestion.name || suggestion.formattedAddress}
+                                </div>
+                                <div className="mt-0.5 text-xs text-day-muted dark:text-night-muted">
+                                  {suggestion.formattedAddress}
+                                </div>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                    <p className="text-xs text-day-muted dark:text-night-muted">
+                      Buradaki secim sadece harita preview ve konum koordinati
+                      icin kullanilir.
+                    </p>
+                  </label>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-day-text dark:text-night-text">
+                        Latitude
+                      </span>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={form.locationPin.lat}
+                        onChange={(e) =>
+                          updateLocationField("lat", e.target.value)
+                        }
+                        className="shell-input"
+                        placeholder="41.0082"
+                      />
+                    </label>
+
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-day-text dark:text-night-text">
+                        Longitude
+                      </span>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={form.locationPin.lng}
+                        onChange={(e) =>
+                          updateLocationField("lng", e.target.value)
+                        }
+                        className="shell-input"
+                        placeholder="28.9784"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={handleGeocode}
+                      disabled={geocodeLoading}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-day-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-day-primary-dark disabled:opacity-60 dark:bg-night-primary dark:text-night-background dark:hover:bg-night-primary-dark"
+                    >
+                      {geocodeLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.2} />
+                      ) : (
+                        <Navigation className="h-4 w-4" strokeWidth={2.2} />
+                      )}
+                      {geocodeLoading
+                        ? "Finding coordinates..."
+                        : "Refresh coordinates"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleReverseGeocode}
+                      disabled={reverseLoading}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-day-border px-4 py-2.5 text-sm font-semibold text-day-text transition hover:bg-day-panel disabled:opacity-60 dark:border-night-border dark:text-night-text dark:hover:bg-night-panel"
+                    >
+                      {reverseLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.2} />
+                      ) : (
+                        <MapPin className="h-4 w-4" strokeWidth={2.2} />
+                      )}
+                      {reverseLoading
+                        ? "Filling address..."
+                        : "Reverse geocode coordinates"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={togglePinpointMode}
+                      disabled={!Number.isFinite(lat) || !Number.isFinite(lng)}
+                      className={`rounded-2xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60 ${
+                        pinpointMode
+                          ? "bg-amber-500 text-white"
+                          : "border border-day-border text-day-text transition hover:bg-day-panel dark:border-night-border dark:text-night-text dark:hover:bg-night-panel"
+                      }`}
+                    >
+                      <LocateFixed className="mr-2 inline h-4 w-4" strokeWidth={2.2} />
+                      {pinpointMode ? "Exit pinpoint mode" : "Pinpoint on map"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-[26px] border border-day-border/70 bg-day-panel/60 p-4 dark:border-night-border/70 dark:bg-night-panel/60">
+                  <div className="mb-4 flex items-start gap-3">
+                    <div className="grid h-11 w-11 place-items-center rounded-2xl bg-day-panel text-day-primary dark:bg-night-panel dark:text-night-primary">
+                      <MapPin className="h-5 w-5" strokeWidth={2.2} />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
+                        Live Map Preview
+                      </h2>
+                      <p className="text-sm text-day-muted dark:text-night-muted">
+                        Koordinatlar degistikce preview ayni calisma alaninda
+                        guncellenir.
+                      </p>
+                    </div>
+                  </div>
+
+                  <MapPreview
+                    lat={lat}
+                    lng={lng}
+                    pinpointMode={pinpointMode}
+                    onPinpointPick={handlePinpointPick}
+                  />
+
+                  <div className="mt-4 rounded-2xl bg-day-surface/80 p-4 text-sm leading-6 text-day-muted dark:bg-night-surface/80 dark:text-night-muted">
+                    <p>
+                      Adres alanlarını doldurduğunuzda koordinatlar otomatik bulunur
+                      ve önizleme kendini günceller. İsterseniz sağlama yapmak için
+                      koordinatları elle de düzeltebilirsiniz.
+                    </p>
+                    {pinpointMode ? (
+                      <p className="mt-2 font-medium text-amber-600 dark:text-amber-400">
+                        Pinpoint mode acik. Haritayi normal sekilde surukleyip
+                        yakinlastirin, sonra istediginiz noktaya tiklayin.
+                      </p>
                     ) : null}
                   </div>
-                  <p className="text-xs text-day-text/55 dark:text-night-text/55">
-                    Buradaki secim sadece harita preview ve konum koordinati
-                    icin kullanilir.
-                  </p>
-                </label>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-day-text dark:text-night-text">
-                    Latitude
-                  </span>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={form.locationPin.lat}
-                    onChange={(e) =>
-                      updateLocationField("lat", e.target.value)
-                    }
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none"
-                    placeholder="41.0082"
-                  />
-                </label>
-
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-day-text dark:text-night-text">
-                    Longitude
-                  </span>
-                  <input
-                    type="number"
-                    step="0.000001"
-                    value={form.locationPin.lng}
-                    onChange={(e) =>
-                      updateLocationField("lng", e.target.value)
-                    }
-                    className="w-full rounded-2xl border border-day-border dark:border-night-border bg-day-background dark:bg-night-background px-4 py-3 text-sm text-day-text dark:text-night-text outline-none"
-                    placeholder="28.9784"
-                  />
-                </label>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={handleGeocode}
-                  disabled={geocodeLoading}
-                  className="rounded-2xl bg-day-primary dark:bg-night-primary px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  {geocodeLoading
-                    ? "Finding coordinates..."
-                    : "Refresh coordinates"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleReverseGeocode}
-                  disabled={reverseLoading}
-                  className="rounded-2xl border border-day-border dark:border-night-border px-4 py-2.5 text-sm font-semibold text-day-text dark:text-night-text disabled:opacity-60"
-                >
-                  {reverseLoading
-                    ? "Filling address..."
-                    : "Reverse geocode coordinates"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={togglePinpointMode}
-                  disabled={!Number.isFinite(lat) || !Number.isFinite(lng)}
-                  className={`rounded-2xl px-4 py-2.5 text-sm font-semibold disabled:opacity-60 ${
-                    pinpointMode
-                      ? "bg-amber-500 text-white"
-                      : "border border-day-border dark:border-night-border text-day-text dark:text-night-text"
-                  }`}
-                >
-                  {pinpointMode ? "Exit pinpoint mode" : "Pinpoint on map"}
-                </button>
+                </div>
               </div>
             </div>
 
@@ -1623,28 +1883,51 @@ const OwnerPropertyCreate = () => {
               </div>
             )}
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="shell-surface flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                  {isEditMode ? "Ready to save changes?" : "Ready to create this listing?"}
+                </p>
+                <p className="mt-1 text-xs text-day-muted dark:text-night-muted">
+                  Files are uploaded after the property record is saved.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
               <button
                 type="submit"
                 data-testid="owner-property-create-submit"
                 disabled={submitting}
-                className="rounded-2xl bg-day-primary dark:bg-night-primary px-6 py-3 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-2xl bg-day-primary px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-day-primary-dark disabled:opacity-60 dark:bg-night-primary dark:text-night-background dark:hover:bg-night-primary-dark"
               >
-                {submitting ? "Creating property..." : "Create Property"}
+                {submitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.2} />
+                ) : (
+                  <Save className="h-4 w-4" strokeWidth={2.2} />
+                )}
+                {submitting
+                  ? isEditMode
+                    ? "Saving changes..."
+                    : "Creating property..."
+                  : isEditMode
+                    ? "Save Changes"
+                    : "Create Property"}
               </button>
               <button
                 type="button"
                 onClick={() => navigate("/owner/properties")}
-                className="rounded-2xl border border-day-border dark:border-night-border px-6 py-3 text-sm font-semibold text-day-text dark:text-night-text"
+                className="inline-flex items-center gap-2 rounded-2xl border border-day-border px-6 py-3 text-sm font-semibold text-day-text transition hover:bg-day-panel dark:border-night-border dark:text-night-text dark:hover:bg-night-panel"
               >
+                <X className="h-4 w-4" strokeWidth={2.2} />
                 Cancel
               </button>
+              </div>
             </div>
           </form>
 
           <aside className="space-y-6">
             {loadingProvider ? (
-              <div className="rounded-3xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-5 text-sm text-day-text/60 dark:text-night-text/60">
+              <div className="shell-surface flex items-center gap-2 p-5 text-sm text-day-muted dark:text-night-muted">
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2.2} />
                 Map provider bilgisi yükleniyor...
               </div>
             ) : providerError ? (
@@ -1655,44 +1938,48 @@ const OwnerPropertyCreate = () => {
               <ProviderBadge providerInfo={providerInfo} />
             )}
 
-            <div className="rounded-3xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-5">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
-                    Live Map Preview
-                  </h2>
-                  <p className="text-sm text-day-text/60 dark:text-night-text/60">
-                    Aktif provider:{" "}
-                    <span className="font-medium">
-                      {providerKey === "google"
-                        ? "Google Maps"
-                        : "OpenStreetMap"}
-                    </span>
-                  </p>
+            {isEditMode ? (
+              <div className="shell-surface p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+                      Existing assets
+                    </p>
+                    <h2 className="mt-2 text-lg font-semibold text-day-text dark:text-night-text">
+                      Attached media stays in place
+                    </h2>
+                  </div>
+                  <div className="grid h-11 w-11 place-items-center rounded-2xl bg-day-panel text-day-primary dark:bg-night-panel dark:text-night-primary">
+                    <Camera className="h-5 w-5" strokeWidth={2.2} />
+                  </div>
                 </div>
-              </div>
 
-              <MapPreview
-                lat={lat}
-                lng={lng}
-                pinpointMode={pinpointMode}
-                onPinpointPick={handlePinpointPick}
-              />
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-day-panel/70 p-4 dark:bg-night-panel/70">
+                    <p className="text-xs uppercase tracking-[0.16em] text-day-muted dark:text-night-muted">
+                      Images
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-day-text dark:text-night-text">
+                      {existingProperty?.images?.length || 0}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-day-panel/70 p-4 dark:bg-night-panel/70">
+                    <p className="text-xs uppercase tracking-[0.16em] text-day-muted dark:text-night-muted">
+                      Documents
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-day-text dark:text-night-text">
+                      {existingProperty?.documents?.length || 0}
+                    </p>
+                  </div>
+                </div>
 
-              <div className="mt-4 rounded-2xl bg-day-background dark:bg-night-background p-4 text-sm text-day-text/65 dark:text-night-text/65">
-                <p>
-                  Adres alanlarını doldurduğunuzda koordinatlar otomatik bulunur
-                  ve önizleme kendini günceller. İsterseniz sağlama yapmak için
-                  koordinatları elle de düzeltebilirsiniz.
+                <p className="mt-4 text-sm leading-6 text-day-muted dark:text-night-muted">
+                  Uploading new files here adds them after saving; existing
+                  attachments can still be reviewed from the property detail
+                  screen.
                 </p>
-                {pinpointMode ? (
-                  <p className="mt-2 font-medium text-amber-600 dark:text-amber-400">
-                    Pinpoint mode acik. Haritayi normal sekilde surukleyip
-                    yakinlastirin, sonra istediginiz noktaya tiklayin.
-                  </p>
-                ) : null}
               </div>
-            </div>
+            ) : null}
           </aside>
         </div>
       </div>

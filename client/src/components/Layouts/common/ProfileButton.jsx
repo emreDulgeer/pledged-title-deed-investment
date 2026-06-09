@@ -1,4 +1,3 @@
-// src/components/Layouts/Admin/Topbar/ProfileButton.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -16,7 +15,7 @@ import {
 } from "../../../utils/profileRoutes";
 
 const menuItemClassName =
-  "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-day-text dark:text-night-text hover:bg-day-background dark:hover:bg-night-background transition-colors";
+  "flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-day-text transition-colors hover:bg-day-panel/80 dark:text-night-text dark:hover:bg-night-panel/80";
 
 const ProfileButton = ({ theme, user, onLogout }) => {
   const location = useLocation();
@@ -62,25 +61,33 @@ const ProfileButton = ({ theme, user, onLogout }) => {
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
         aria-label="Open profile menu"
-        className="flex items-center gap-2 rounded-xl p-2 hover:bg-day-primary-light/30 dark:hover:bg-night-primary-dark/40 transition-colors"
+        className="flex items-center gap-3 rounded-2xl border border-transparent px-2 py-1.5 transition-all hover:border-day-border hover:bg-day-panel dark:hover:border-night-border dark:hover:bg-night-panel"
       >
         <img
           className="h-9 w-9 rounded-full border border-day-border dark:border-night-border"
           src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
             user?.fullName || "User",
-          )}&background=${theme === "dark" ? "00C896" : "0F9D58"}&color=fff`}
+          )}&background=${theme === "dark" ? "95D3BA" : "003527"}&color=fff`}
           alt="Profile"
         />
+        <div className="hidden text-left xl:block">
+          <p className="max-w-[10rem] truncate text-sm font-semibold text-day-text dark:text-night-text">
+            {user?.fullName || "User"}
+          </p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-day-muted dark:text-night-muted">
+            {user?.role?.replaceAll("_", " ") || "Workspace"}
+          </p>
+        </div>
         <ChevronDown
-          className={`h-4 w-4 text-day-text/70 dark:text-night-text/70 transition-transform ${
+          className={`h-4 w-4 text-day-muted dark:text-night-muted transition-transform ${
             open ? "rotate-180" : ""
           }`}
         />
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-56 overflow-hidden rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface shadow-xl">
-          <div className="border-b border-day-border dark:border-night-border px-4 py-3">
+        <div className="absolute right-0 z-30 mt-2 w-64 overflow-hidden rounded-[28px] border border-day-border/80 bg-day-surface shadow-panel dark:border-night-border/80 dark:bg-night-surface">
+          <div className="border-b border-day-border/70 px-4 py-4 dark:border-night-border/70">
             <p className="text-sm font-semibold text-day-text dark:text-night-text">
               {user?.fullName || "User"}
             </p>
@@ -90,17 +97,11 @@ const ProfileButton = ({ theme, user, onLogout }) => {
           </div>
 
           <div className="p-2">
-            <Link
-              to={profilePath}
-              className={menuItemClassName}
-            >
+            <Link to={profilePath} className={menuItemClassName}>
               <UserRound className="h-4 w-4" />
               Profile
             </Link>
-            <Link
-              to={settingsPath}
-              className={menuItemClassName}
-            >
+            <Link to={settingsPath} className={menuItemClassName}>
               <Settings className="h-4 w-4" />
               Profile Settings
             </Link>

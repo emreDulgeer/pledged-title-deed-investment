@@ -1,26 +1,21 @@
 // src/components/Layouts/Investor/Sidebar/InvestorSidebar.jsx
 import React from "react";
-import { useTranslation } from "react-i18next";
 import SidebarNav from "../../common/Sidebar/SidebarNav";
 import UserCard from "../../common/Sidebar/UserCard";
+import SidebarLogo from "../../common/Sidebar/SidebarLogo";
 
 const InvestorSidebar = ({ menuItems, user, onLogout }) => {
-  const { t } = useTranslation();
-
   return (
-    <div className="h-full flex flex-col p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-day-primary dark:text-night-primary">
-          EstateLink
-        </h2>
-        <p className="text-sm mt-1 text-day-text dark:text-night-text opacity-75">
-          {t("navigation.investor_panel") || "Investor Panel"}
-        </p>
+    <div className="flex h-full flex-col px-5 py-6">
+      <div className="border-b border-day-border/70 pb-6 dark:border-night-border/70">
+        <SidebarLogo subtitle="Investor workspace" />
       </div>
 
-      <SidebarNav items={menuItems} />
+      <div className="flex-1 overflow-y-auto py-6">
+        <SidebarNav items={menuItems} />
+      </div>
 
-      <div className="mt-auto pt-6 border-t border-day-border dark:border-night-border">
+      <div className="border-t border-day-border/70 pt-5 dark:border-night-border/70">
         <UserCard user={user} onLogout={onLogout} />
       </div>
     </div>

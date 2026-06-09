@@ -61,13 +61,16 @@ const LocationMap = ({ property, t }) => {
   const externalMapUrl = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`;
 
   return (
-    <div className="bg-day-surface dark:bg-night-surface rounded-lg shadow-lg p-6">
-      <div className="flex items-start justify-between gap-4 mb-4">
+    <div className="shell-surface px-6 py-6 sm:px-7">
+      <div className="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-lg font-semibold text-day-text dark:text-night-text">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+            Location context
+          </p>
+          <h3 className="mt-3 text-2xl font-semibold text-day-text dark:text-night-text">
             {translate("properties.location", "Location")}
           </h3>
-          <div className="mt-2 flex items-start gap-2 text-day-text/70 dark:text-night-text/70">
+          <div className="mt-3 flex items-start gap-2 text-day-muted dark:text-night-muted">
             <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
             <span>{displayAddress}</span>
           </div>
@@ -77,7 +80,7 @@ const LocationMap = ({ property, t }) => {
           href={externalMapUrl}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-2 rounded-lg border border-day-border dark:border-night-border px-3 py-2 text-sm text-day-primary dark:text-night-primary hover:bg-day-background dark:hover:bg-night-dashboard transition-colors"
+          className="inline-flex items-center gap-2 rounded-2xl border border-day-border dark:border-night-border px-3 py-2 text-sm text-day-primary transition-colors hover:bg-day-panel/60 dark:text-night-primary dark:hover:bg-night-panel/60"
         >
           <Navigation className="w-4 h-4" />
           {translate("properties.open_in_map", "Open map")}
@@ -86,10 +89,10 @@ const LocationMap = ({ property, t }) => {
 
       <div
         ref={containerRef}
-        className="relative z-0 h-80 w-full rounded-2xl border border-day-border dark:border-night-border overflow-hidden"
+        className="relative z-0 h-80 w-full overflow-hidden rounded-[24px] border border-day-border/80 dark:border-night-border/80"
       />
 
-      <div className="mt-3 text-xs text-day-text/55 dark:text-night-text/55">
+      <div className="mt-3 text-xs text-day-muted dark:text-night-muted">
         {lat.toFixed(6)}, {lng.toFixed(6)}
       </div>
     </div>

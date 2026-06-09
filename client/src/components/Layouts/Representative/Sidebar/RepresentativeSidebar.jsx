@@ -1,22 +1,20 @@
 import React from "react";
 import SidebarNav from "../../common/Sidebar/SidebarNav";
 import UserCard from "../../common/Sidebar/UserCard";
+import SidebarLogo from "../../common/Sidebar/SidebarLogo";
 
 const RepresentativeSidebar = ({ menuItems, user, onLogout }) => {
   return (
-    <div className="flex h-full flex-col p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-day-primary dark:text-night-primary">
-          EstateLink
-        </h2>
-        <p className="mt-1 text-sm text-day-text opacity-75 dark:text-night-text">
-          Local Representative Panel
-        </p>
+    <div className="flex h-full flex-col px-5 py-6">
+      <div className="border-b border-day-border/70 pb-6 dark:border-night-border/70">
+        <SidebarLogo subtitle="Representative workspace" />
       </div>
 
-      <SidebarNav items={menuItems} />
+      <div className="flex-1 overflow-y-auto py-6">
+        <SidebarNav items={menuItems} />
+      </div>
 
-      <div className="mt-auto border-t border-day-border pt-6 dark:border-night-border">
+      <div className="border-t border-day-border/70 pt-5 dark:border-night-border/70">
         <UserCard user={user} onLogout={onLogout} />
       </div>
     </div>

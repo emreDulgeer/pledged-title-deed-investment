@@ -1,702 +1,690 @@
-// src/components/Dashboards/OwnerDashboard.jsx
-import React, { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Building2,
+  CircleDollarSign,
+  ClipboardList,
+  FilePlus2,
+  Landmark,
+  MapPin,
+  ReceiptText,
+  RefreshCw,
+  ShieldCheck,
+  WalletCards,
+} from "lucide-react";
+
 import { selectUser } from "../../store/slices/authSlice";
 import bridge from "../../controllers/bridge";
+import {
+  getPrimaryPropertyImage,
+  getPropertyImageStyle,
+  getPropertyImageUrl,
+} from "../../utils/propertyImages";
 import { APP_CURRENCY } from "../../utils/currency";
 
-// ── Sabit yardımcılar ─────────────────────────────────────────────────────────
-
-const STATUS_COLORS = {
-  draft: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300",
+const STATUS_STYLES = {
+  draft:
+    "bg-slate-200 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200",
   published:
-    "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200",
   in_contract:
-    "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  sold: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
-  suspended: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+    "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-200",
+  active:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200",
+  sold: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-200",
+  suspended:
+    "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200",
   archived:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
 };
 
-const PAYMENT_STATUS_COLORS = {
-  pending: "text-yellow-600 dark:text-yellow-400",
-  paid: "text-green-600 dark:text-green-400",
-  delayed: "text-red-600 dark:text-red-400",
+const PAYMENT_STATUS_STYLES = {
+  pending:
+    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
+  paid: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200",
+  delayed:
+    "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200",
 };
 
-const fmt = (num, currency = APP_CURRENCY) =>
-  `${(num ?? 0).toLocaleString("en-US")}${currency ? " " + currency : ""}`;
+const formatAmount = (value, currency = APP_CURRENCY) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
 
-const formatDate = (str) =>
-  str
-    ? new Date(str).toLocaleDateString("en-US", {
-        day: "2-digit",
-        month: "short",
+const formatDate = (value) => {
+  if (!value) return "—";
+
+  try {
+    return new Date(value).toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "—";
+  }
+};
+
+const formatMonthLabel = (value) => {
+  if (!value) return "Pending schedule";
+
+  if (/^\d{4}-\d{2}$/.test(value)) {
+    const date = new Date(`${value}-01T00:00:00`);
+    if (!Number.isNaN(date.getTime())) {
+      return new Intl.DateTimeFormat("en-US", {
+        month: "long",
         year: "numeric",
-      })
-    : "—";
+      }).format(date);
+    }
+  }
 
-// ── Alt bileşenler ────────────────────────────────────────────────────────────
+  return formatDate(value) === "—" ? value : formatDate(value);
+};
 
-/** Tek istatistik kartı */
-const StatCard = ({ label, value, sub, iconBg, icon }) => (
-  <div className="rounded-xl shadow-sm p-5 bg-day-surface dark:bg-night-surface border border-day-border dark:border-night-border flex items-center gap-4">
-    <div className={`p-3 rounded-lg shrink-0 ${iconBg}`}>{icon}</div>
-    <div className="min-w-0">
-      <p className="text-sm font-medium text-day-text/70 dark:text-night-text/70 truncate">
-        {label}
-      </p>
-      <p className="text-2xl font-bold text-day-text dark:text-night-text leading-tight">
-        {value}
-      </p>
-      {sub && (
-        <p className="text-xs text-day-text/50 dark:text-night-text/50 mt-0.5">
-          {sub}
+const formatKeyLabel = (value = "") =>
+  String(value)
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || "Unknown";
+
+const getStatusClass = (status) =>
+  STATUS_STYLES[status] || STATUS_STYLES.draft;
+
+const getPaymentStatusClass = (status) =>
+  PAYMENT_STATUS_STYLES[status] || PAYMENT_STATUS_STYLES.pending;
+
+const getPropertyId = (property) => property?._id || property?.id || "";
+
+const getPropertyTitle = (property) =>
+  property?.title ||
+  property?.fullAddress ||
+  [property?.city, property?.country].filter(Boolean).join(", ") ||
+  "Property";
+
+const getPropertyLocation = (property) =>
+  [property?.city, property?.country].filter(Boolean).join(", ") ||
+  property?.fullAddress ||
+  "Location pending";
+
+const getPaymentPropertyLabel = (payment) =>
+  payment?.property?.title ||
+  [payment?.property?.city, payment?.property?.country]
+    .filter(Boolean)
+    .join(", ") ||
+  "Payment";
+
+const getPaymentInvestmentId = (payment) =>
+  payment?.investment?.id ||
+  payment?.investment?._id ||
+  payment?.investmentId ||
+  "";
+
+const SummaryCard = ({ label, value, helpText = "", icon: Icon, accentClass = "" }) => (
+  <div className="shell-subtle-surface px-4 py-4">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-day-muted dark:text-night-muted">
+          {label}
         </p>
-      )}
+        <p
+          className={`mt-3 text-2xl font-semibold text-day-text dark:text-night-text ${accentClass}`.trim()}
+        >
+          {value}
+        </p>
+        {helpText ? (
+          <p className="mt-2 text-sm leading-6 text-day-muted dark:text-night-muted">
+            {helpText}
+          </p>
+        ) : null}
+      </div>
+
+      {Icon ? (
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-day-surface text-day-primary dark:bg-night-surface dark:text-night-primary">
+          <Icon className="h-5 w-5" strokeWidth={2.1} />
+        </div>
+      ) : null}
     </div>
   </div>
 );
 
-/** Skeleton satır */
-const SkeletonRow = ({ cols = 4 }) => (
-  <tr className="animate-pulse">
-    {Array.from({ length: cols }).map((_, i) => (
-      <td key={i} className="px-4 py-3">
-        <div className="h-4 rounded bg-day-border dark:bg-night-border" />
-      </td>
-    ))}
-  </tr>
+const LoadingBlock = ({ className = "h-32" }) => (
+  <div
+    className={`shell-surface animate-pulse bg-day-panel/60 dark:bg-night-panel/60 ${className}`.trim()}
+  />
 );
 
-/** Boş tablo mesajı */
-const EmptyRow = ({ cols, message }) => (
-  <tr>
-    <td
-      colSpan={cols}
-      className="px-4 py-10 text-center text-sm text-day-text/50 dark:text-night-text/50"
+const EmptyState = ({ title, copy, actionLabel, onAction }) => (
+  <div className="px-6 py-12 text-center">
+    <div className="mx-auto grid h-14 w-14 place-items-center rounded-3xl bg-day-panel text-day-primary dark:bg-night-panel dark:text-night-primary">
+      <Landmark className="h-6 w-6" strokeWidth={2} />
+    </div>
+    <h3 className="mt-5 text-xl font-semibold text-day-text dark:text-night-text">
+      {title}
+    </h3>
+    <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-day-muted dark:text-night-muted">
+      {copy}
+    </p>
+    {actionLabel ? (
+      <button
+        type="button"
+        onClick={onAction}
+        className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-day-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-day-primary-dark dark:bg-night-primary dark:text-night-background dark:hover:bg-night-primary-dark"
+      >
+        {actionLabel}
+        <ArrowRight className="h-4 w-4" strokeWidth={2.1} />
+      </button>
+    ) : null}
+  </div>
+);
+
+const PropertyRow = ({ property, onOpen }) => {
+  const image = getPrimaryPropertyImage(property);
+  const imageUrl = getPropertyImageUrl(image);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group shell-subtle-surface w-full px-4 py-4 text-left transition hover:-translate-y-0.5 hover:shadow-shell"
     >
-      {message}
-    </td>
-  </tr>
-);
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[24px] bg-day-panel dark:bg-night-panel">
+            {imageUrl ? (
+              <img
+                src={imageUrl}
+                alt={getPropertyTitle(property)}
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                style={getPropertyImageStyle(image)}
+              />
+            ) : (
+              <div className="grid h-full w-full place-items-center text-day-primary/35 dark:text-night-primary/35">
+                <Building2 className="h-8 w-8" strokeWidth={1.8} />
+              </div>
+            )}
+          </div>
 
-// ── Ana bileşen ───────────────────────────────────────────────────────────────
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getStatusClass(
+                  property.status,
+                )}`}
+              >
+                {formatKeyLabel(property.status || "draft")}
+              </span>
+              <span className="rounded-full bg-day-surface px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-day-primary dark:bg-night-surface dark:text-night-primary">
+                {formatKeyLabel(property.propertyType || "property")}
+              </span>
+            </div>
+
+            <h3 className="mt-3 text-lg font-semibold text-day-text dark:text-night-text">
+              {getPropertyTitle(property)}
+            </h3>
+            <div className="mt-2 flex items-start gap-2 text-sm text-day-muted dark:text-night-muted">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
+              <span>{getPropertyLocation(property)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[300px]">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-day-muted dark:text-night-muted">
+              Estimated value
+            </p>
+            <p className="mt-2 text-sm font-semibold text-day-text dark:text-night-text">
+              {property.estimatedValue ? formatAmount(property.estimatedValue) : "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-day-muted dark:text-night-muted">
+              Listed capital
+            </p>
+            <p className="mt-2 text-sm font-semibold text-day-text dark:text-night-text">
+              {property.requestedInvestment
+                ? formatAmount(property.requestedInvestment)
+                : "—"}
+            </p>
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+};
+
+const PaymentRow = ({ payment, onOpen }) => (
+  <button
+    type="button"
+    onClick={onOpen}
+    disabled={!getPaymentInvestmentId(payment)}
+    className="shell-subtle-surface flex w-full flex-col gap-4 px-4 py-4 text-left transition hover:-translate-y-0.5 hover:shadow-shell disabled:cursor-default disabled:hover:translate-y-0 disabled:hover:shadow-none sm:flex-row sm:items-center sm:justify-between"
+  >
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-sm font-semibold text-day-text dark:text-night-text">
+          {getPaymentPropertyLabel(payment)}
+        </p>
+        <span
+          className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getPaymentStatusClass(
+            payment.status,
+          )}`}
+        >
+          {formatKeyLabel(payment.status || "pending")}
+        </span>
+      </div>
+      <p className="mt-2 text-sm text-day-muted dark:text-night-muted">
+        {formatMonthLabel(payment.month || payment.createdAt)} · Settled{" "}
+        {payment.paidAt ? formatDate(payment.paidAt) : "—"}
+      </p>
+    </div>
+
+    <p className="text-base font-semibold text-day-text dark:text-night-text">
+      {formatAmount(payment.amount)}
+    </p>
+  </button>
+);
 
 const OwnerDashboard = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const user = useSelector(selectUser);
 
-  // State
   const [stats, setStats] = useState(null);
   const [recentProperties, setRecentProperties] = useState([]);
   const [recentPayments, setRecentPayments] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [loadingProps, setLoadingProps] = useState(true);
   const [loadingPayments, setLoadingPayments] = useState(true);
+  const [errors, setErrors] = useState([]);
 
-  // Veri çekme fonksiyonları
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     setLoadingStats(true);
     try {
-      const res = await bridge.properties.getMyPropertiesStatistics();
-      if (res?.success) setStats(res.data);
-    } catch (e) {
-      console.error("Owner stats error:", e);
+      const response = await bridge.properties.getMyPropertiesStatistics();
+      if (response?.success) {
+        setStats(response.data);
+      }
+    } catch (error) {
+      console.error("Owner stats error:", error);
+      setErrors((current) => [
+        ...current.filter((item) => item !== "stats"),
+        "stats",
+      ]);
     } finally {
       setLoadingStats(false);
     }
-  };
+  }, []);
 
-  const fetchRecentProperties = async () => {
+  const fetchRecentProperties = useCallback(async () => {
     setLoadingProps(true);
     try {
-      const res = await bridge.properties.getMyProperties({
+      const response = await bridge.properties.getMyProperties({
         limit: 6,
         sortBy: "createdAt",
         sortOrder: "desc",
       });
-      if (res?.success) setRecentProperties(res.data ?? []);
-    } catch (e) {
-      console.error("Owner properties error:", e);
+      if (response?.success) {
+        setRecentProperties(response.data ?? []);
+      }
+    } catch (error) {
+      console.error("Owner properties error:", error);
+      setErrors((current) => [
+        ...current.filter((item) => item !== "properties"),
+        "properties",
+      ]);
     } finally {
       setLoadingProps(false);
     }
-  };
+  }, []);
 
-  const fetchRecentPayments = async () => {
+  const fetchRecentPayments = useCallback(async () => {
     setLoadingPayments(true);
     try {
-      const res = await bridge.investments.getPropertyOwnerRentalPayments({
+      const response = await bridge.investments.getPropertyOwnerRentalPayments({
         limit: 5,
         sortBy: "month",
         sortOrder: "desc",
       });
-      if (res?.success) setRecentPayments(res.data ?? []);
-    } catch (e) {
-      console.error("Owner rental payments error:", e);
+      if (response?.success) {
+        setRecentPayments(response.data ?? []);
+      }
+    } catch (error) {
+      console.error("Owner rental payments error:", error);
+      setErrors((current) => [
+        ...current.filter((item) => item !== "payments"),
+        "payments",
+      ]);
     } finally {
       setLoadingPayments(false);
     }
-  };
-
-  const handleRefresh = () => {
-    fetchStats();
-    fetchRecentProperties();
-    fetchRecentPayments();
-  };
-
-  useEffect(() => {
-    fetchStats();
-    fetchRecentProperties();
-    fetchRecentPayments();
   }, []);
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  const handleRefresh = useCallback(() => {
+    setErrors([]);
+    fetchStats();
+    fetchRecentProperties();
+    fetchRecentPayments();
+  }, [fetchRecentPayments, fetchRecentProperties, fetchStats]);
+
+  useEffect(() => {
+    handleRefresh();
+  }, [handleRefresh]);
+
+  const paymentSummary = useMemo(() => {
+    const paid = recentPayments.filter((payment) => payment.status === "paid");
+    const pending = recentPayments.filter(
+      (payment) => payment.status === "pending",
+    );
+    const delayed = recentPayments.filter(
+      (payment) => payment.status === "delayed",
+    );
+
+    return {
+      paidAmount: paid.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+      pendingCount: pending.length,
+      delayedCount: delayed.length,
+    };
+  }, [recentPayments]);
+
+  const activeListingCount = stats?.publishedProperties ?? 0;
+  const contractCount = stats?.propertiesInContract ?? 0;
+  const ownerName =
+    user?.fullName ||
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+    user?.email ||
+    "Owner";
+
   return (
-    <div className="p-6 min-h-screen bg-day-dashboard dark:bg-night-dashboard text-day-text dark:text-night-text">
-      {/* ── Create Property Banner (en üst, her zaman görünür) ── */}
-      <div className="mb-6 flex items-center justify-between gap-4 px-5 py-4 rounded-xl bg-gradient-to-r from-day-primary to-day-secondary dark:from-night-primary dark:to-night-secondary shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-white/20">
-            <svg
-              className="w-6 h-6 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"
-              />
-              <polyline
-                points="9 22 9 12 15 12 15 22"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-              />
-            </svg>
-          </div>
-          <div>
-            <p className="text-white font-semibold text-sm">
-              {t("owner.list_property_cta") || "List a new property"}
-            </p>
-            <p className="text-white/70 text-xs">
-              {t("owner.list_property_sub") ||
-                "Reach thousands of international investors on EstateLink"}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={() => navigate("/owner/properties/new")}
-          className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-white text-day-primary dark:text-night-primary text-sm font-bold hover:bg-white/90 transition-opacity shadow"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2.5}
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-          {t("owner.add_property") || "Add Property"}
-        </button>
-      </div>
-
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold">
-            {t("owner.dashboard") || "Property Owner Dashboard"}
-          </h1>
-          <p className="mt-1 text-sm text-day-text/60 dark:text-night-text/60">
-            {t("owner.welcome") || "Welcome back"},{" "}
-            <span className="font-medium text-day-text dark:text-night-text">
-              {user?.fullName || user?.email || ""}
+    <div className="space-y-6 p-4 sm:p-6 xl:p-8">
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_340px]">
+        <div className="shell-surface flex h-full flex-col justify-between px-6 py-7 sm:px-8">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="rounded-full border border-day-border/70 bg-day-surface px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-day-primary dark:border-night-border/70 dark:bg-night-surface dark:text-night-primary">
+              Owner workspace
             </span>
+            <span className="rounded-full border border-day-border/70 bg-day-panel/70 px-3 py-1 text-xs font-medium text-day-muted dark:border-night-border/70 dark:bg-night-panel/70 dark:text-night-muted">
+              Asset operations
+            </span>
+          </div>
+
+          <div className="mt-6 max-w-3xl">
+            <h1 className="text-4xl font-semibold tracking-tight text-day-text dark:text-night-text sm:text-5xl">
+              {t("owner.dashboard", "Property Owner Dashboard")}
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-day-muted dark:text-night-muted">
+              Welcome back,{" "}
+              <span className="font-semibold text-day-text dark:text-night-text">
+                {ownerName}
+              </span>
+              . Monitor listed assets, active contract movement, and rental
+              payment flow from one operational surface.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryCard
+              label={t("owner.total_properties", "Total properties")}
+              value={loadingStats ? "—" : (stats?.totalProperties ?? 0)}
+              helpText={t("owner.all_time", "All time")}
+              icon={Building2}
+            />
+            <SummaryCard
+              label={t("owner.published_properties", "Published")}
+              value={loadingStats ? "—" : activeListingCount}
+              helpText={t("owner.active_listings", "Active listings")}
+              icon={BadgeCheck}
+              accentClass="text-emerald-600 dark:text-emerald-300"
+            />
+            <SummaryCard
+              label={t("owner.in_contract", "In contract")}
+              value={loadingStats ? "—" : contractCount}
+              helpText={t("owner.active_contracts", "Active contracts")}
+              icon={ClipboardList}
+            />
+            <SummaryCard
+              label={t("owner.total_value", "Portfolio value")}
+              value={loadingStats ? "—" : formatAmount(stats?.totalValue)}
+              helpText={t("owner.estimated_value", "Estimated total")}
+              icon={CircleDollarSign}
+            />
+          </div>
+        </div>
+
+        <aside className="shell-surface flex h-full flex-col px-6 py-7 sm:px-7">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-day-muted dark:text-night-muted">
+                Primary actions
+              </p>
+              <h2 className="mt-3 text-2xl font-semibold text-day-text dark:text-night-text">
+                Move the portfolio
+              </h2>
+            </div>
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-day-panel text-day-primary dark:bg-night-panel dark:text-night-primary">
+              <FilePlus2 className="h-5 w-5" strokeWidth={2.2} />
+            </div>
+          </div>
+
+          <p className="mt-4 text-sm leading-6 text-day-muted dark:text-night-muted">
+            Add a new asset, review investor offers, or refresh the latest asset
+            and rental payment data.
           </p>
-        </div>
 
-        <div className="flex gap-2">
-          {/* Yenile */}
-          <button
-            onClick={handleRefresh}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-day-border dark:border-night-border text-sm font-medium hover:bg-day-surface dark:hover:bg-night-surface transition-colors"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-            {t("common.refresh") || "Refresh"}
-          </button>
-
-          {/* Mülk ekle - header içinde de kalsın (ikincil) */}
-          <button
-            onClick={() => navigate("/owner/properties/new")}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-day-primary dark:bg-night-primary text-white text-sm font-medium hover:opacity-90 transition-opacity"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
-            {t("owner.add_property") || "Add Property"}
-          </button>
-        </div>
-      </div>
-
-      {/* ── İstatistik Kartları ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          label={t("owner.total_properties") || "Total Properties"}
-          value={loadingStats ? "—" : (stats?.totalProperties ?? 0)}
-          sub={t("owner.all_time") || "All time"}
-          iconBg="bg-day-primary-light/20 dark:bg-night-primary/20"
-          icon={
-            <svg
-              className="w-6 h-6 text-day-primary dark:text-night-primary"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2.25}
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-              />
-            </svg>
-          }
-        />
-
-        <StatCard
-          label={t("owner.published_properties") || "Published"}
-          value={loadingStats ? "—" : (stats?.publishedProperties ?? 0)}
-          sub={t("owner.active_listings") || "Active listings"}
-          iconBg="bg-green-100 dark:bg-green-900/20"
-          icon={
-            <svg
-              className="w-6 h-6 text-green-600 dark:text-green-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2.25}
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          }
-        />
-
-        <StatCard
-          label={t("owner.in_contract") || "In Contract"}
-          value={loadingStats ? "—" : (stats?.propertiesInContract ?? 0)}
-          sub={t("owner.active_contracts") || "Active contracts"}
-          iconBg="bg-day-secondary-light/20 dark:bg-night-secondary/20"
-          icon={
-            <svg
-              className="w-6 h-6 text-day-secondary dark:text-night-secondary"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2.25}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-          }
-        />
-
-        <StatCard
-          label={t("owner.total_value") || "Portfolio Value"}
-          value={loadingStats ? "—" : fmt(stats?.totalValue)}
-          sub={t("owner.estimated_value") || "Estimated total"}
-          iconBg="bg-day-accent-light/20 dark:bg-night-accent/20"
-          icon={
-            <svg
-              className="w-6 h-6 text-day-accent dark:text-night-accent"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2.25}
-                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          }
-        />
-      </div>
-
-      {/* ── İki kolon alt bölüm ── */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* ── Son Mülklerim ── */}
-        <div className="rounded-xl shadow-sm bg-day-surface dark:bg-night-surface border border-day-border dark:border-night-border overflow-hidden">
-          {/* Başlık */}
-          <div className="px-6 py-4 border-b border-day-border dark:border-night-border flex items-center justify-between">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <svg
-                className="w-5 h-5 text-day-primary dark:text-night-primary"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.25}
-                  d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                />
-              </svg>
-              {t("owner.my_properties") || "My Properties"}
-            </h2>
+          <div className="mt-6 space-y-3">
             <button
-              onClick={() => navigate("/owner/properties")}
-              className="text-sm font-medium text-day-primary dark:text-night-primary hover:opacity-75 transition-opacity"
+              type="button"
+              onClick={() => navigate("/owner/properties/new")}
+              className="inline-flex w-full items-center justify-between rounded-2xl bg-day-primary px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-day-primary-dark dark:bg-night-primary dark:text-night-background dark:hover:bg-night-primary-dark"
             >
-              {t("common.view_all") || "View All"} →
+              <span>{t("owner.add_property", "Add property")}</span>
+              <ArrowRight className="h-4 w-4" strokeWidth={2.2} />
             </button>
-          </div>
 
-          {/* Tablo */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-day-background dark:bg-night-background text-day-text/60 dark:text-night-text/60">
-                  <th className="px-4 py-3 text-left font-medium">
-                    {t("owner.property") || "Property"}
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium">
-                    {t("common.type") || "Type"}
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium">
-                    {t("common.status") || "Status"}
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium">
-                    {t("owner.value") || "Value"}
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium">
-                    {t("common.actions") || "Actions"}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-day-border dark:divide-night-border">
-                {loadingProps ? (
-                  <>
-                    <SkeletonRow cols={5} />
-                    <SkeletonRow cols={5} />
-                    <SkeletonRow cols={5} />
-                  </>
-                ) : recentProperties.length === 0 ? (
-                  <EmptyRow
-                    cols={5}
-                    message={
-                      t("owner.no_properties") ||
-                      "No properties found. Add your first one!"
-                    }
-                  />
-                ) : (
-                  recentProperties.map((prop) => (
-                    <tr
-                      key={prop._id || prop.id}
-                      className="hover:bg-day-background/60 dark:hover:bg-night-background/40 transition-colors"
-                    >
-                      {/* Property */}
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-day-text dark:text-night-text truncate max-w-[160px]">
-                          {prop.title ||
-                            prop.fullAddress ||
-                            `${prop.city}, ${prop.country}`}
-                        </p>
-                        <p className="text-xs text-day-text/50 dark:text-night-text/50">
-                          {prop.city}, {prop.country}
-                        </p>
-                      </td>
-
-                      {/* Type */}
-                      <td className="px-4 py-3 capitalize text-day-text/70 dark:text-night-text/70">
-                        {prop.propertyType || "—"}
-                      </td>
-
-                      {/* Status */}
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[prop.status] || STATUS_COLORS.draft}`}
-                        >
-                          {prop.status?.replace("_", " ") || "draft"}
-                        </span>
-                      </td>
-
-                      {/* Value */}
-                      <td className="px-4 py-3 font-medium text-day-text dark:text-night-text">
-                        {prop.estimatedValue
-                          ? fmt(prop.estimatedValue, APP_CURRENCY)
-                          : "—"}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() =>
-                            navigate(`/owner/properties/${prop._id || prop.id}`)
-                          }
-                          className="text-day-primary dark:text-night-primary hover:opacity-75 text-xs font-medium transition-opacity"
-                        >
-                          {t("common.view") || "View"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* ── Son Kira Ödemeleri ── */}
-        <div className="rounded-xl shadow-sm bg-day-surface dark:bg-night-surface border border-day-border dark:border-night-border overflow-hidden">
-          {/* Başlık */}
-          <div className="px-6 py-4 border-b border-day-border dark:border-night-border flex items-center justify-between">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <svg
-                className="w-5 h-5 text-day-accent dark:text-night-accent"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.25}
-                  d="M9 14h6m-6-4h6M7 21l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1-2-1-2 1v18z"
-                />
-              </svg>
-              {t("owner.rental_payments") || "Rental Payments"}
-            </h2>
             <button
+              type="button"
+              onClick={() => navigate("/owner/offers")}
+              className="inline-flex w-full items-center justify-between rounded-2xl border border-day-border bg-day-surface px-4 py-3 text-sm font-semibold text-day-text transition hover:bg-day-panel/60 dark:border-night-border dark:bg-night-surface dark:text-night-text dark:hover:bg-night-panel/60"
+            >
+              <span>{t("owner.view_offers", "View offers")}</span>
+              <ClipboardList className="h-4 w-4" strokeWidth={2.1} />
+            </button>
+
+            <button
+              type="button"
               onClick={() => navigate("/owner/rental-payments")}
-              className="text-sm font-medium text-day-primary dark:text-night-primary hover:opacity-75 transition-opacity"
+              className="inline-flex w-full items-center justify-between rounded-2xl border border-day-border bg-day-surface px-4 py-3 text-sm font-semibold text-day-text transition hover:bg-day-panel/60 dark:border-night-border dark:bg-night-surface dark:text-night-text dark:hover:bg-night-panel/60"
             >
-              {t("common.view_all") || "View All"} →
+              <span>{t("owner.rental_payments", "Rental payments")}</span>
+              <ReceiptText className="h-4 w-4" strokeWidth={2.1} />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="inline-flex w-full items-center justify-between rounded-2xl border border-day-border bg-day-surface px-4 py-3 text-sm font-semibold text-day-text transition hover:bg-day-panel/60 dark:border-night-border dark:bg-night-surface dark:text-night-text dark:hover:bg-night-panel/60"
+            >
+              <span>{t("common.refresh", "Refresh")}</span>
+              <RefreshCw
+                className={`h-4 w-4 ${
+                  loadingStats || loadingProps || loadingPayments ? "animate-spin" : ""
+                }`}
+                strokeWidth={2.2}
+              />
             </button>
           </div>
 
-          {/* Liste */}
-          <div className="divide-y divide-day-border dark:divide-night-border">
-            {loadingPayments ? (
-              // Skeleton kartlar
-              Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="px-6 py-4 flex items-center justify-between animate-pulse"
-                >
-                  <div className="space-y-2 flex-1">
-                    <div className="h-4 w-40 rounded bg-day-border dark:bg-night-border" />
-                    <div className="h-3 w-24 rounded bg-day-border dark:bg-night-border" />
-                  </div>
-                  <div className="h-4 w-16 rounded bg-day-border dark:bg-night-border" />
-                </div>
-              ))
-            ) : recentPayments.length === 0 ? (
-              <div className="px-6 py-10 text-center text-sm text-day-text/50 dark:text-night-text/50">
-                {t("owner.no_payments") || "No rental payments yet."}
-              </div>
+          <div className="mt-6 grid gap-3">
+            <SummaryCard
+              label="Recent rent received"
+              value={formatAmount(paymentSummary.paidAmount)}
+              helpText="Loaded from the latest owner payment records."
+              icon={WalletCards}
+              accentClass="text-emerald-600 dark:text-emerald-300"
+            />
+            <SummaryCard
+              label="Payment exceptions"
+              value={paymentSummary.delayedCount}
+              helpText={`${paymentSummary.pendingCount} pending payment${paymentSummary.pendingCount === 1 ? "" : "s"} in the same slice.`}
+              icon={ShieldCheck}
+              accentClass={
+                paymentSummary.delayedCount > 0
+                  ? "text-rose-700 dark:text-rose-300"
+                  : ""
+              }
+            />
+          </div>
+        </aside>
+      </section>
+
+      {errors.length > 0 ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+          Some dashboard data could not be refreshed. The available sections are
+          still shown below.
+        </div>
+      ) : null}
+
+      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+        <div className="shell-surface overflow-hidden">
+          <div className="flex flex-col gap-4 border-b border-day-border/70 px-6 py-5 dark:border-night-border/70 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+                Asset pipeline
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold text-day-text dark:text-night-text">
+                {t("owner.my_properties", "My properties")}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/owner/properties")}
+              className="inline-flex items-center gap-2 rounded-full border border-day-border px-4 py-2 text-sm font-semibold text-day-primary transition hover:bg-day-panel/60 dark:border-night-border dark:text-night-primary dark:hover:bg-night-panel/60"
+            >
+              {t("common.view_all", "View all")}
+              <ArrowRight className="h-4 w-4" strokeWidth={2.1} />
+            </button>
+          </div>
+
+          <div className="space-y-3 px-5 py-5">
+            {loadingProps ? (
+              <>
+                <LoadingBlock className="h-32" />
+                <LoadingBlock className="h-32" />
+                <LoadingBlock className="h-32" />
+              </>
+            ) : recentProperties.length === 0 ? (
+              <EmptyState
+                title={t("owner.no_properties", "No properties found")}
+                copy="Create your first property record to start collecting investor interest and operational history."
+                actionLabel={t("owner.add_property", "Add property")}
+                onAction={() => navigate("/owner/properties/new")}
+              />
             ) : (
-              recentPayments.map((payment, idx) => (
-                <div
-                  key={payment._id || payment.id || idx}
-                  className="px-6 py-4 flex items-center justify-between hover:bg-day-background/60 dark:hover:bg-night-background/40 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    {/* Durum noktası */}
-                    <span
-                      className={`w-2 h-2 rounded-full shrink-0 ${
-                        payment.status === "paid"
-                          ? "bg-green-500"
-                          : payment.status === "delayed"
-                            ? "bg-red-500"
-                            : "bg-yellow-500"
-                      }`}
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-day-text dark:text-night-text">
-                        {payment.property?.city
-                          ? `${payment.property.city}, ${payment.property.country}`
-                          : t("owner.payment") || "Payment"}
-                      </p>
-                      <p className="text-xs text-day-text/50 dark:text-night-text/50">
-                        {payment.month || formatDate(payment.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-day-text dark:text-night-text">
-                      {fmt(payment.amount, APP_CURRENCY)}
-                    </p>
-                    <p
-                      className={`text-xs font-medium capitalize ${PAYMENT_STATUS_COLORS[payment.status] || PAYMENT_STATUS_COLORS.pending}`}
-                    >
-                      {payment.status || "pending"}
-                    </p>
-                  </div>
-                </div>
+              recentProperties.map((property) => (
+                <PropertyRow
+                  key={getPropertyId(property)}
+                  property={property}
+                  onOpen={() =>
+                    navigate(`/owner/properties/${getPropertyId(property)}`)
+                  }
+                />
               ))
             )}
           </div>
         </div>
-      </div>
 
-      {/* ── Hızlı Aksiyonlar ── */}
-      <div className="mt-6 rounded-xl shadow-sm bg-day-surface dark:bg-night-surface border border-day-border dark:border-night-border p-6">
-        <h2 className="text-lg font-semibold mb-4">
-          {t("owner.quick_actions") || "Quick Actions"}
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <QuickAction
-            label={t("owner.add_property") || "Add Property"}
-            onClick={() => navigate("/owner/properties/new")}
-            iconColor="text-day-primary dark:text-night-primary"
-            icon={
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+        <div className="space-y-6">
+          <div className="shell-surface overflow-hidden">
+            <div className="flex items-center justify-between gap-4 border-b border-day-border/70 px-6 py-5 dark:border-night-border/70">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+                  Rental ledger
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-day-text dark:text-night-text">
+                  {t("owner.rental_payments", "Rental payments")}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate("/owner/rental-payments")}
+                className="inline-flex items-center gap-2 rounded-full border border-day-border px-4 py-2 text-sm font-semibold text-day-primary transition hover:bg-day-panel/60 dark:border-night-border dark:text-night-primary dark:hover:bg-night-panel/60"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-            }
-          />
+                {t("common.view_all", "View all")}
+              </button>
+            </div>
 
-          <QuickAction
-            label={t("owner.view_offers") || "View Offers"}
-            onClick={() => navigate("/owner/offers")}
-            iconColor="text-day-secondary dark:text-night-secondary"
-            icon={
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+            <div className="space-y-3 px-5 py-5">
+              {loadingPayments ? (
+                <>
+                  <LoadingBlock className="h-24" />
+                  <LoadingBlock className="h-24" />
+                  <LoadingBlock className="h-24" />
+                </>
+              ) : recentPayments.length === 0 ? (
+                <EmptyState
+                  title={t("owner.no_payments", "No rental payments yet")}
+                  copy="Incoming rental payment lines will appear here once active investments begin producing rent."
+                  actionLabel={t("owner.rental_payments", "Rental payments")}
+                  onAction={() => navigate("/owner/rental-payments")}
                 />
-              </svg>
-            }
-          />
+              ) : (
+                recentPayments.map((payment, index) => (
+                  <PaymentRow
+                    key={payment._id || payment.id || `${payment.month}-${index}`}
+                    payment={payment}
+                    onOpen={() => {
+                      const investmentId = getPaymentInvestmentId(payment);
+                      if (investmentId) {
+                        navigate(`/owner/investments/${investmentId}`);
+                      }
+                    }}
+                  />
+                ))
+              )}
+            </div>
+          </div>
 
-          <QuickAction
-            label={t("owner.rental_payments") || "Rental Payments"}
-            onClick={() => navigate("/owner/rental-payments")}
-            iconColor="text-day-accent dark:text-night-accent"
-            icon={
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+          <div className="shell-surface px-6 py-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+              Next steps
+            </p>
+            <h2 className="mt-3 text-2xl font-semibold text-day-text dark:text-night-text">
+              Keep listings investor-ready
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-day-muted dark:text-night-muted">
+              Review draft assets, respond to offers, and keep rental payment
+              records up to date so investors see a clean operating history.
+            </p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => navigate("/owner/properties/new")}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-day-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-day-primary-dark dark:bg-night-primary dark:text-night-background dark:hover:bg-night-primary-dark"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 14h6m-6-4h6M7 21l2-1 2 1 2-1 2 1 2-1 2 1V3l-2 1-2-1-2 1-2-1-2 1-2-1-2 1v18z"
-                />
-              </svg>
-            }
-          />
-
-          <QuickAction
-            label={t("navigation.settings") || "Settings"}
-            onClick={() => navigate("/owner/settings")}
-            iconColor="text-gray-500 dark:text-gray-400"
-            icon={
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+                <FilePlus2 className="h-4 w-4" strokeWidth={2.1} />
+                Add asset
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/owner/offers")}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-day-border bg-day-surface px-4 py-3 text-sm font-semibold text-day-text transition hover:bg-day-panel/60 dark:border-night-border dark:bg-night-surface dark:text-night-text dark:hover:bg-night-panel/60"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-            }
-          />
+                <ClipboardList className="h-4 w-4" strokeWidth={2.1} />
+                Offers
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 };
-
-/** Hızlı aksiyon butonu */
-const QuickAction = ({ label, onClick, icon, iconColor }) => (
-  <button
-    onClick={onClick}
-    className="flex flex-col items-center gap-2 p-4 rounded-lg border border-day-border dark:border-night-border hover:bg-day-background dark:hover:bg-night-background transition-colors group"
-  >
-    <span className={`${iconColor} group-hover:scale-110 transition-transform`}>
-      {icon}
-    </span>
-    <span className="text-xs font-medium text-center text-day-text dark:text-night-text">
-      {label}
-    </span>
-  </button>
-);
 
 export default OwnerDashboard;

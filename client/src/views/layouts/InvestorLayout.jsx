@@ -9,7 +9,11 @@ import InvestorSidebar from "../../components/Layouts/Investor/Sidebar/InvestorS
 import InvestorTopbar from "../../components/Layouts/Investor/Topbar/InvestorTopbar";
 
 import { selectUser, logout } from "../../store/slices/authSlice";
-import { toggleSidebar, selectSidebarOpen } from "../../store/slices/uiSlice";
+import {
+  toggleSidebar,
+  selectSidebarOpen,
+  setSidebarOpen,
+} from "../../store/slices/uiSlice";
 
 import { useTheme } from "../../utils/hooks/useTheme";
 import { useLanguage } from "../../utils/hooks/useLanguage";
@@ -75,6 +79,7 @@ const InvestorLayout = () => {
   return (
     <LayoutShell
       sidebarOpen={sidebarOpen}
+      onCloseSidebar={() => dispatch(setSidebarOpen(false))}
       sidebar={
         <InvestorSidebar
           menuItems={menuItems}

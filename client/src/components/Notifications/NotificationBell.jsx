@@ -163,12 +163,12 @@ const NotificationBell = () => {
       {/* Bell */}
       <button
         onClick={handleBellClick}
-        className="relative p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="shell-icon-button relative"
         aria-label="Notifications"
       >
-        <Bell className="w-6 h-6 text-gray-600 dark:text-gray-300" />
+        <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full min-w-[20px]">
+          <span className="absolute right-0 top-0 inline-flex min-w-[20px] translate-x-1/3 -translate-y-1/3 items-center justify-center rounded-full bg-day-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-white dark:bg-night-primary dark:text-night-background">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
@@ -176,16 +176,16 @@ const NotificationBell = () => {
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-96 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-[600px] flex flex-col">
+        <div className="absolute right-0 z-50 mt-2 flex max-h-[600px] w-96 flex-col overflow-hidden rounded-[28px] border border-day-border/80 bg-day-surface shadow-panel dark:border-night-border/80 dark:bg-night-surface">
           {/* Header */}
-          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between flex-shrink-0">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <div className="flex flex-shrink-0 items-center justify-between border-b border-day-border/70 px-4 py-4 dark:border-night-border/70">
+            <h3 className="text-base font-semibold text-day-text dark:text-night-text">
               {t("notifications.title")}
             </h3>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
-                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
+                className="text-sm font-medium text-day-primary transition-colors hover:opacity-80 dark:text-night-primary"
               >
                 {t("notifications.markAllRead")}
               </button>
@@ -196,39 +196,39 @@ const NotificationBell = () => {
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-day-primary dark:border-night-primary"></div>
               </div>
             ) : notifications.length === 0 ? (
-              <div className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                <Bell className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <div className="px-4 py-8 text-center text-day-muted dark:text-night-muted">
+                <Bell className="mx-auto mb-2 h-12 w-12 opacity-50" />
                 <p>{t("notifications.noNotifications")}</p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-200 dark:divide-gray-700">
+              <div className="divide-y divide-day-border/60 dark:divide-night-border/60">
                 {notifications.map((n) => (
                   <div
                     key={n._id || n.id}
                     onClick={() => handleNotificationClick(n)}
-                    className={`px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                      !n.isRead ? "bg-blue-50 dark:bg-blue-900/10" : ""
+                    className={`cursor-pointer px-4 py-3 transition-colors hover:bg-day-panel/65 dark:hover:bg-night-panel/75 ${
+                      !n.isRead ? "bg-day-panel/55 dark:bg-night-panel/60" : ""
                     } ${getPriorityColor(n.priority)}`}
                   >
                     <div className="flex items-start space-x-3">
                       {getNotificationIcon(n.type)}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        <p className="text-sm font-medium text-day-text dark:text-night-text">
                           {n.title}
                         </p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                        <p className="line-clamp-2 text-sm text-day-muted dark:text-night-muted">
                           {n.message}
                         </p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        <p className="mt-1 text-xs text-day-muted/80 dark:text-night-muted/80">
                           {formatTime(n.createdAt)}
                         </p>
                       </div>
                       {!n.isRead && (
                         <div className="flex-shrink-0">
-                          <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                          <div className="h-2 w-2 rounded-full bg-day-primary dark:bg-night-primary"></div>
                         </div>
                       )}
                     </div>
@@ -240,13 +240,13 @@ const NotificationBell = () => {
 
           {/* Footer */}
           {notifications.length > 0 && (
-            <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+            <div className="flex-shrink-0 border-t border-day-border/70 px-4 py-3 dark:border-night-border/70">
               <button
                 onClick={() => {
                   navigate("/admin/notifications");
                   setIsOpen(false);
                 }}
-                className="w-full text-center text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
+                className="w-full text-center text-sm font-medium text-day-primary transition-colors hover:opacity-80 dark:text-night-primary"
               >
                 {t("notifications.viewAll")}
               </button>

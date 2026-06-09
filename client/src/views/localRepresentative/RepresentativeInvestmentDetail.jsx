@@ -3,9 +3,25 @@ import { Link, useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
   ArrowLeft,
+  ArrowRight,
+  BadgeCheck,
+  Banknote,
+  Building2,
+  CalendarDays,
   CheckCircle2,
+  ClipboardCheck,
   Download,
+  FileCheck2,
+  FileText,
+  Handshake,
+  Home,
+  Landmark,
   Loader2,
+  MapPin,
+  ReceiptText,
+  ShieldCheck,
+  UserRound,
+  Users,
   XCircle,
 } from "lucide-react";
 
@@ -14,14 +30,12 @@ import InvestmentPropertyPanel from "../../components/investments/InvestmentProp
 import DocumentsList from "../../components/property/detail/DocumentsList";
 import { selectUser } from "../../store/slices/authSlice";
 import { APP_CURRENCY } from "../../utils/currency";
+import { useAppFeedback } from "../../utils/hooks/useAppFeedback";
 import {
   getInvestmentPropertyPath,
   getUserId,
   getUserProfilePath,
 } from "../../utils/profileRoutes";
-
-const formatDate = (value) =>
-  value ? new Date(value).toLocaleDateString() : "-";
 
 const PROCESS_LABELS = {
   offerSent: "Offer Stage",
@@ -32,14 +46,32 @@ const PROCESS_LABELS = {
   completion: "Completion",
 };
 
-const STATUS_TONES = {
-  offer_sent: "text-sky-500",
-  contract_signed: "text-amber-500",
-  title_deed_pending: "text-violet-500",
-  active: "text-emerald-500",
-  completed: "text-slate-500",
-  refunded: "text-rose-500",
-  rejected: "text-rose-500",
+const STATUS_STYLES = {
+  offer_sent:
+    "bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-300/15 dark:text-sky-200 dark:ring-sky-300/25",
+  contract_signed:
+    "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-300/15 dark:text-amber-200 dark:ring-amber-300/25",
+  title_deed_pending:
+    "bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-300/15 dark:text-violet-200 dark:ring-violet-300/25",
+  active:
+    "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-300/15 dark:text-emerald-200 dark:ring-emerald-300/25",
+  completed:
+    "bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-300/15 dark:text-slate-200 dark:ring-slate-300/25",
+  refunded:
+    "bg-cyan-50 text-cyan-700 ring-cyan-200 dark:bg-cyan-300/15 dark:text-cyan-200 dark:ring-cyan-300/25",
+  rejected:
+    "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-300/15 dark:text-rose-200 dark:ring-rose-300/25",
+};
+
+const REVIEW_STATUS_STYLES = {
+  not_requested:
+    "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-300/15 dark:text-slate-200 dark:ring-slate-300/25",
+  pending_review:
+    "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-300/15 dark:text-amber-200 dark:ring-amber-300/25",
+  approved:
+    "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-300/15 dark:text-emerald-200 dark:ring-emerald-300/25",
+  changes_requested:
+    "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-300/15 dark:text-rose-200 dark:ring-rose-300/25",
 };
 
 const ACTION_COPY = {
@@ -92,6 +124,15 @@ const ACTOR_LABELS = {
   admin: "Admin",
 };
 
+const formatDate = (value) => {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString();
+};
+
 const formatKeyLabel = (value) =>
   value
     ? String(value)
@@ -104,6 +145,10 @@ const formatMoney = (value, currency = APP_CURRENCY) =>
     ? `${Number(value).toLocaleString()} ${currency}`
     : "-";
 
+const getStatusClass = (status) =>
+  STATUS_STYLES[status] ||
+  "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-300/15 dark:text-slate-200 dark:ring-slate-300/25";
+
 const getNextActionMeta = (action) =>
   ACTION_COPY[action?.key] || {
     title: action?.key ? formatKeyLabel(action.key) : "No pending workflow gate",
@@ -113,31 +158,33 @@ const getNextActionMeta = (action) =>
 
 const getActorLabel = (actor) => ACTOR_LABELS[actor] || formatKeyLabel(actor);
 
-const MetricCard = ({ label, value, hint = null, toneClass = "" }) => (
-  <div className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-5">
-    <p className="text-sm text-day-text/60 dark:text-night-text/60">{label}</p>
-    <p
-      className={`mt-2 text-2xl font-bold text-day-text dark:text-night-text ${toneClass}`.trim()}
-    >
-      {value}
-    </p>
-    {hint ? (
-      <p className="mt-2 text-xs leading-5 text-day-text/55 dark:text-night-text/55">
-        {hint}
-      </p>
-    ) : null}
-  </div>
-);
+const getPropertyId = (property) =>
+  property?.id || property?._id || property?.propertyId || null;
 
-const REVIEW_STATUS_STYLES = {
-  not_requested:
-    "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
-  pending_review:
-    "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
-  approved:
-    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200",
-  changes_requested:
-    "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200",
+const getLocationLabel = (investment) => {
+  const property = investment?.property;
+  const cityCountry = [property?.city, property?.country]
+    .filter(Boolean)
+    .join(", ");
+
+  return cityCountry || property?.fullAddress || "Property location pending";
+};
+
+const getPersonName = (person, fallback = "Unknown") =>
+  person?.fullName ||
+  [person?.firstName, person?.lastName].filter(Boolean).join(" ") ||
+  person?.email ||
+  fallback;
+
+const getInitials = (person, fallback = "NA") => {
+  const name = getPersonName(person, fallback);
+  const parts = name.split(/\s+/).filter(Boolean);
+
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+
+  return name.slice(0, 2).toUpperCase();
 };
 
 const formatReviewLabel = (status) => {
@@ -153,9 +200,256 @@ const formatReviewLabel = (status) => {
   }
 };
 
+const SectionHeader = ({ action = null, eyebrow, icon, title, subtitle }) => (
+  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+        {React.createElement(icon, { className: "h-3.5 w-3.5" })}
+        {eyebrow}
+      </div>
+      <h2 className="mt-2 text-xl font-semibold text-day-text dark:text-night-text">
+        {title}
+      </h2>
+      {subtitle ? (
+        <p className="mt-1 max-w-3xl text-sm leading-6 text-day-muted dark:text-night-muted">
+          {subtitle}
+        </p>
+      ) : null}
+    </div>
+    {action}
+  </div>
+);
+
+const MetricCard = ({ icon, label, value, hint = null, tone = "" }) => (
+  <div className="shell-subtle-surface px-4 py-4">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+          {label}
+        </p>
+        <p
+          className={`mt-3 text-2xl font-semibold text-day-text dark:text-night-text ${tone}`.trim()}
+        >
+          {value}
+        </p>
+      </div>
+      <div className="grid h-11 w-11 place-items-center rounded-2xl bg-day-panel text-day-muted dark:bg-night-panel dark:text-night-muted">
+        {React.createElement(icon, { className: "h-5 w-5" })}
+      </div>
+    </div>
+    {hint ? (
+      <p className="mt-2 text-xs leading-5 text-day-muted dark:text-night-muted">
+        {hint}
+      </p>
+    ) : null}
+  </div>
+);
+
+const InfoTile = ({ icon, label, value, helper = null }) => (
+  <div className="rounded-2xl border border-day-border/70 bg-day-panel/70 px-4 py-4 dark:border-night-border/70 dark:bg-night-panel/70">
+    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-day-muted dark:text-night-muted">
+      {React.createElement(icon, { className: "h-3.5 w-3.5" })}
+      {label}
+    </div>
+    <p className="mt-2 text-sm font-semibold capitalize text-day-text dark:text-night-text">
+      {value}
+    </p>
+    {helper ? (
+      <p className="mt-1 text-xs leading-5 text-day-muted dark:text-night-muted">
+        {helper}
+      </p>
+    ) : null}
+  </div>
+);
+
+const PersonCard = ({ icon, label, person }) => {
+  const userId = getUserId(person);
+
+  return (
+    <section className="shell-surface px-5 py-5">
+      <div className="flex items-start gap-4">
+        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-3xl bg-sky-300 text-sm font-bold text-slate-950">
+          {getInitials(person, label)}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-day-muted dark:text-night-muted">
+            {React.createElement(icon, { className: "h-3.5 w-3.5" })}
+            {label}
+          </div>
+          <p className="mt-2 truncate text-base font-semibold text-day-text dark:text-night-text">
+            {getPersonName(person, "-")}
+          </p>
+          <p className="mt-1 truncate text-sm text-day-muted dark:text-night-muted">
+            {person?.email || "-"}
+          </p>
+          <Link
+            to={getUserProfilePath(userId)}
+            className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-day-primary hover:underline dark:text-night-primary"
+          >
+            Open profile
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const ProcessCard = ({ entryKey, value }) => (
+  <div className="shell-subtle-surface px-4 py-4">
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="text-sm font-semibold text-day-text dark:text-night-text">
+          {PROCESS_LABELS[entryKey] || formatKeyLabel(entryKey)}
+        </p>
+        <p className="mt-2 text-xs text-day-muted dark:text-night-muted">
+          Date {formatDate(value?.date || value?.startDate)}
+        </p>
+      </div>
+      <span
+        className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${
+          value?.active
+            ? "bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-300/15 dark:text-sky-200 dark:ring-sky-300/25"
+            : value?.completed
+              ? "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-300/15 dark:text-emerald-200 dark:ring-emerald-300/25"
+              : "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-300/15 dark:text-slate-200 dark:ring-slate-300/25"
+        }`}
+      >
+        {value?.active ? "Active" : value?.completed ? "Completed" : "Pending"}
+      </span>
+    </div>
+  </div>
+);
+
+const ReviewDocumentCard = ({
+  document,
+  isReviewing,
+  onDownload,
+  onReview,
+  reviewNote,
+  setReviewNote,
+}) => (
+  <article className="shell-subtle-surface px-4 py-4">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <p className="text-sm font-semibold text-day-text dark:text-night-text">
+          {document.name}
+        </p>
+        <p className="mt-1 text-xs text-day-muted dark:text-night-muted">
+          {formatKeyLabel(document.type)} · uploaded {formatDate(document.uploadedAt)}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => onDownload(document.fileId, document.name)}
+        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-day-border bg-day-surface px-3 py-2 text-xs font-semibold text-day-text transition hover:border-day-primary/40 hover:text-day-primary dark:border-night-border dark:bg-night-surface dark:text-night-text dark:hover:border-night-primary/50 dark:hover:text-night-primary"
+      >
+        <Download className="h-4 w-4" />
+        Download
+      </button>
+    </div>
+
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <span
+        className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+          REVIEW_STATUS_STYLES[document.reviewStatus] ||
+          REVIEW_STATUS_STYLES.not_requested
+        }`}
+      >
+        {formatReviewLabel(document.reviewStatus)}
+      </span>
+      {document.verified ? (
+        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-300/15 dark:text-emerald-200 dark:ring-emerald-300/25">
+          Workflow verified
+        </span>
+      ) : null}
+    </div>
+
+    {document.reviewNotes ? (
+      <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100">
+        Latest note: {document.reviewNotes}
+      </div>
+    ) : null}
+
+    <textarea
+      value={reviewNote}
+      onChange={(event) => setReviewNote(document.fileId, event.target.value)}
+      placeholder="Optional approval note or required re-upload details..."
+      className="mt-3 shell-input min-h-[96px] resize-none"
+    />
+
+    <div className="mt-3 flex flex-wrap gap-3">
+      <button
+        type="button"
+        onClick={() => onReview(document.fileId, "approve")}
+        disabled={isReviewing || document.reviewStatus === "approved"}
+        className="inline-flex items-center gap-2 rounded-2xl bg-emerald-300 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <CheckCircle2 className="h-4 w-4" />
+        {document.type === "title_deed"
+          ? "Approve and start rental period"
+          : "Approve document"}
+      </button>
+      <button
+        type="button"
+        onClick={() => onReview(document.fileId, "request_changes")}
+        disabled={isReviewing}
+        className="inline-flex items-center gap-2 rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <XCircle className="h-4 w-4" />
+        Request re-upload
+      </button>
+    </div>
+  </article>
+);
+
+const RentalSchedule = ({ payments = [] }) => (
+  <section className="shell-surface px-5 py-6 sm:px-6">
+    <SectionHeader
+      eyebrow="Rental"
+      icon={ReceiptText}
+      title="Rental Schedule"
+      subtitle="Rental payment milestones become visible once the investment enters the rental period."
+    />
+
+    {payments.length ? (
+      <div className="mt-5 space-y-3">
+        {payments.map((payment, index) => (
+          <div
+            key={`${payment.month}-${index}`}
+            className="shell-subtle-surface flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div>
+              <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                {payment.month}
+              </p>
+              <p className="mt-1 text-xs text-day-muted dark:text-night-muted">
+                Paid at {formatDate(payment.paidAt)}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-day-panel px-3 py-1.5 text-xs font-semibold text-day-muted dark:bg-night-panel dark:text-night-muted">
+                {formatMoney(payment.amount, APP_CURRENCY)}
+              </span>
+              <span className="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-semibold capitalize text-sky-700 ring-1 ring-sky-200 dark:bg-sky-300/15 dark:text-sky-200 dark:ring-sky-300/25">
+                {formatKeyLabel(payment.status)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="mt-5 shell-subtle-surface px-5 py-8 text-sm text-day-muted dark:text-night-muted">
+        Rental schedule is not available yet.
+      </div>
+    )}
+  </section>
+);
+
 const RepresentativeInvestmentDetail = () => {
   const { id } = useParams();
   const user = useSelector(selectUser);
+  const feedback = useAppFeedback();
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState(false);
   const [investment, setInvestment] = useState(null);
@@ -163,12 +457,12 @@ const RepresentativeInvestmentDetail = () => {
   const [reviewingFileId, setReviewingFileId] = useState(null);
   const [reviewNotes, setReviewNotes] = useState({});
 
-  const isAssignedRepresentative = useMemo(() => {
-    return (
+  const isAssignedRepresentative = useMemo(
+    () =>
       String(investment?.localRepresentative?.id || "") ===
-      String(user?.id || user?._id || "")
-    );
-  }, [investment, user]);
+      String(user?.id || user?._id || ""),
+    [investment, user],
+  );
 
   const loadData = useCallback(async () => {
     try {
@@ -205,11 +499,11 @@ const RepresentativeInvestmentDetail = () => {
       const response = await InvestmentController.claimRepresentativeRequest(id);
       if (response?.success) {
         await loadData();
-        window.alert("Representative request claimed successfully.");
+        feedback.success("Representative request claimed successfully.");
       }
     } catch (error) {
       console.error("Claim request error:", error);
-      window.alert(error.message || "Failed to claim representative request.");
+      feedback.error(error.message || "Failed to claim representative request.");
     } finally {
       setClaiming(false);
     }
@@ -228,6 +522,7 @@ const RepresentativeInvestmentDetail = () => {
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Representative document download error:", error);
+      feedback.error("Failed to download document.");
     }
   };
 
@@ -235,7 +530,9 @@ const RepresentativeInvestmentDetail = () => {
     const note = String(reviewNotes[fileId] || "").trim();
 
     if (action === "request_changes" && !note) {
-      window.alert("Please explain what should be corrected before re-upload.");
+      feedback.warning(
+        "Please explain what should be corrected before re-upload.",
+      );
       return;
     }
 
@@ -252,7 +549,7 @@ const RepresentativeInvestmentDetail = () => {
           ...current,
           [fileId]: "",
         }));
-        window.alert(
+        feedback.success(
           action === "approve"
             ? "Document approved successfully."
             : "Re-upload requested successfully.",
@@ -260,15 +557,23 @@ const RepresentativeInvestmentDetail = () => {
       }
     } catch (error) {
       console.error("Representative review error:", error);
-      window.alert(error.message || "Failed to update document review.");
+      feedback.error(error.message || "Failed to update document review.");
     } finally {
       setReviewingFileId(null);
     }
   };
 
+  const setReviewNote = (fileId, value) => {
+    setReviewNotes((current) => ({
+      ...current,
+      [fileId]: value,
+    }));
+  };
+
   const canClaimRequest =
     !!investment?.representativeRequest?.isPending &&
     !investment?.localRepresentative;
+
   const reviewableDocuments = useMemo(
     () =>
       documents
@@ -286,6 +591,7 @@ const RepresentativeInvestmentDetail = () => {
         }),
     [documents],
   );
+
   const pendingReviewCount = useMemo(
     () =>
       reviewableDocuments.filter(
@@ -293,18 +599,46 @@ const RepresentativeInvestmentDetail = () => {
       ).length,
     [reviewableDocuments],
   );
+
+  if (loading) {
+    return (
+      <div className="shell-surface grid min-h-[360px] place-items-center">
+        <div className="flex items-center gap-2 text-day-muted dark:text-night-muted">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading case details...
+        </div>
+      </div>
+    );
+  }
+
+  if (!investment) {
+    return (
+      <div className="shell-surface px-6 py-8">
+        <Link
+          to="/rep/cases"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-day-primary hover:underline dark:text-night-primary"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to cases
+        </Link>
+        <p className="mt-4 text-sm text-day-muted dark:text-night-muted">
+          Investment not found or you are no longer allowed to access it.
+        </p>
+      </div>
+    );
+  }
+
   const detailMode = isAssignedRepresentative ? "workflow" : "evaluation";
   const propertyPath =
     isAssignedRepresentative && investment?.property
       ? getInvestmentPropertyPath(
           "local_representative",
-          getUserId(investment.property),
+          getPropertyId(investment.property),
         )
       : null;
   const processEntries = Object.entries(investment?.processTracking || {});
   const nextActionMeta = getNextActionMeta(investment?.nextRequiredAction);
   const statusLabel = formatKeyLabel(investment?.status);
-  const statusTone = STATUS_TONES[investment?.status] || "";
   const requestedByRoleLabel = formatKeyLabel(
     investment?.representativeRequest?.requestedByRole,
   );
@@ -337,27 +671,33 @@ const RepresentativeInvestmentDetail = () => {
             : documents.length > 0
               ? "Packages on file"
               : "No package submitted";
-  const reviewQueueHint =
-    pendingReviewCount > 0
-      ? "Use the action area below to approve or request re-uploads."
-      : "You step in when a new investor or owner submission needs local review.";
+  const backPath = isAssignedRepresentative ? "/rep/cases" : "/rep/request-pool";
+  const backLabel = isAssignedRepresentative ? "Back to cases" : "Back to pool";
+  const heroTone =
+    detailMode === "workflow"
+      ? "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-300/10 dark:text-emerald-200 dark:ring-emerald-300/20"
+      : "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-300/10 dark:text-amber-200 dark:ring-amber-300/20";
+
   const summaryCards =
     detailMode === "workflow"
       ? [
           {
             label: "Case Status",
             value: statusLabel,
-            toneClass: statusTone,
+            icon: BadgeCheck,
+            tone: "text-emerald-600 dark:text-emerald-300",
             hint: "This is the stage you are actively helping move forward.",
           },
           {
-            label: "Next Workflow Gate",
+            label: "Next Gate",
             value: nextActionMeta.title,
+            icon: ClipboardCheck,
             hint: nextActionMeta.description,
           },
           {
             label: "Decision Owner",
             value: nextActionActorLabel,
+            icon: UserRound,
             hint:
               pendingReviewCount > 0
                 ? `${pendingReviewCount} pending review item(s) are visible below.`
@@ -366,173 +706,137 @@ const RepresentativeInvestmentDetail = () => {
           {
             label: "Pending Reviews",
             value: String(pendingReviewCount),
-            hint: reviewQueueHint,
+            icon: FileCheck2,
+            tone:
+              pendingReviewCount > 0
+                ? "text-amber-600 dark:text-amber-300"
+                : "text-day-text dark:text-night-text",
+            hint:
+              pendingReviewCount > 0
+                ? "Use the review area below to approve or request re-uploads."
+                : "You step in when a new submission needs local review.",
           },
         ]
       : [
           {
-            label: "Investment Amount",
+            label: "Amount",
             value: formatMoney(investment?.amountInvested, APP_CURRENCY),
+            icon: Banknote,
+            tone: "text-sky-600 dark:text-sky-300",
             hint: "Headline ticket size for this request.",
           },
           {
             label: "Current Stage",
             value: statusLabel,
-            toneClass: statusTone,
+            icon: BadgeCheck,
             hint: `${currentProcessLabel} is the phase you would be stepping into.`,
           },
           {
             label: "Request Region",
             value: investment?.representativeRequest?.region || "-",
+            icon: MapPin,
             hint: "Claim only if this fits your local operating capacity.",
           },
           {
-            label: "Expected Local Focus",
+            label: "Expected Focus",
             value: nextActionMeta.title,
+            icon: ClipboardCheck,
             hint: nextActionMeta.description,
           },
         ];
 
-  if (loading) {
-    return (
-      <div className="grid min-h-[320px] place-items-center rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface">
-        <div className="flex items-center gap-2 text-day-text/70 dark:text-night-text/70">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading case details...
-        </div>
-      </div>
-    );
-  }
-
-  if (!investment) {
-    return (
-      <div className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
-        <Link
-          to="/rep/cases"
-          className="inline-flex items-center gap-2 text-sm font-medium text-sky-600 hover:underline dark:text-sky-300"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to cases
-        </Link>
-        <p className="mt-4 text-sm text-day-text/60 dark:text-night-text/60">
-          Investment not found or you are no longer allowed to access it.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <Link
-            to={isAssignedRepresentative ? "/rep/cases" : "/rep/request-pool"}
-            className="inline-flex items-center gap-2 text-sm font-medium text-sky-600 hover:underline dark:text-sky-300"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Link>
-          <div className="mt-3">
-            <span
-              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                detailMode === "workflow"
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200"
-                  : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200"
-              }`}
+      <section className="shell-surface relative overflow-hidden px-6 py-7 sm:px-8">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_34%),linear-gradient(135deg,rgba(15,23,42,0.04),transparent)] dark:bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_36%),linear-gradient(135deg,rgba(15,23,42,0.82),rgba(8,15,27,0.24))]" />
+        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-3xl">
+            <Link
+              to={backPath}
+              className="inline-flex items-center gap-2 text-sm font-semibold text-day-primary hover:underline dark:text-night-primary"
             >
+              <ArrowLeft className="h-4 w-4" />
+              {backLabel}
+            </Link>
+
+            <div
+              className={`mt-5 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] ring-1 ${heroTone}`}
+            >
+              <ShieldCheck className="h-4 w-4" />
               {detailMode === "workflow"
-                ? "Assigned Case Workflow"
-                : "Request Pool Review"}
+                ? "Assigned case workflow"
+                : "Request pool review"}
+            </div>
+            <h1 className="mt-5 text-3xl font-semibold text-day-text dark:text-night-text sm:text-4xl">
+              {getLocationLabel(investment)}
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-day-muted dark:text-night-muted">
+              {detailMode === "workflow"
+                ? "You own this case operationally. Review submissions, monitor workflow gates, and keep the next step moving."
+                : "Review the investment and property context first, then decide whether you want to claim and manage this case."}
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            {canClaimRequest ? (
+              <button
+                type="button"
+                onClick={handleClaim}
+                disabled={claiming}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-sky-300 px-4 py-3 text-sm font-bold text-slate-950 transition hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {claiming ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Claiming...
+                  </>
+                ) : (
+                  <>
+                    <BadgeCheck className="h-4 w-4" />
+                    Claim and Start Managing
+                  </>
+                )}
+              </button>
+            ) : null}
+            <span
+              className={`inline-flex items-center justify-center rounded-2xl px-4 py-3 text-sm font-bold capitalize ring-1 ${getStatusClass(
+                investment.status,
+              )}`}
+            >
+              {statusLabel}
             </span>
           </div>
-          <h1 className="mt-3 text-2xl font-bold text-day-text dark:text-night-text">
-            {investment.property?.city}, {investment.property?.country}
-          </h1>
-          <p className="mt-2 text-sm text-day-text/60 dark:text-night-text/60">
-            {detailMode === "workflow"
-              ? "You already own this case operationally. Use the workflow controls below to unblock the next stage."
-              : "Review the investment and property context first, then decide whether you want to claim and manage this case."}
-          </p>
         </div>
+      </section>
 
-        {canClaimRequest && (
-          <button
-            type="button"
-            onClick={handleClaim}
-            disabled={claiming}
-            className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
-          >
-            {claiming ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Claiming...
-              </>
-            ) : (
-              "Claim and Start Managing"
-            )}
-          </button>
-        )}
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => (
-          <MetricCard
-            key={card.label}
-            label={card.label}
-            value={card.value}
-            hint={card.hint}
-            toneClass={card.toneClass}
-          />
+          <MetricCard key={card.label} {...card} />
         ))}
-      </div>
+      </section>
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <section className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
-          <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
-            Investor
-          </h2>
-          <p className="mt-3 text-sm font-medium text-day-text dark:text-night-text">
-            {investment.investor?.fullName || "-"}
-          </p>
-          <p className="mt-1 text-sm text-day-text/60 dark:text-night-text/60">
-            {investment.investor?.email || "-"}
-          </p>
-          <Link
-            to={getUserProfilePath(getUserId(investment.investor))}
-            className="mt-4 inline-flex text-sm font-medium text-sky-600 hover:underline dark:text-sky-300"
-          >
-            Open investor profile
-          </Link>
-        </section>
-
-        <section className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
-          <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
-            Property Owner
-          </h2>
-          <p className="mt-3 text-sm font-medium text-day-text dark:text-night-text">
-            {investment.propertyOwner?.fullName || "-"}
-          </p>
-          <p className="mt-1 text-sm text-day-text/60 dark:text-night-text/60">
-            {investment.propertyOwner?.email || "-"}
-          </p>
-          <Link
-            to={getUserProfilePath(getUserId(investment.propertyOwner))}
-            className="mt-4 inline-flex text-sm font-medium text-sky-600 hover:underline dark:text-sky-300"
-          >
-            Open owner profile
-          </Link>
-        </section>
-
-        <section className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
-          <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
+      <section className="grid gap-5 xl:grid-cols-3">
+        <PersonCard
+          icon={UserRound}
+          label="Investor"
+          person={investment.investor}
+        />
+        <PersonCard
+          icon={Users}
+          label="Property Owner"
+          person={investment.propertyOwner}
+        />
+        <section className="shell-surface px-5 py-5">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-day-muted dark:text-night-muted">
+            <Handshake className="h-3.5 w-3.5" />
             {detailMode === "workflow"
-              ? "Workflow Responsibility"
-              : "Claim Decision Brief"}
-          </h2>
-          <div className="mt-3 space-y-2 text-sm text-day-text dark:text-night-text">
+              ? "Workflow responsibility"
+              : "Claim decision brief"}
+          </div>
+          <div className="mt-4 space-y-3 text-sm text-day-text dark:text-night-text">
             <p>
               {detailMode === "workflow" ? "Claimed at:" : "Requested on:"}{" "}
-              <span className="font-medium">
+              <span className="font-semibold">
                 {formatDate(
                   detailMode === "workflow"
                     ? investment.representativeRequest?.claimedAt
@@ -542,151 +846,118 @@ const RepresentativeInvestmentDetail = () => {
             </p>
             <p>
               Requested by role:{" "}
-              <span className="font-medium capitalize">
+              <span className="font-semibold capitalize">
                 {requestedByRoleLabel}
               </span>
             </p>
             <p>
               {detailMode === "workflow" ? "Decision owner:" : "If you claim:"}{" "}
-              <span className="font-medium">
+              <span className="font-semibold">
                 {detailMode === "workflow"
                   ? nextActionActorLabel
                   : "you take over the local execution lane"}
               </span>
             </p>
             <p>
-              {detailMode === "workflow"
-                ? "Current gate:"
-                : "Likely next gate after claim:"}{" "}
-              <span className="font-medium">{nextActionMeta.title}</span>
+              Current gate:{" "}
+              <span className="font-semibold">{nextActionMeta.title}</span>
             </p>
           </div>
         </section>
-      </div>
+      </section>
 
       {detailMode === "evaluation" ? (
-        <section className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-          <div className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
-            <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
-              Should You Claim This Case?
-            </h2>
-            <p className="mt-2 text-sm text-day-text/60 dark:text-night-text/60">
-              This view stays focused on general investment and property context
-              so you can decide whether the case fits your bandwidth and local
-              expertise.
-            </p>
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr),minmax(320px,0.85fr)]">
+          <div className="shell-surface px-5 py-6 sm:px-6">
+            <SectionHeader
+              eyebrow="Evaluation"
+              icon={ClipboardCheck}
+              title="Should You Claim This Case?"
+              subtitle="Use the investment and property context to decide whether this case fits your bandwidth and local expertise."
+            />
 
-            <div className="mt-5 grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl border border-day-border dark:border-night-border p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
-                  Property Type
-                </p>
-                <p className="mt-2 text-sm font-semibold text-day-text dark:text-night-text">
-                  {formatKeyLabel(investment.property?.propertyType)}
-                </p>
-              </div>
-              <div className="rounded-xl border border-day-border dark:border-night-border p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
-                  Contract Horizon
-                </p>
-                <p className="mt-2 text-sm font-semibold text-day-text dark:text-night-text">
-                  {contractMonthsLabel}
-                </p>
-              </div>
-              <div className="rounded-xl border border-day-border dark:border-night-border p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
-                  Target Monthly Rent
-                </p>
-                <p className="mt-2 text-sm font-semibold text-day-text dark:text-night-text">
-                  {monthlyRentLabel}
-                </p>
-              </div>
-              <div className="rounded-xl border border-day-border dark:border-night-border p-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
-                  Current Workflow Gate
-                </p>
-                <p className="mt-2 text-sm font-semibold text-day-text dark:text-night-text">
-                  {nextActionMeta.title}
-                </p>
-              </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <InfoTile
+                icon={Home}
+                label="Property Type"
+                value={formatKeyLabel(investment.property?.propertyType)}
+              />
+              <InfoTile
+                icon={CalendarDays}
+                label="Contract Horizon"
+                value={contractMonthsLabel}
+              />
+              <InfoTile
+                icon={ReceiptText}
+                label="Target Monthly Rent"
+                value={monthlyRentLabel}
+              />
+              <InfoTile
+                icon={ClipboardCheck}
+                label="Current Workflow Gate"
+                value={nextActionMeta.title}
+                helper={nextActionMeta.description}
+              />
             </div>
           </div>
 
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-900/40 dark:bg-amber-900/20">
-            <h2 className="text-lg font-semibold text-amber-950 dark:text-amber-100">
-              Claim Outcome
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-amber-900/80 dark:text-amber-100/80">
-              After claiming, this request leaves the pool and becomes your
-              operational case. From that moment, you will use the workflow
-              screen to review investor and owner uploads, then decide whether
-              the investment can move to the next stage.
-            </p>
-            <div className="mt-5 rounded-xl border border-amber-200/80 bg-white/60 p-4 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-black/10 dark:text-amber-100">
-              <p className="font-semibold">What you would take ownership of</p>
-              <p className="mt-2">Current stage: {statusLabel}</p>
-              <p className="mt-1">Next gate: {nextActionMeta.title}</p>
-              <p className="mt-1">Requested by: {requestedByRoleLabel}</p>
-              <p className="mt-1">Documents currently visible: {documents.length}</p>
+          <div className="shell-surface border-amber-200 bg-amber-50 px-5 py-6 dark:border-amber-900/40 dark:bg-amber-900/20 sm:px-6">
+            <SectionHeader
+              eyebrow="Outcome"
+              icon={Handshake}
+              title="Claim Outcome"
+              subtitle="After claiming, this request leaves the pool and becomes your operational case."
+            />
+            <div className="mt-5 space-y-2 rounded-2xl border border-amber-200/80 bg-white/60 p-4 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-black/10 dark:text-amber-100">
+              <p>Current stage: {statusLabel}</p>
+              <p>Next gate: {nextActionMeta.title}</p>
+              <p>Requested by: {requestedByRoleLabel}</p>
+              <p>Documents currently visible: {documents.length}</p>
             </div>
           </div>
         </section>
       ) : (
-        <section className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
-                Workflow Control Center
-              </h2>
-              <p className="mt-2 text-sm text-day-text/60 dark:text-night-text/60">
-                This case is already yours. Investor and owner submissions land
-                here, and your reviews determine whether the investment
-                advances to its next step.
-              </p>
-            </div>
-            <div className="rounded-xl border border-day-border dark:border-night-border px-4 py-3 text-sm text-day-text dark:text-night-text">
-              <p className="font-semibold">Active decision gate</p>
-              <p className="mt-1 text-day-text/65 dark:text-night-text/65">
-                {nextActionMeta.title}
-              </p>
-            </div>
-          </div>
+        <section className="shell-surface px-5 py-6 sm:px-6">
+          <SectionHeader
+            eyebrow="Control"
+            icon={ClipboardCheck}
+            title="Workflow Control Center"
+            subtitle="Investor and owner submissions land here. Your reviews determine whether the investment advances to its next step."
+            action={
+              <div className="rounded-2xl border border-day-border bg-day-panel px-4 py-3 text-sm text-day-text dark:border-night-border dark:bg-night-panel dark:text-night-text">
+                <p className="font-semibold">Active decision gate</p>
+                <p className="mt-1 text-day-muted dark:text-night-muted">
+                  {nextActionMeta.title}
+                </p>
+              </div>
+            }
+          />
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-xl border border-day-border dark:border-night-border p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
-                Principal Payment
-              </p>
-              <p className="mt-2 text-sm font-semibold text-day-text dark:text-night-text">
-                {formatKeyLabel(investment?.principalPayment?.status)}
-              </p>
-            </div>
-            <div className="rounded-xl border border-day-border dark:border-night-border p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
-                Document Submission
-              </p>
-              <p className="mt-2 text-sm font-semibold text-day-text dark:text-night-text">
-                {documentSubmissionLabel}
-              </p>
-            </div>
-            <div className="rounded-xl border border-day-border dark:border-night-border p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
-                Review Queue
-              </p>
-              <p className="mt-2 text-sm font-semibold text-day-text dark:text-night-text">
-                {pendingReviewCount > 0
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <InfoTile
+              icon={Banknote}
+              label="Principal Payment"
+              value={formatKeyLabel(investment?.principalPayment?.status)}
+            />
+            <InfoTile
+              icon={FileText}
+              label="Document Submission"
+              value={documentSubmissionLabel}
+            />
+            <InfoTile
+              icon={FileCheck2}
+              label="Review Queue"
+              value={
+                pendingReviewCount > 0
                   ? `${pendingReviewCount} item(s) waiting`
-                  : "Nothing pending"}
-              </p>
-            </div>
-            <div className="rounded-xl border border-day-border dark:border-night-border p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
-                Local Focus
-              </p>
-              <p className="mt-2 text-sm font-semibold text-day-text dark:text-night-text">
-                {currentProcessLabel}
-              </p>
-            </div>
+                  : "Nothing pending"
+              }
+            />
+            <InfoTile
+              icon={Landmark}
+              label="Local Focus"
+              value={currentProcessLabel}
+            />
           </div>
         </section>
       )}
@@ -695,192 +966,79 @@ const RepresentativeInvestmentDetail = () => {
         property={investment.property}
         owner={investment.propertyOwner || investment.property?.owner}
         propertyPath={propertyPath}
-        navigateLabel={
-          isAssignedRepresentative
-            ? "Open property page"
-            : null
-        }
+        navigateLabel={isAssignedRepresentative ? "Open property page" : null}
       />
 
       {detailMode === "workflow" ? (
         <>
-          <section className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
-            <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
-              Process Tracking
-            </h2>
+          <section className="shell-surface px-5 py-6 sm:px-6">
+            <SectionHeader
+              eyebrow="Timeline"
+              icon={CalendarDays}
+              title="Process Tracking"
+              subtitle="Each stage shows whether it is active, completed, or still waiting for the next operational event."
+            />
             <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {processEntries.map(([key, value]) => (
-                <div
-                  key={key}
-                  className="rounded-xl border border-day-border dark:border-night-border p-4"
-                >
-                  <p className="text-sm font-medium text-day-text dark:text-night-text">
-                    {PROCESS_LABELS[key] || key}
-                  </p>
-                  <p className="mt-2 text-sm text-day-text/60 dark:text-night-text/60">
-                    Completed: {value?.completed ? "Yes" : "No"}
-                  </p>
-                  <p className="mt-1 text-sm text-day-text/60 dark:text-night-text/60">
-                    Active: {value?.active ? "Yes" : "No"}
-                  </p>
-                  <p className="mt-1 text-sm text-day-text/60 dark:text-night-text/60">
-                    Date: {formatDate(value?.date || value?.startDate)}
-                  </p>
+              {processEntries.length ? (
+                processEntries.map(([key, value]) => (
+                  <ProcessCard key={key} entryKey={key} value={value} />
+                ))
+              ) : (
+                <div className="shell-subtle-surface px-5 py-8 text-sm text-day-muted dark:text-night-muted md:col-span-2 xl:col-span-3">
+                  No process tracking entries are available yet.
                 </div>
-              ))}
+              )}
             </div>
           </section>
 
-          <section className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
-            <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
-              Documents and Workflow Decisions
-            </h2>
+          <section className="shell-surface px-5 py-6 sm:px-6">
+            <SectionHeader
+              eyebrow="Documents"
+              icon={FileText}
+              title="Documents and Workflow Decisions"
+              subtitle="Download each submitted file, verify it locally, then approve the package or request a corrected re-upload."
+            />
 
-            <div className="mt-5 grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-              <div className="rounded-xl border border-day-border dark:border-night-border p-4">
-                <p className="text-sm font-medium text-day-text dark:text-night-text">
-                  Submission Ownership
-                </p>
-                <p className="mt-1 text-sm text-day-text/60 dark:text-night-text/60">
-                  Contracts, title deed files, and supporting documents are
-                  uploaded by the investor or property owner.
-                </p>
-                <p className="mt-3 text-xs leading-5 text-day-text/55 dark:text-night-text/55">
-                  Local representative stays read-only for uploads and steps in
-                  when submitted files need local verification.
-                </p>
+            <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(320px,0.82fr),minmax(0,1.18fr)]">
+              <div className="space-y-4">
+                <InfoTile
+                  icon={Users}
+                  label="Submission Ownership"
+                  value="Investor or owner uploads"
+                  helper="Local representative stays read-only for uploads and steps in when submitted files need local verification."
+                />
+                <InfoTile
+                  icon={ShieldCheck}
+                  label="How You Advance The Case"
+                  value="Approve or request re-upload"
+                  helper="Your approval can unlock payment confirmation, title deed activation, or the next operational stage."
+                />
+                <InfoTile
+                  icon={FileCheck2}
+                  label="Review Queue"
+                  value={`${pendingReviewCount} pending`}
+                  helper="Pending items are sorted to the top of the review list."
+                />
               </div>
 
-              <div className="rounded-xl border border-day-border dark:border-night-border p-4">
-                <p className="text-sm font-medium text-day-text dark:text-night-text">
-                  How You Advance The Case
-                </p>
-                <p className="mt-1 text-sm text-day-text/60 dark:text-night-text/60">
-                  Download each uploaded file, verify it locally, then approve
-                  it if the package is clean or request a corrected re-upload.
-                </p>
-                <p className="mt-3 text-xs leading-5 text-day-text/55 dark:text-night-text/55">
-                  Your approval can unlock payment confirmation, title deed
-                  activation, or the next operational stage.
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-day-border dark:border-night-border p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium text-day-text dark:text-night-text">
-                      Review Queue
-                    </p>
-                    <p className="mt-1 text-sm text-day-text/60 dark:text-night-text/60">
-                      Download investor and owner uploads, verify them locally,
-                      then approve or ask for a corrected re-upload.
-                    </p>
+              <div className="space-y-4">
+                {reviewableDocuments.length === 0 ? (
+                  <div className="shell-subtle-surface px-5 py-8 text-sm text-day-muted dark:text-night-muted">
+                    No upload is currently waiting for your local review.
                   </div>
-                  <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-900/30 dark:text-sky-200">
-                    {pendingReviewCount} pending
-                  </span>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  {reviewableDocuments.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-day-border dark:border-night-border px-4 py-5 text-sm text-day-text/60 dark:text-night-text/60">
-                      No upload is currently waiting for your local review.
-                    </div>
-                  ) : (
-                    reviewableDocuments.map((document) => {
-                      const isReviewing = reviewingFileId === document.fileId;
-                      return (
-                        <article
-                          key={document.fileId}
-                          className="rounded-xl border border-day-border dark:border-night-border p-4"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-semibold text-day-text dark:text-night-text">
-                                {document.name}
-                              </p>
-                              <p className="mt-1 text-xs text-day-text/55 dark:text-night-text/55">
-                                {document.type.replaceAll("_", " ")} · uploaded{" "}
-                                {formatDate(document.uploadedAt)}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleDownloadDocument(document.fileId, document.name)
-                              }
-                              className="inline-flex items-center gap-2 rounded-lg border border-day-border dark:border-night-border px-3 py-2 text-xs font-medium text-day-text hover:bg-day-border/10 dark:text-night-text dark:hover:bg-night-border/10"
-                            >
-                              <Download className="h-4 w-4" />
-                              Download
-                            </button>
-                          </div>
-
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-semibold ${REVIEW_STATUS_STYLES[document.reviewStatus] || REVIEW_STATUS_STYLES.not_requested}`}
-                            >
-                              {formatReviewLabel(document.reviewStatus)}
-                            </span>
-                            {document.verified ? (
-                              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
-                                Workflow verified
-                              </span>
-                            ) : null}
-                          </div>
-
-                          {document.reviewNotes ? (
-                            <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-900/20 dark:text-amber-100">
-                              Latest note: {document.reviewNotes}
-                            </div>
-                          ) : null}
-
-                          <textarea
-                            value={reviewNotes[document.fileId] || ""}
-                            onChange={(event) =>
-                              setReviewNotes((current) => ({
-                                ...current,
-                                [document.fileId]: event.target.value,
-                              }))
-                            }
-                            placeholder="Optional approval note or required re-upload details..."
-                            className="mt-3 min-h-[88px] w-full rounded-xl border border-day-border dark:border-night-border bg-transparent px-4 py-3 text-sm text-day-text dark:text-night-text"
-                          />
-
-                          <div className="mt-3 flex flex-wrap gap-3">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleReviewDocument(document.fileId, "approve")
-                              }
-                              disabled={isReviewing || document.reviewStatus === "approved"}
-                              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-                            >
-                              <CheckCircle2 className="h-4 w-4" />
-                              {document.type === "title_deed"
-                                ? "Approve and start rental period"
-                                : "Approve document"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleReviewDocument(
-                                  document.fileId,
-                                  "request_changes",
-                                )
-                              }
-                              disabled={isReviewing}
-                              className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
-                            >
-                              <XCircle className="h-4 w-4" />
-                              Request re-upload
-                            </button>
-                          </div>
-                        </article>
-                      );
-                    })
-                  )}
-                </div>
+                ) : (
+                  reviewableDocuments.map((item) => (
+                    <ReviewDocumentCard
+                      key={item.fileId}
+                      document={item}
+                      isReviewing={reviewingFileId === item.fileId}
+                      onDownload={handleDownloadDocument}
+                      onReview={handleReviewDocument}
+                      reviewNote={reviewNotes[item.fileId] || ""}
+                      setReviewNote={setReviewNote}
+                    />
+                  ))
+                )}
               </div>
 
               <div className="xl:col-span-2">
@@ -892,84 +1050,33 @@ const RepresentativeInvestmentDetail = () => {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
-            <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
-              Rental Schedule
-            </h2>
-            {investment.rentalPayments?.length ? (
-              <div className="mt-5 overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-day-border/10 dark:bg-night-border/10">
-                    <tr className="text-left text-xs uppercase tracking-wide text-day-text/55 dark:text-night-text/55">
-                      <th className="px-4 py-3">Month</th>
-                      <th className="px-4 py-3">Amount</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Paid At</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-day-border dark:divide-night-border">
-                    {investment.rentalPayments.map((payment, index) => (
-                      <tr key={`${payment.month}-${index}`}>
-                        <td className="px-4 py-3 text-sm text-day-text dark:text-night-text">
-                          {payment.month}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-day-text dark:text-night-text">
-                          {payment.amount?.toLocaleString()} {APP_CURRENCY}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-day-text dark:text-night-text">
-                          {payment.status}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-day-text/60 dark:text-night-text/60">
-                          {formatDate(payment.paidAt)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="mt-4 text-sm text-day-text/60 dark:text-night-text/60">
-                Rental schedule is not available yet.
-              </p>
-            )}
-          </section>
+          <RentalSchedule payments={investment.rentalPayments || []} />
         </>
       ) : (
-        <section className="rounded-2xl border border-day-border dark:border-night-border bg-day-surface dark:bg-night-surface p-6">
-          <h2 className="text-lg font-semibold text-day-text dark:text-night-text">
-            Available Case Context
-          </h2>
-          <p className="mt-2 text-sm text-day-text/60 dark:text-night-text/60">
-            This pool view stays read-only. Use it to understand the property,
-            the parties, and the current investment stage before taking
-            ownership.
-          </p>
+        <section className="shell-surface px-5 py-6 sm:px-6">
+          <SectionHeader
+            eyebrow="Context"
+            icon={FileText}
+            title="Available Case Context"
+            subtitle="This pool view stays read-only. Use it to understand the property, parties, and current investment stage before taking ownership."
+          />
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div className="rounded-xl border border-day-border dark:border-night-border p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
-                Request Status
-              </p>
-              <p className="mt-2 text-sm font-semibold text-day-text dark:text-night-text">
-                {formatKeyLabel(investment?.representativeRequest?.status)}
-              </p>
-            </div>
-            <div className="rounded-xl border border-day-border dark:border-night-border p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
-                Active Process Stage
-              </p>
-              <p className="mt-2 text-sm font-semibold text-day-text dark:text-night-text">
-                {currentProcessLabel}
-              </p>
-            </div>
-            <div className="rounded-xl border border-day-border dark:border-night-border p-4">
-              <p className="text-xs uppercase tracking-[0.18em] text-day-text/50 dark:text-night-text/50">
-                Documents on File
-              </p>
-              <p className="mt-2 text-sm font-semibold text-day-text dark:text-night-text">
-                {documents.length}
-              </p>
-            </div>
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <InfoTile
+              icon={BadgeCheck}
+              label="Request Status"
+              value={formatKeyLabel(investment?.representativeRequest?.status)}
+            />
+            <InfoTile
+              icon={ClipboardCheck}
+              label="Active Process Stage"
+              value={currentProcessLabel}
+            />
+            <InfoTile
+              icon={FileText}
+              label="Documents On File"
+              value={documents.length}
+            />
           </div>
 
           <div className="mt-6">
@@ -979,7 +1086,7 @@ const RepresentativeInvestmentDetail = () => {
                 onDownload={handleDownloadDocument}
               />
             ) : (
-              <div className="rounded-xl border border-dashed border-day-border dark:border-night-border px-4 py-5 text-sm text-day-text/60 dark:text-night-text/60">
+              <div className="shell-subtle-surface px-5 py-8 text-sm text-day-muted dark:text-night-muted">
                 No supporting file has been uploaded for this request yet.
               </div>
             )}

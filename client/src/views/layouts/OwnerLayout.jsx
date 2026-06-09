@@ -9,7 +9,11 @@ import OwnerSidebar from "../../components/Layouts/Owner/Sidebar/OwnerSidebar";
 import OwnerTopbar from "../../components/Layouts/Owner/Topbar/OwnerTopbar";
 
 import { selectUser, logout } from "../../store/slices/authSlice";
-import { toggleSidebar, selectSidebarOpen } from "../../store/slices/uiSlice";
+import {
+  toggleSidebar,
+  selectSidebarOpen,
+  setSidebarOpen,
+} from "../../store/slices/uiSlice";
 import { useTheme } from "../../utils/hooks/useTheme";
 import { useLanguage } from "../../utils/hooks/useLanguage";
 
@@ -69,6 +73,7 @@ const OwnerLayout = () => {
   return (
     <LayoutShell
       sidebarOpen={sidebarOpen}
+      onCloseSidebar={() => dispatch(setSidebarOpen(false))}
       sidebar={
         <OwnerSidebar
           menuItems={menuItems}

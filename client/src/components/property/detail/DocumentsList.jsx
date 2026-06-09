@@ -40,25 +40,30 @@ const DocumentsList = ({ documents = [], onDownload, onPreview, t: translate }) 
   return (
     <div
       data-testid="document-list"
-      className="bg-day-surface dark:bg-night-surface rounded-lg shadow-lg p-6"
+      className="shell-surface px-6 py-6 sm:px-7"
     >
-      <h3 className="text-lg font-semibold text-day-text dark:text-night-text mb-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-day-muted dark:text-night-muted">
+        Data room
+      </p>
+      <h3 className="mt-3 text-2xl font-semibold text-day-text dark:text-night-text">
         {tr("properties.documents")}
       </h3>
 
-      <div className="space-y-2">
+      <div className="mt-6 space-y-3">
         {documents.map((doc, index) => (
           <div
             key={index}
             data-testid={`document-row-${doc.fileId || index}`}
-            className="rounded-lg bg-day-background p-3 dark:bg-night-dashboard"
+            className="shell-subtle-surface px-4 py-4"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-start gap-3">
-                <FileText className="mt-0.5 w-5 h-5 text-day-text/70 dark:text-night-text/70" />
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-day-surface text-day-primary dark:bg-night-surface dark:text-night-primary">
+                  <FileText className="h-5 w-5" />
+                </div>
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-day-text/90 dark:text-night-text/90">
+                    <span className="text-sm font-medium text-day-text dark:text-night-text">
                       {doc.name ||
                         tr(
                           `documents.types.${doc.type}`,
@@ -77,7 +82,7 @@ const DocumentsList = ({ documents = [], onDownload, onPreview, t: translate }) 
                     ) : null}
                   </div>
                   {doc.reviewNotes ? (
-                    <p className="text-xs text-day-text/65 dark:text-night-text/65">
+                    <p className="text-xs leading-5 text-day-muted dark:text-night-muted">
                       {doc.reviewNotes}
                     </p>
                   ) : null}
@@ -94,8 +99,8 @@ const DocumentsList = ({ documents = [], onDownload, onPreview, t: translate }) 
                     )
                   }`}
                   disabled={!onPreview || !doc.previewUrl}
-                  onClick={() => onPreview?.(doc.previewUrl)}
-                  className="text-day-secondary dark:text-night-secondary hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => onPreview?.(doc.previewUrl, doc)}
+                  className="shell-icon-button h-10 w-10 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Eye className="w-4 h-4" />
                 </button>
@@ -117,7 +122,7 @@ const DocumentsList = ({ documents = [], onDownload, onPreview, t: translate }) 
                         `document-${index + 1}`,
                     )
                   }
-                  className="text-day-secondary dark:text-night-secondary hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="shell-icon-button h-10 w-10 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Download className="w-4 h-4" />
                 </button>

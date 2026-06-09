@@ -148,19 +148,29 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-day-surface dark:bg-night-surface rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-night-background/70 p-4 backdrop-blur-sm">
+      <div className="shell-surface w-full max-w-5xl overflow-hidden shadow-shell max-h-[92vh]">
         {/* Header */}
-        <div className="p-6 border-b border-day-border dark:border-night-border flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-day-text dark:text-night-text">
-            {mode === "create"
-              ? t("admin.membership.form.create_title") || "Create New Plan"
-              : t("admin.membership.form.edit_title") || "Edit Plan"}
-          </h2>
+        <div className="relative flex items-start justify-between gap-4 border-b border-day-border/70 px-6 py-6 dark:border-night-border/70">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-r from-day-primary/10 via-day-panel to-day-accent/10 dark:from-night-primary/10 dark:via-night-panel/40 dark:to-night-accent/10" />
+          <div className="relative">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-day-muted dark:text-night-muted">
+              Plan studio
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-day-text dark:text-night-text">
+              {mode === "create"
+                ? t("admin.membership.form.create_title") || "Create New Plan"
+                : t("admin.membership.form.edit_title") || "Edit Plan"}
+            </h2>
+            <p className="mt-2 text-sm text-day-muted dark:text-night-muted">
+              Configure pricing, limits, support, and visibility without leaving
+              the admin workspace.
+            </p>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded hover:bg-day-background dark:hover:bg-night-background text-day-text/70 dark:text-night-text/70"
+            className="relative grid h-11 w-11 place-items-center rounded-2xl border border-day-border bg-day-surface text-day-muted transition hover:bg-day-panel hover:text-day-text dark:border-night-border dark:bg-night-surface dark:text-night-muted dark:hover:bg-night-panel dark:hover:text-night-text"
             aria-label={t("common.close") || "Close"}
             title={t("common.close") || "Close"}
           >
@@ -169,17 +179,17 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-day-border dark:border-night-border">
-          <div className="flex gap-1 px-6 overflow-x-auto">
+        <div className="border-b border-day-border/70 bg-day-panel/40 dark:border-night-border/70 dark:bg-night-panel/30">
+          <div className="flex gap-2 overflow-x-auto px-4 py-3 sm:px-6">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                className={`whitespace-nowrap rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
                   activeTab === tab.id
-                    ? "text-day-primary dark:text-night-primary border-day-primary dark:border-night-primary"
-                    : "text-day-text/70 dark:text-night-text/70 border-transparent hover:text-day-text dark:hover:text-night-text"
+                    ? "bg-day-primary text-white shadow-accent dark:bg-night-primary dark:text-night-background"
+                    : "text-day-muted hover:bg-day-surface hover:text-day-text dark:text-night-muted dark:hover:bg-night-surface dark:hover:text-night-text"
                 }`}
               >
                 {tab.label}
@@ -191,11 +201,11 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
         {/* Form */}
         <form
           onSubmit={handleSubmit}
-          className="p-6 overflow-y-auto max-h-[60vh]"
+          className="max-h-[58vh] overflow-y-auto px-5 py-6 sm:px-6"
         >
           {activeTab === "basic" && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Field
                   label={t("admin.membership.form.name") || "Internal Name"}
                   required
@@ -245,7 +255,7 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
                 />
               </Field>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Field
                   label={t("admin.membership.form.tier") || "Tier Level"}
                   error={errors.tier}
@@ -317,7 +327,7 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
                 {t("admin.membership.form.monthly_pricing") ||
                   "Monthly Pricing"}
               </SectionTitle>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <NumberInput
                   label="Amount *"
                   value={formData.pricing.monthly.amount}
@@ -338,7 +348,7 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
               <SectionTitle>
                 {t("admin.membership.form.yearly_pricing") || "Yearly Pricing"}
               </SectionTitle>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <NumberInput
                   label="Amount *"
                   value={formData.pricing.yearly.amount}
@@ -376,7 +386,7 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
                 }
               />
               {formData.pricing.trial.enabled && (
-                <div className="grid grid-cols-2 gap-4 ml-6">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <NumberInput
                     label={
                       t("admin.membership.form.trial_days") || "Trial Days"
@@ -407,7 +417,7 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
                 {t("admin.membership.form.investment_features") ||
                   "Investment Features"}
               </SectionTitle>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <NumberInput
                   label="Max Active Investments (-1 = unlimited)"
                   value={formData.features.investments.maxActiveInvestments}
@@ -435,7 +445,7 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
                 {t("admin.membership.form.commission_discounts") ||
                   "Commission Discounts"}
               </SectionTitle>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <NumberInput
                   label="Platform Commission Discount (%)"
                   value={
@@ -574,7 +584,7 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
               <SectionTitle>
                 {t("admin.membership.form.support_level") || "Support Level"}
               </SectionTitle>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Select
                   label="Support Level"
                   value={formData.features.support.level}
@@ -702,7 +712,7 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
                 {t("admin.membership.form.referral_system") ||
                   "Referral System"}
               </SectionTitle>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <CheckboxRow
                   checked={formData.features.referral.canEarnCommission}
                   onChange={(v) =>
@@ -748,18 +758,18 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
         </form>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-day-border dark:border-night-border flex items-center justify-end gap-3 bg-day-background/60 dark:bg-night-background/60">
+        <div className="flex flex-col-reverse gap-3 border-t border-day-border/70 bg-day-panel/50 px-6 py-4 dark:border-night-border/70 dark:bg-night-panel/40 sm:flex-row sm:items-center sm:justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-day-border dark:border-night-border text-day-text dark:text-night-text hover:bg-day-surface/70 dark:hover:bg-night-surface/70 transition"
+            className="inline-flex items-center justify-center rounded-2xl border border-day-border bg-day-surface px-5 py-3 text-sm font-semibold text-day-text transition hover:bg-day-panel dark:border-night-border dark:bg-night-surface dark:text-night-text dark:hover:bg-night-panel"
           >
             {t("common.cancel") || "Cancel"}
           </button>
           <button
             type="button"
             onClick={handleSubmit}
-            className="px-4 py-2 rounded-lg bg-day-primary dark:bg-night-primary text-white hover:opacity-90 transition"
+            className="inline-flex items-center justify-center rounded-2xl bg-day-primary px-5 py-3 text-sm font-semibold text-white shadow-accent transition hover:-translate-y-0.5 hover:opacity-95 dark:bg-night-primary dark:text-night-background"
           >
             {t("common.save") || "Save"}
           </button>
@@ -770,19 +780,23 @@ const MembershipPlanForm = ({ mode, planData, onSave, onClose }) => {
 };
 
 const INPUT_CLS = (err, isTextArea = false) =>
-  `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-day-primary dark:focus:ring-night-primary 
-   bg-day-background dark:bg-night-background text-day-text dark:text-night-text
+  `w-full rounded-2xl border px-4 py-3 text-sm outline-none transition focus:ring-4 focus:ring-day-primary/10 dark:focus:ring-night-primary/10 
+   bg-day-surface dark:bg-night-surface text-day-text dark:text-night-text placeholder:text-day-muted/70 dark:placeholder:text-night-muted/70
    ${isTextArea ? "min-h-[96px]" : ""}
-   ${err ? "border-red-500" : "border-day-border dark:border-night-border"}`;
+   ${
+     err
+       ? "border-red-500 focus:border-red-500"
+       : "border-day-border focus:border-day-primary dark:border-night-border dark:focus:border-night-primary"
+   }`;
 
 const SectionTitle = ({ children }) => (
-  <h3 className="text-lg font-medium text-day-text dark:text-night-text mb-4">
+  <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-day-muted dark:text-night-muted">
     {children}
   </h3>
 );
 const Field = ({ label, children, error, required }) => (
   <div>
-    <label className="block text-sm font-medium text-day-text dark:text-night-text mb-1">
+    <label className="mb-2 block text-sm font-semibold text-day-text dark:text-night-text">
       {label} {required ? "*" : ""}
     </label>
     {children}
@@ -791,14 +805,18 @@ const Field = ({ label, children, error, required }) => (
 );
 
 const CheckboxRow = ({ checked, onChange, label, className = "" }) => (
-  <label className={`flex items-center gap-2 ${className}`}>
+  <label
+    className={`flex cursor-pointer items-center gap-3 rounded-2xl border border-day-border/70 bg-day-panel/60 px-4 py-3 transition hover:bg-day-panel dark:border-night-border/70 dark:bg-night-panel/60 dark:hover:bg-night-panel ${className}`}
+  >
     <input
       type="checkbox"
       checked={!!checked}
       onChange={(e) => onChange(e.target.checked)}
-      className="w-4 h-4 text-day-primary dark:text-night-primary rounded focus:ring-2 focus:ring-day-primary dark:focus:ring-night-primary"
+      className="h-4 w-4 rounded border-day-border text-day-primary focus:ring-2 focus:ring-day-primary/20 dark:border-night-border dark:text-night-primary dark:focus:ring-night-primary/20"
     />
-    <span className="text-sm text-day-text dark:text-night-text">{label}</span>
+    <span className="text-sm font-medium text-day-text dark:text-night-text">
+      {label}
+    </span>
   </label>
 );
 
@@ -813,7 +831,7 @@ const NumberInput = ({
   className = "",
 }) => (
   <div className={className}>
-    <label className="block text-sm font-medium text-day-text dark:text-night-text mb-1">
+    <label className="mb-2 block text-sm font-semibold text-day-text dark:text-night-text">
       {label}
     </label>
     <input
@@ -823,12 +841,12 @@ const NumberInput = ({
       min={min}
       max={max}
       step={step}
-      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-day-primary dark:focus:ring-night-primary 
-        bg-day-background dark:bg-night-background text-day-text dark:text-night-text
+      className={`w-full rounded-2xl border px-4 py-3 text-sm text-day-text outline-none transition focus:ring-4 focus:ring-day-primary/10 dark:text-night-text dark:focus:ring-night-primary/10
+        bg-day-surface dark:bg-night-surface
         ${
           error
-            ? "border-red-500"
-            : "border-day-border dark:border-night-border"
+            ? "border-red-500 focus:border-red-500"
+            : "border-day-border focus:border-day-primary dark:border-night-border dark:focus:border-night-primary"
         }`}
     />
     {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
@@ -837,7 +855,7 @@ const NumberInput = ({
 
 const TextInput = ({ label, value, onChange, placeholder }) => (
   <div>
-    <label className="block text-sm font-medium text-day-text dark:text-night-text mb-1">
+    <label className="mb-2 block text-sm font-semibold text-day-text dark:text-night-text">
       {label}
     </label>
     <input
@@ -845,25 +863,21 @@ const TextInput = ({ label, value, onChange, placeholder }) => (
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full px-3 py-2 border border-day-border dark:border-night-border rounded-lg 
-        focus:ring-2 focus:ring-day-primary dark:focus:ring-night-primary 
-        bg-day-background dark:bg-night-background text-day-text dark:text-night-text"
+      className="w-full rounded-2xl border border-day-border bg-day-surface px-4 py-3 text-sm text-day-text outline-none transition placeholder:text-day-muted/70 focus:border-day-primary focus:ring-4 focus:ring-day-primary/10 dark:border-night-border dark:bg-night-surface dark:text-night-text dark:placeholder:text-night-muted/70 dark:focus:border-night-primary dark:focus:ring-night-primary/10"
     />
   </div>
 );
 
 const Select = ({ label, value, onChange, options, disabled = false }) => (
   <div>
-    <label className="block text-sm font-medium text-day-text dark:text-night-text mb-1">
+    <label className="mb-2 block text-sm font-semibold text-day-text dark:text-night-text">
       {label}
     </label>
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
-      className="w-full px-3 py-2 border border-day-border dark:border-night-border rounded-lg 
-        focus:ring-2 focus:ring-day-primary dark:focus:ring-night-primary 
-        bg-day-background dark:bg-night-background text-day-text dark:text-night-text disabled:opacity-70 disabled:cursor-not-allowed"
+      className="w-full rounded-2xl border border-day-border bg-day-surface px-4 py-3 text-sm text-day-text outline-none transition focus:border-day-primary focus:ring-4 focus:ring-day-primary/10 disabled:cursor-not-allowed disabled:opacity-70 dark:border-night-border dark:bg-night-surface dark:text-night-text dark:focus:border-night-primary dark:focus:ring-night-primary/10"
     >
       {options.map((opt) => (
         <option key={opt.value} value={opt.value}>
