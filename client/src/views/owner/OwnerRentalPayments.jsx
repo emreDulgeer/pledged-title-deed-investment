@@ -199,7 +199,9 @@ const getPropertyLabel = (payment) => {
 
   return (
     property?.title ||
+    payment?.propertyTitle ||
     [property?.city, property?.country].filter(Boolean).join(", ") ||
+    [payment?.propertyCity, payment?.propertyCountry].filter(Boolean).join(", ") ||
     (getPropertyId(payment) ? `Property ${String(getPropertyId(payment)).slice(-6)}` : "") ||
     "Associated property"
   );
@@ -212,9 +214,13 @@ const getPropertyLocation = (payment) => {
     property?.fullAddress ||
     property?.mapSearchAddress ||
     [property?.city, property?.country].filter(Boolean).join(", ") ||
+    [payment?.propertyCity, payment?.propertyCountry].filter(Boolean).join(", ") ||
     "Location pending"
   );
 };
+
+const getCounterpartyLabel = (payment) =>
+  payment?.investorName || payment?.counterpartyName || "Investor pending";
 
 const getMapReferenceAddress = (property) =>
   property?.mapSearchAddress && property.mapSearchAddress !== property?.fullAddress
@@ -251,6 +257,23 @@ const pickLatestMonth = (current, candidate) => {
   }
 
   return String(candidate) > String(current) ? candidate : current;
+};
+
+const getPaymentTimeline = (payment) => {
+  const settledAt = payment?.paidAt || payment?.receivedAt;
+  const dueAt = payment?.dueDate || payment?.expectedDate;
+
+  if (payment?.status === "paid") {
+    return {
+      label: "Settled",
+      value: formatDate(settledAt),
+    };
+  }
+
+  return {
+    label: "Due",
+    value: formatDate(dueAt),
+  };
 };
 
 const SummaryCard = ({
@@ -406,6 +429,7 @@ const StatusBadge = ({ status }) => (
 const PaymentRow = ({ payment, onPreviewReceipt }) => {
   const receiptUrl = resolveReceiptUrl(payment);
   const status = payment.status || "pending";
+  const timeline = getPaymentTimeline(payment);
 
   return (
     <div className="shell-subtle-surface flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between">
@@ -417,7 +441,7 @@ const PaymentRow = ({ payment, onPreviewReceipt }) => {
           <StatusBadge status={status} />
         </div>
         <div className="mt-2 flex flex-wrap gap-4 text-sm text-day-muted dark:text-night-muted">
-          <span>Settled {payment.paidAt ? formatDate(payment.paidAt) : "-"}</span>
+          <span>{timeline.label} {timeline.value}</span>
           <span>Receipt {receiptUrl ? "available" : "not provided"}</span>
         </div>
       </div>
@@ -498,6 +522,10 @@ const PaymentGroupCard = ({
             <div className="mt-2 flex items-start gap-2 text-sm text-day-muted dark:text-night-muted">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
               <span>{group.locationLabel}</span>
+            </div>
+
+            <div className="mt-2 text-sm text-day-muted dark:text-night-muted">
+              Counterparty: {group.counterpartyLabel}
             </div>
 
             {mapReferenceAddress ? (
@@ -670,6 +698,7 @@ const OwnerRentalPayments = () => {
         propertyId,
         propertyLabel: getPropertyLabel(payment),
         locationLabel: getPropertyLocation(payment),
+        counterpartyLabel: getCounterpartyLabel(payment),
         payments: [],
         paymentCount: 0,
         paidAmount: 0,

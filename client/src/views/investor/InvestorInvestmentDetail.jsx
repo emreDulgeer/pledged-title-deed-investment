@@ -154,6 +154,31 @@ const formatDate = (value) => {
   }
 };
 
+const formatMonthLabel = (value) => {
+  if (!value) return "Pending schedule";
+
+  if (/^\d{4}-\d{2}$/.test(value)) {
+    const date = new Date(`${value}-01T00:00:00`);
+    if (!Number.isNaN(date.getTime())) {
+      return new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        year: "numeric",
+      }).format(date);
+    }
+  }
+
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).format(date);
+  }
+
+  return value;
+};
+
 const formatDateTime = (value) => {
   if (!value) return "—";
 
@@ -193,6 +218,23 @@ const getStatusClass = (status) =>
 const getPaymentStatusClass = (status) =>
   PAYMENT_STATUS_STYLES[status] ||
   "bg-slate-200 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200";
+
+const getPaymentTimeline = (payment, formatter = formatDate) => {
+  const settledAt = payment?.paidAt || payment?.receivedAt;
+  const dueAt = payment?.dueDate || payment?.expectedDate;
+
+  if (payment?.status === "paid") {
+    return {
+      label: "Settled",
+      value: formatter(settledAt),
+    };
+  }
+
+  return {
+    label: "Due",
+    value: formatter(dueAt),
+  };
+};
 
 const getPrincipalPaymentStatusClass = (status) =>
   PRINCIPAL_PAYMENT_STATUS_STYLES[status] ||
@@ -1983,34 +2025,39 @@ export const InvestmentDetailPage = ({ viewerRole = "investor" }) => {
           >
             {investment.rentalPayments?.length ? (
               <div className="space-y-3">
-                {investment.rentalPayments.map((payment, index) => (
-                  <div
-                    key={`${payment.month || "payment"}-${index}`}
-                    className="shell-subtle-surface flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-day-text dark:text-night-text">
-                        {payment.month || `Payment ${index + 1}`}
-                      </p>
-                      <p className="mt-1 text-sm text-day-muted dark:text-night-muted">
-                        Paid date: {payment.paidAt ? formatDate(payment.paidAt) : "—"}
-                      </p>
-                    </div>
+                {investment.rentalPayments.map((payment, index) => {
+                  const timeline = getPaymentTimeline(payment, formatDate);
 
-                    <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-                      <span className="text-sm font-semibold text-day-text dark:text-night-text">
-                        {formatAmount(payment.amount)}
-                      </span>
-                      <span
-                        className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getPaymentStatusClass(
-                          payment.status,
-                        )}`}
-                      >
-                        {formatKeyLabel(payment.status)}
-                      </span>
+                  return (
+                    <div
+                      key={`${payment.month || "payment"}-${index}`}
+                      className="shell-subtle-surface flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                          {formatMonthLabel(payment.month || payment.dueDate) ||
+                            `Payment ${index + 1}`}
+                        </p>
+                        <p className="mt-1 text-sm text-day-muted dark:text-night-muted">
+                          {timeline.label}: {timeline.value}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+                        <span className="text-sm font-semibold text-day-text dark:text-night-text">
+                          {formatAmount(payment.amount)}
+                        </span>
+                        <span
+                          className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getPaymentStatusClass(
+                            payment.status,
+                          )}`}
+                        >
+                          {formatKeyLabel(payment.status)}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <Notice tone="slate">

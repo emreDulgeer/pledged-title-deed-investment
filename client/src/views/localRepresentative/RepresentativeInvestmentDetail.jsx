@@ -133,6 +133,31 @@ const formatDate = (value) => {
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString();
 };
 
+const formatMonthLabel = (value) => {
+  if (!value) return "Pending schedule";
+
+  if (/^\d{4}-\d{2}$/.test(value)) {
+    const date = new Date(`${value}-01T00:00:00`);
+    if (!Number.isNaN(date.getTime())) {
+      return new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        year: "numeric",
+      }).format(date);
+    }
+  }
+
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).format(date);
+  }
+
+  return value;
+};
+
 const formatKeyLabel = (value) =>
   value
     ? String(value)
@@ -144,6 +169,23 @@ const formatMoney = (value, currency = APP_CURRENCY) =>
   Number.isFinite(Number(value))
     ? `${Number(value).toLocaleString()} ${currency}`
     : "-";
+
+const getPaymentTimeline = (payment) => {
+  const settledAt = payment?.paidAt || payment?.receivedAt;
+  const dueAt = payment?.dueDate || payment?.expectedDate;
+
+  if (payment?.status === "paid") {
+    return {
+      label: "Settled",
+      value: formatDate(settledAt),
+    };
+  }
+
+  return {
+    label: "Due",
+    value: formatDate(dueAt),
+  };
+};
 
 const getStatusClass = (status) =>
   STATUS_STYLES[status] ||
@@ -414,29 +456,33 @@ const RentalSchedule = ({ payments = [] }) => (
 
     {payments.length ? (
       <div className="mt-5 space-y-3">
-        {payments.map((payment, index) => (
-          <div
-            key={`${payment.month}-${index}`}
-            className="shell-subtle-surface flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div>
-              <p className="text-sm font-semibold text-day-text dark:text-night-text">
-                {payment.month}
-              </p>
-              <p className="mt-1 text-xs text-day-muted dark:text-night-muted">
-                Paid at {formatDate(payment.paidAt)}
-              </p>
+        {payments.map((payment, index) => {
+          const timeline = getPaymentTimeline(payment);
+
+          return (
+            <div
+              key={`${payment.month}-${index}`}
+              className="shell-subtle-surface flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div>
+                <p className="text-sm font-semibold text-day-text dark:text-night-text">
+                  {formatMonthLabel(payment.month || payment.dueDate)}
+                </p>
+                <p className="mt-1 text-xs text-day-muted dark:text-night-muted">
+                  {timeline.label}: {timeline.value}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-day-panel px-3 py-1.5 text-xs font-semibold text-day-muted dark:bg-night-panel dark:text-night-muted">
+                  {formatMoney(payment.amount, APP_CURRENCY)}
+                </span>
+                <span className="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-semibold capitalize text-sky-700 ring-1 ring-sky-200 dark:bg-sky-300/15 dark:text-sky-200 dark:ring-sky-300/25">
+                  {formatKeyLabel(payment.status)}
+                </span>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-day-panel px-3 py-1.5 text-xs font-semibold text-day-muted dark:bg-night-panel dark:text-night-muted">
-                {formatMoney(payment.amount, APP_CURRENCY)}
-              </span>
-              <span className="rounded-full bg-sky-50 px-3 py-1.5 text-xs font-semibold capitalize text-sky-700 ring-1 ring-sky-200 dark:bg-sky-300/15 dark:text-sky-200 dark:ring-sky-300/25">
-                {formatKeyLabel(payment.status)}
-              </span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     ) : (
       <div className="mt-5 shell-subtle-surface px-5 py-8 text-sm text-day-muted dark:text-night-muted">
@@ -1011,7 +1057,7 @@ const RepresentativeInvestmentDetail = () => {
                   icon={ShieldCheck}
                   label="How You Advance The Case"
                   value="Approve or request re-upload"
-                  helper="Your approval can unlock payment confirmation, title deed activation, or the next operational stage."
+                  helper="Your approval can unlock title deed activation or the next operational stage when local verification is part of the workflow."
                 />
                 <InfoTile
                   icon={FileCheck2}

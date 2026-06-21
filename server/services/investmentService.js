@@ -51,7 +51,7 @@ class InvestmentService {
     this.notificationService = notificationService;
     this.paymentService = paymentService;
   }
-  async displayNameOf(user) {
+  displayNameOf(user) {
     if (!user) return "User";
     if (user.fullName && user.fullName.trim()) return user.fullName.trim();
 
@@ -225,6 +225,27 @@ class InvestmentService {
       : { ...investment.principalPayment };
   }
 
+  getRentalPaymentPropertySnapshot(property) {
+    if (!property || typeof property !== "object") {
+      return null;
+    }
+
+    return {
+      id: property._id || property.id || null,
+      title: property.title || null,
+      city: property.city || null,
+      country: property.country || null,
+      fullAddress: property.fullAddress || null,
+      mapSearchAddress: property.mapSearchAddress || null,
+      propertyType: property.propertyType || null,
+      thumbnail:
+        property.thumbnail ||
+        property.coverImage ||
+        (Array.isArray(property.images) ? property.images[0] : null) ||
+        null,
+    };
+  }
+
   isAssignedRepresentative(investment, userId) {
     return (
       String(
@@ -292,13 +313,11 @@ class InvestmentService {
 
     if (type === "contract_investor_signed") {
       pushApproval(ownerId, "property_owner");
-      pushApproval(representativeId, "local_representative");
       return approvals;
     }
 
     if (type === "contract_owner_signed") {
       pushApproval(investorId, "investor");
-      pushApproval(representativeId, "local_representative");
       return approvals;
     }
 
@@ -2495,17 +2514,32 @@ class InvestmentService {
     // Kira ödemelerini topla
     const payments = [];
     investments.data.forEach((investment) => {
+      const propertySnapshot = this.getRentalPaymentPropertySnapshot(
+        investment.property,
+      );
       investment.rentalPayments.forEach((payment) => {
         payments.push({
           investmentId: investment._id,
+          propertyId: propertySnapshot?.id || null,
+          property: propertySnapshot,
+          propertyTitle: propertySnapshot?.title || null,
           propertyCity: investment.property.city,
+          propertyCountry: investment.property.country || null,
           investorName: this.displayNameOf(investment.investor),
           month: payment.month,
           amount: payment.amount,
           currency: APP_CURRENCY,
           status: payment.status,
           dueDate: payment.dueDate,
+          expectedDate: payment.dueDate,
           paidAt: payment.paidAt,
+          receivedAt: payment.paidAt,
+          receiptUrl: payment.paymentReceipt?.url || null,
+          receipt: payment.paymentReceipt?.url
+            ? {
+                url: payment.paymentReceipt.url,
+              }
+            : null,
         });
       });
     });
@@ -2533,17 +2567,32 @@ class InvestmentService {
     // Kira gelirlerini topla
     const incomes = [];
     investments.data.forEach((investment) => {
+      const propertySnapshot = this.getRentalPaymentPropertySnapshot(
+        investment.property,
+      );
       investment.rentalPayments.forEach((payment) => {
         incomes.push({
           investmentId: investment._id,
+          propertyId: propertySnapshot?.id || null,
+          property: propertySnapshot,
+          propertyTitle: propertySnapshot?.title || null,
           propertyCity: investment.property.city,
+          propertyCountry: investment.property.country || null,
           propertyOwnerName: this.displayNameOf(investment.propertyOwner),
           month: payment.month,
           amount: payment.amount,
           currency: APP_CURRENCY,
           status: payment.status,
+          dueDate: payment.dueDate,
           expectedDate: payment.dueDate,
+          paidAt: payment.paidAt,
           receivedAt: payment.paidAt,
+          receiptUrl: payment.paymentReceipt?.url || null,
+          receipt: payment.paymentReceipt?.url
+            ? {
+                url: payment.paymentReceipt.url,
+              }
+            : null,
         });
       });
     });

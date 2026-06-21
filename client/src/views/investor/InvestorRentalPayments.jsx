@@ -163,7 +163,10 @@ const getPaymentStatusClass = (status) =>
   "bg-slate-200 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200";
 
 const getPaymentProperty = (payment) =>
-  payment?.investment?.property || payment?.property || null;
+  payment?.investment?.property ||
+  payment?.property ||
+  payment?.propertySnapshot ||
+  null;
 
 const getInvestmentId = (payment) =>
   payment?.investment?.id ||
@@ -176,7 +179,9 @@ const getPropertyLabel = (payment) => {
 
   return (
     property?.title ||
+    payment?.propertyTitle ||
     [property?.city, property?.country].filter(Boolean).join(", ") ||
+    [payment?.propertyCity, payment?.propertyCountry].filter(Boolean).join(", ") ||
     "Associated property"
   );
 };
@@ -188,8 +193,50 @@ const getPropertyLocation = (payment) => {
     property?.fullAddress ||
     property?.mapSearchAddress ||
     [property?.city, property?.country].filter(Boolean).join(", ") ||
+    [payment?.propertyCity, payment?.propertyCountry].filter(Boolean).join(", ") ||
     "Location pending"
   );
+};
+
+const getCounterpartyLabel = (payment) =>
+  payment?.propertyOwnerName || payment?.ownerName || "Property owner pending";
+
+const getMonthTime = (value) => {
+  if (!value) return 0;
+  const normalized = /^\d{4}-\d{2}$/.test(value) ? `${value}-01T00:00:00` : value;
+  const timestamp = new Date(normalized).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+const pickLatestMonth = (current, candidate) => {
+  if (!current) return candidate || "";
+  if (!candidate) return current;
+
+  const currentTime = getMonthTime(current);
+  const candidateTime = getMonthTime(candidate);
+
+  if (currentTime || candidateTime) {
+    return candidateTime > currentTime ? candidate : current;
+  }
+
+  return String(candidate) > String(current) ? candidate : current;
+};
+
+const getPaymentTimeline = (payment) => {
+  const settledAt = payment?.paidAt || payment?.receivedAt;
+  const dueAt = payment?.dueDate || payment?.expectedDate;
+
+  if (payment?.status === "paid") {
+    return {
+      label: "Settled",
+      value: formatDate(settledAt),
+    };
+  }
+
+  return {
+    label: "Due",
+    value: formatDate(dueAt),
+  };
 };
 
 const resolveReceiptUrl = (payment) =>
@@ -322,6 +369,7 @@ const Pagination = ({ pagination, onPageChange }) => {
 
 const PaymentRow = ({ payment, onPreviewReceipt }) => {
   const receiptUrl = resolveReceiptUrl(payment);
+  const timeline = getPaymentTimeline(payment);
 
   return (
     <div className="shell-subtle-surface flex flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between">
@@ -339,7 +387,7 @@ const PaymentRow = ({ payment, onPreviewReceipt }) => {
           </span>
         </div>
         <div className="mt-2 flex flex-wrap gap-4 text-sm text-day-muted dark:text-night-muted">
-          <span>Settled {payment.paidAt ? formatDate(payment.paidAt) : "—"}</span>
+          <span>{timeline.label} {timeline.value}</span>
           <span>
             Receipt {receiptUrl ? "available" : "not provided"}
           </span>
@@ -410,6 +458,10 @@ const PaymentGroupCard = ({ group, onOpenInvestment, onPreviewReceipt }) => {
             <div className="mt-2 flex items-start gap-2 text-sm text-day-muted dark:text-night-muted">
               <MapPin className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
               <span>{group.locationLabel}</span>
+            </div>
+
+            <div className="mt-2 text-sm text-day-muted dark:text-night-muted">
+              Counterparty: {group.counterpartyLabel}
             </div>
 
             <div className="mt-4 flex flex-wrap gap-4 text-sm text-day-muted dark:text-night-muted">
@@ -555,6 +607,7 @@ const InvestorRentalPayments = () => {
         investmentId: investmentId === "unknown" ? "" : investmentId,
         propertyLabel: getPropertyLabel(payment),
         locationLabel: getPropertyLocation(payment),
+        counterpartyLabel: getCounterpartyLabel(payment),
         payments: [],
         paymentCount: 0,
         paidAmount: 0,
@@ -568,7 +621,7 @@ const InvestorRentalPayments = () => {
 
       existing.payments.push(payment);
       existing.paymentCount += 1;
-      existing.latestMonth = existing.latestMonth || payment.month || "";
+      existing.latestMonth = pickLatestMonth(existing.latestMonth, payment.month);
 
       if (payment.status === "paid") {
         existing.paidAmount += Number(payment.amount || 0);
